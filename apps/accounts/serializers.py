@@ -1,0 +1,120 @@
+from rest_framework import serializers
+from django.utils import timezone
+from .models import User, UserProfile, OTPCode
+from core.utils import generate_otp, otp_expiry
+
+
+class RegisterSerializer(serializers.ModelSerializer):
+    password  = serializers.CharField(write_only=True, min_length=6)
+    password2 = serializers.CharField(write_only=True)
+
+    class Meta:
+        model  = User
+        fields = ('phone_number', 'full_name', 'password', 'password2', 'city', 'quartier')
+
+    def validate(self, attrs):
+        if attrs['password'] != attrs['password2']:
+            raise serializers.ValidationError("Les mots de passe ne correspondent pas.")
+        return attrs
+
+    def validate_phone_number(self, value):
+        if User.objects.filter(phone_number=value).exists():
+            raise serializers.ValidationError("Ce numéro est déjà utilisé.")
+        return value
+
+    def create(self, validated_data):
+        validated_data.pop('password2')
+        password = validated_data.pop('password')
+        user = User(**validated_data)
+        user.set_password(password)
+        user.save()
+
+        # Générer OTP de vérification
+        OTPCode.objects.create(
+            user=user,
+            code=generate_otp(),
+            purpose=OTPCode.Purpose.REGISTER,
+            expires_at=otp_expiry(minutes=10)
+        )
+        return user
+
+
+class VerifyOTPSerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
+    code         = serializers.CharField(max_length=6)
+    purpose      = serializers.ChoiceField(choices=OTPCode.Purpose.choices)
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(phone_number=attrs['phone_number'])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Utilisateur introuvable.")
+
+        otp = OTPCode.objects.filter(
+            user=user,
+            code=attrs['code'],
+            purpose=attrs['purpose'],
+            is_used=False,
+            expires_at__gt=timezone.now()
+        ).last()
+
+        if not otp:
+            raise serializers.ValidationError("Code invalide ou expiré.")
+
+        attrs['user'] = user
+        attrs['otp']  = otp
+        return attrs
+
+
+class LoginSerializer(serializers.Serializer):
+    phone_number = serializers.CharField()
+    password     = serializers.CharField(write_only=True)
+
+    def validate(self, attrs):
+        try:
+            user = User.objects.get(phone_number=attrs['phone_number'])
+        except User.DoesNotExist:
+            raise serializers.ValidationError("Numéro ou mot de passe incorrect.")
+
+        if not user.check_password(attrs['password']):
+            raise serializers.ValidationError("Numéro ou mot de passe incorrect.")
+
+        if not user.is_active:
+            raise serializers.ValidationError("Ce compte est désactivé.")
+
+        if not user.is_verified:
+            raise serializers.ValidationError("Veuillez vérifier votre numéro de téléphone d'abord.")
+
+        attrs['user'] = user
+        return attrs
+
+
+class UserProfileSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = UserProfile
+        fields = ('avatar_url', 'bio', 'rating_avg', 'total_ratings', 'total_sales')
+        read_only_fields = ('rating_avg', 'total_ratings', 'total_sales')
+
+
+class UserSerializer(serializers.ModelSerializer):
+    profile = UserProfileSerializer(read_only=True)
+
+    class Meta:
+        model  = User
+        fields = (
+            'id', 'phone_number', 'full_name', 'email',
+            'role', 'city', 'quartier', 'is_verified',
+            'created_at', 'profile'
+        )
+        read_only_fields = ('id', 'phone_number', 'is_verified', 'created_at')
+
+
+class ChangePasswordSerializer(serializers.Serializer):
+    old_password = serializers.CharField(write_only=True)
+    new_password = serializers.CharField(write_only=True, min_length=6)
+
+    def validate_old_password(self, value):
+        user = self.context['request'].user
+        if not user.check_password(value):
+            raise serializers.ValidationError("Ancien mot de passe incorrect.")
+        return value
