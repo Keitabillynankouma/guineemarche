@@ -1,14 +1,13 @@
 from pathlib import Path
-from decouple import config, Csv
 import dj_database_url
+import os
 from datetime import timedelta
 
+BASE_DIR = Path(__file__).resolve().parent.parent
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-
-SECRET_KEY = config('SECRET_KEY')
-DEBUG = config('DEBUG', default=False, cast=bool)
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', cast=Csv())
+SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
+DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
 
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -54,13 +53,16 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'config.urls'
 
-
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+DATABASE_URL = os.environ.get('DATABASE_URL')
+if DATABASE_URL:
+    DATABASES = {'default': dj_database_url.config(default=DATABASE_URL)}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
     }
-}
 
 AUTH_USER_MODEL = 'accounts.User'
 
@@ -103,6 +105,11 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
+CORS_ALLOW_ALL_ORIGINS = DEBUG
+CORS_ALLOWED_ORIGINS = [
+    "https://guineemarche-frontend.onrender.com",
+]
+
 LANGUAGE_CODE = 'fr-fr'
 TIME_ZONE = 'Africa/Conakry'
 USE_I18N = True
@@ -113,7 +120,8 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-PHONENUMBER_DEFAULT_REGION = 'GN'  # Guinée
+PHONENUMBER_DEFAULT_REGION = 'GN'
