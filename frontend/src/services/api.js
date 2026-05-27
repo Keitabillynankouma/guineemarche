@@ -60,4 +60,11 @@ export const ordersAPI = {
   pay:      (id, data) => api.post(`/orders/${id}/pay/`, data),
 }
 
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL 
+    ? `${import.meta.env.VITE_API_URL}/api/v1` 
+    : '/api/v1',
+  headers: { 'Content-Type': 'application/json' },
+})
+
 export default api
