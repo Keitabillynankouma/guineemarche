@@ -105,6 +105,11 @@ REST_FRAMEWORK = {
     'PAGE_SIZE': 20,
 }
 
+CSRF_TRUSTED_ORIGINS = [
+    'https://guineemarche-frontend.onrender.com',
+    'https://guineemarche.onrender.com',
+]
+
 CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOWED_ORIGINS = [
     "https://guineemarche-frontend.onrender.com",
