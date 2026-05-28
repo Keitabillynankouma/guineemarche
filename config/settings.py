@@ -7,7 +7,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 DEBUG = os.environ.get('DEBUG', 'True') == 'True'
-ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '*').split(',')
+ALLOWED_HOSTS = ['*']
 
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -143,3 +143,4 @@ CORS_ALLOW_HEADERS = list(default_headers) + ['X-CSRFToken']
 DEFAULT_EXCEPTION_HANDLER = 'rest_framework.views.exception_handler'
 
 APPEND_SLASH = False
+
