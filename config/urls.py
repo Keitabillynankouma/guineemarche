@@ -19,6 +19,20 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
+from django.http import JsonResponse
+
+def bad_request(request, exception):
+    return JsonResponse({'error': 'Bad request'}, status=400)
+
+def permission_denied(request, exception):
+    return JsonResponse({'error': 'Permission denied'}, status=403)
+
+def page_not_found(request, exception):
+    return JsonResponse({'error': 'Not found'}, status=404)
+
+handler400 = bad_request
+handler403 = permission_denied
+handler404 = page_not_found
 
 urlpatterns = [
     path('admin/', admin.site.urls),

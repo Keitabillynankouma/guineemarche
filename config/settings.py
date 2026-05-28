@@ -138,3 +138,8 @@ CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 # Exempter les URLs API du CSRF
 from corsheaders.defaults import default_headers
 CORS_ALLOW_HEADERS = list(default_headers) + ['X-CSRFToken']
+
+# Forcer les réponses JSON pour l'API
+DEFAULT_EXCEPTION_HANDLER = 'rest_framework.views.exception_handler'
+
+APPEND_SLASH = False
