@@ -14,4 +14,7 @@ urlpatterns = [
     path('<uuid:pk>/pay/',
         views.InitiatePaymentView.as_view(),
         name='order-pay'),
+    path('webhook/<str:provider>/',
+        views.PaymentWebhookView.as_view(),
+        name='payment-webhook'),
 ]

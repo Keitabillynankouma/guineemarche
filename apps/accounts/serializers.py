@@ -2,6 +2,7 @@ from rest_framework import serializers
 from django.utils import timezone
 from .models import User, UserProfile, OTPCode
 from core.utils import generate_otp, otp_expiry
+from core.sms import send_otp_sms
 
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -29,13 +30,15 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
 
-        # Générer OTP de vérification
+        # Générer OTP de vérification et envoyer par SMS
+        code = generate_otp()
         OTPCode.objects.create(
             user=user,
-            code=generate_otp(),
+            code=code,
             purpose=OTPCode.Purpose.REGISTER,
             expires_at=otp_expiry(minutes=10)
         )
+        send_otp_sms(str(user.phone_number), code)
         return user
 
 

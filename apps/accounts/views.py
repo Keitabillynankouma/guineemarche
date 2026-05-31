@@ -113,6 +113,7 @@ class ResendOTPView(APIView):
 
     def post(self, request):
         from core.utils import generate_otp, otp_expiry
+        from core.sms import send_otp_sms
         phone_number = request.data.get('phone_number')
         purpose      = request.data.get('purpose', OTPCode.Purpose.REGISTER)
 
@@ -124,10 +125,12 @@ class ResendOTPView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        code = generate_otp()
         OTPCode.objects.create(
             user=user,
-            code=generate_otp(),
+            code=code,
             purpose=purpose,
             expires_at=otp_expiry(minutes=10)
         )
+        send_otp_sms(str(user.phone_number), code)
         return Response({'message': 'Nouveau code envoyé.'})

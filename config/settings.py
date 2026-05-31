@@ -32,6 +32,7 @@ THIRD_PARTY_APPS = [
     'corsheaders',
     'django_filters',
     'phonenumber_field',
+    'channels',
 ]
 
 LOCAL_APPS = [
@@ -156,6 +157,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 PHONENUMBER_DEFAULT_REGION = 'GN'
 
+TWILIO_ACCOUNT_SID   = env('TWILIO_ACCOUNT_SID',   default='')
+TWILIO_AUTH_TOKEN    = env('TWILIO_AUTH_TOKEN',    default='')
+TWILIO_PHONE_NUMBER  = env('TWILIO_PHONE_NUMBER',  default='')
+
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
@@ -168,4 +173,13 @@ CORS_ALLOW_HEADERS = list(default_headers) + ['X-CSRFToken']
 DEFAULT_EXCEPTION_HANDLER = 'rest_framework.views.exception_handler'
 
 APPEND_SLASH = False
+
+ASGI_APPLICATION = 'config.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG':  {'hosts': [env('REDIS_URL', default='redis://localhost:6379/1')]},
+    }
+}
 

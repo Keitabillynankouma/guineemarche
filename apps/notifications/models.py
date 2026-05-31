@@ -34,10 +34,30 @@ class Notification(BaseModel):
 
     @classmethod
     def send(cls, user, type, title, body, data=None):
-        return cls.objects.create(
+        notif = cls.objects.create(
             user=user,
             type=type,
             title=title,
             body=body,
             data=data or {}
         )
+        # Pousser en temps réel via WebSocket (silencieux si channels non dispo)
+        try:
+            from asgiref.sync import async_to_sync
+            from channels.layers import get_channel_layer
+            layer = get_channel_layer()
+            if layer:
+                async_to_sync(layer.group_send)(
+                    f"user_{user.id}",
+                    {
+                        'type':              'notification.message',
+                        'notification_type': type,
+                        'title':             title,
+                        'body':              body,
+                        'data':              data or {},
+                        'notif_id':          str(notif.id),
+                    }
+                )
+        except Exception:
+            pass
+        return notif
