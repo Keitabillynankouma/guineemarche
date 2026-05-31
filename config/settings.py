@@ -47,9 +47,9 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 
 cloudinary.config(
-    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
-    api_key=os.environ.get('CLOUDINARY_API_KEY'),
-    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    cloud_name=os.environ.get('downepqsx'),
+    api_key=os.environ.get('957889188295742'),
+    api_secret=os.environ.get('JuXpyGH2d5t3COHC'),
     secure=True
 )
 
