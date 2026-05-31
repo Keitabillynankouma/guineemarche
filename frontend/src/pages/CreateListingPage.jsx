@@ -14,10 +14,15 @@ export default function CreateListingPage() {
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
 
-    const { data: categories } = useQuery({
+    const { data: categoriesData } = useQuery({
         queryKey: ['categories'],
         queryFn: () => listingsAPI.categories().then(r => r.data),
+        onError: () => { },
     })
+
+    const categories = Array.isArray(categoriesData)
+        ? categoriesData
+        : categoriesData?.results || []
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -25,12 +30,24 @@ export default function CreateListingPage() {
         setLoading(true)
         try {
             const formData = new FormData()
-            Object.entries(form).forEach(([k, v]) => { if (v) formData.append(k, v) })
-            files.forEach(f => formData.append('uploaded_files', f))
+            Object.entries(form).forEach(([k, v]) => {
+                if (v !== '' && v !== null && v !== undefined) {
+                    formData.append(k, v)
+                }
+            })
+            // N'ajouter uploaded_files que s'il y a des fichiers
+            if (files.length > 0) {
+                files.forEach(f => formData.append('uploaded_files', f))
+            }
             await listingsAPI.create(formData)
             navigate('/my-listings')
         } catch (err) {
-            setError('Erreur lors de la publication.')
+            console.error('Erreur:', err.response?.data)
+            const data = err.response?.data
+            const msg = data
+                ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
+                : 'Erreur lors de la publication.'
+            setError(msg)
         } finally {
             setLoading(false)
         }

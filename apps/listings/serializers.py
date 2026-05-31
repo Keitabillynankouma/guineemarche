@@ -22,14 +22,16 @@ class ListingMediaSerializer(serializers.ModelSerializer):
 
 
 class ListingSerializer(serializers.ModelSerializer):
-    media        = ListingMediaSerializer(many=True, read_only=True)
-    seller_name  = serializers.CharField(source='seller.full_name', read_only=True)
-    seller_phone = serializers.CharField(source='seller.phone_number', read_only=True)
+    media         = ListingMediaSerializer(many=True, read_only=True)
+    seller_name   = serializers.CharField(source='seller.full_name', read_only=True)
+    seller_phone  = serializers.CharField(source='seller.phone_number', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
     uploaded_files = serializers.ListField(
         child=serializers.ImageField(),
         write_only=True,
-        required=False
+        required=False,
+        allow_empty=True,
+        default=list
     )
 
     class Meta:
@@ -41,7 +43,7 @@ class ListingSerializer(serializers.ModelSerializer):
             'seller_name', 'seller_phone', 'category', 'category_name',
             'media', 'uploaded_files'
         )
-        read_only_fields = ('id', 'seller_name', 'seller_phone', 'view_count', 'created_at')
+        read_only_fields = ('id', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted')
 
     def create(self, validated_data):
         uploaded_files = validated_data.pop('uploaded_files', [])
@@ -62,7 +64,7 @@ class ListingDetailSerializer(ListingSerializer):
 
 
 class FavoriteSerializer(serializers.ModelSerializer):
-    listing = ListingSerializer(read_only=True)
+    listing    = ListingSerializer(read_only=True)
     listing_id = serializers.UUIDField(write_only=True)
 
     class Meta:
@@ -73,7 +75,7 @@ class FavoriteSerializer(serializers.ModelSerializer):
         listing_id = validated_data.pop('listing_id')
         listing    = Listing.objects.get(id=listing_id)
         user       = self.context['request'].user
-        favorite, created = Favorite.objects.get_or_create(user=user, listing=listing)
+        favorite, _ = Favorite.objects.get_or_create(user=user, listing=listing)
         return favorite
 
 
