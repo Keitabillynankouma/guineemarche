@@ -19,7 +19,9 @@ DJANGO_APPS = [
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
+    'cloudinary_storage',
     'django.contrib.staticfiles',
+    'cloudinary',
 ]
 
 THIRD_PARTY_APPS = [
@@ -43,15 +45,14 @@ LOCAL_APPS = [
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
-INSTALLED_APPS += ['cloudinary_storage', 'cloudinary']
 
-CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': os.environ.get('Racine'),
-    'API_KEY':    os.environ.get('957889188295742'),
-    'API_SECRET': os.environ.get('JuXpyGH2d5t3COHC'),
-}
+cloudinary.config(
+    cloud_name=os.environ.get('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.environ.get('CLOUDINARY_API_KEY'),
+    api_secret=os.environ.get('CLOUDINARY_API_SECRET'),
+    secure=True
+)
 
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
