@@ -63,6 +63,9 @@ export const ordersAPI = {
   getOne: (id) => api.get(`/orders/${id}/`),
   updateStatus: (id, action) => api.post(`/orders/${id}/${action}/`),
   pay: (id, data) => api.post(`/orders/${id}/pay/`, data),
+  confirmReceipt: (id) => api.post(`/orders/${id}/confirm-receipt/`),
+  dispute: (id) => api.post(`/orders/${id}/dispute/`),
+  getPickupPoints: (city) => api.get('/orders/pickup-points/', { params: city ? { city } : {} }),
 }
 
 export default api

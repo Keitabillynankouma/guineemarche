@@ -3,26 +3,58 @@ import { useNavigate, Link } from 'react-router-dom'
 import { listingsAPI } from '../services/api'
 import { useQuery } from '@tanstack/react-query'
 
+const QUARTIERS = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
+const VILLES    = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré']
+
+async function compressImage(file) {
+    return new Promise((resolve) => {
+        const reader = new FileReader()
+        reader.onload = (e) => {
+            const img = new Image()
+            img.onload = () => {
+                const MAX = 1200
+                let { width, height } = img
+                if (width > MAX) { height = Math.round(height * MAX / width); width = MAX }
+                if (height > MAX) { width = Math.round(width * MAX / height); height = MAX }
+                const canvas = document.createElement('canvas')
+                canvas.width  = width
+                canvas.height = height
+                canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+                canvas.toBlob(
+                    (blob) => resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' })),
+                    'image/jpeg', 0.75
+                )
+            }
+            img.src = e.target.result
+        }
+        reader.readAsDataURL(file)
+    })
+}
+
 export default function CreateListingPage() {
     const [form, setForm] = useState({
         title: '', description: '', price_gnf: '',
         price_type: 'fixed', condition: 'good',
         city: 'Conakry', quartier: '', category: ''
     })
-    const [files, setFiles] = useState([])
-    const [error, setError] = useState('')
+    const [files, setFiles]     = useState([])
+    const [previews, setPreviews] = useState([])
+    const [error, setError]     = useState('')
     const [loading, setLoading] = useState(false)
     const navigate = useNavigate()
 
     const { data: categoriesData } = useQuery({
         queryKey: ['categories'],
         queryFn: () => listingsAPI.categories().then(r => r.data),
-        onError: () => { },
     })
+    const categories = Array.isArray(categoriesData) ? categoriesData : categoriesData?.results || []
 
-    const categories = Array.isArray(categoriesData)
-        ? categoriesData
-        : categoriesData?.results || []
+    const handleFiles = async (e) => {
+        const selected = Array.from(e.target.files)
+        const compressed = await Promise.all(selected.map(compressImage))
+        setFiles(compressed)
+        setPreviews(compressed.map(f => URL.createObjectURL(f)))
+    }
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -31,20 +63,14 @@ export default function CreateListingPage() {
         try {
             const formData = new FormData()
             Object.entries(form).forEach(([k, v]) => {
-                if (v !== '' && v !== null && v !== undefined) {
-                    formData.append(k, v)
-                }
+                if (v !== '' && v !== null && v !== undefined) formData.append(k, v)
             })
-            // N'ajouter uploaded_files que s'il y a des fichiers
-            if (files.length > 0) {
-                files.forEach(f => formData.append('uploaded_files', f))
-            }
+            files.forEach(f => formData.append('uploaded_files', f))
             await listingsAPI.create(formData)
             navigate('/my-listings')
         } catch (err) {
-            console.error('Erreur:', err.response?.data)
             const data = err.response?.data
-            const msg = data
+            const msg  = data
                 ? Object.entries(data).map(([k, v]) => `${k}: ${v}`).join(', ')
                 : 'Erreur lors de la publication.'
             setError(msg)
@@ -52,9 +78,6 @@ export default function CreateListingPage() {
             setLoading(false)
         }
     }
-
-    const QUARTIERS = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
-    const VILLES = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré']
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -74,7 +97,7 @@ export default function CreateListingPage() {
 
                     <form onSubmit={handleSubmit} className="space-y-5">
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Titre de l'annonce</label>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Titre</label>
                             <input
                                 type="text" placeholder="Ex: iPhone 13 Pro Max 256Go"
                                 value={form.title}
@@ -103,7 +126,7 @@ export default function CreateListingPage() {
                                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
                             >
                                 <option value="">Sans catégorie</option>
-                                {categories?.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
 
@@ -171,21 +194,30 @@ export default function CreateListingPage() {
                         </div>
 
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Photos</label>
-                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Photos <span className="text-gray-400 font-normal">(compressées automatiquement)</span>
+                            </label>
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
                                 <input
                                     type="file" multiple accept="image/*"
-                                    onChange={(e) => setFiles(Array.from(e.target.files))}
+                                    onChange={handleFiles}
                                     className="hidden" id="photos"
                                 />
-                                <label htmlFor="photos" className="cursor-pointer">
+                                <label htmlFor="photos" className="cursor-pointer block">
                                     <p className="text-4xl mb-2">📷</p>
-                                    <p className="text-gray-500 text-sm">Cliquez pour ajouter des photos</p>
+                                    <p className="text-gray-500 text-sm">Cliquer pour ajouter des photos</p>
                                     {files.length > 0 && (
-                                        <p className="text-green-600 mt-2 font-medium">{files.length} photo(s) sélectionnée(s)</p>
+                                        <p className="text-green-600 mt-1 font-medium text-sm">{files.length} photo(s) — compressées</p>
                                     )}
                                 </label>
                             </div>
+                            {previews.length > 0 && (
+                                <div className="flex gap-2 mt-3 flex-wrap">
+                                    {previews.map((p, i) => (
+                                        <img key={i} src={p} alt="" className="h-20 w-20 object-cover rounded-lg border" />
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         <button

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { listingsAPI, messagingAPI } from '../services/api'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { listingsAPI, messagingAPI, ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 
 function formatPrice(price, type) {
@@ -9,18 +9,215 @@ function formatPrice(price, type) {
     return new Intl.NumberFormat('fr-GN').format(price) + ' GNF'
 }
 
+const MEETING_ZONES = {
+    Conakry:    ['Carrefour Kipé', 'Carrefour Bambéto', 'Carrefour Cosa', 'Marché Madina', 'Carrefour Hamdallaye', 'Marché Dixinn', 'Centre Commercial Kaloum', 'Carrefour Sonfonia'],
+    Kankan:     ['Grand Marché Kankan', 'Carrefour Central Kankan'],
+    Labé:       ['Grand Marché Labé', 'Carrefour Central Labé'],
+    Kindia:     ['Grand Marché Kindia'],
+    Faranah:    ['Grand Marché Faranah'],
+    Nzérékoré: ['Grand Marché Nzérékoré'],
+}
+
+function OrderModal({ listing, onClose, onSuccess }) {
+    const [step, setStep]           = useState(1)
+    const [deliveryMode, setDeliveryMode] = useState('meeting_point')
+    const [meetLocation, setMeetLocation] = useState('')
+    const [pickupPoint, setPickupPoint]   = useState('')
+    const [provider, setProvider]         = useState('orange_money')
+    const [phone, setPhone]               = useState('')
+    const [error, setError]               = useState('')
+    const queryClient = useQueryClient()
+
+    const { data: pickupPoints = [] } = useQuery({
+        queryKey: ['pickup-points', listing.city],
+        queryFn: () => ordersAPI.getPickupPoints(listing.city).then(r => r.data?.results || r.data || []),
+        enabled: deliveryMode === 'pickup_point',
+    })
+
+    const createOrder = useMutation({
+        mutationFn: (data) => ordersAPI.create(data),
+        onError: (err) => setError(err.response?.data?.detail || 'Erreur lors de la commande.'),
+    })
+
+    const pay = useMutation({
+        mutationFn: ({ id, data }) => ordersAPI.pay(id, data),
+        onSuccess: () => {
+            queryClient.invalidateQueries(['listing', listing.id])
+            onSuccess()
+        },
+        onError: (err) => setError(err.response?.data?.error || 'Erreur paiement.'),
+    })
+
+    const handleOrder = async (e) => {
+        e.preventDefault()
+        setError('')
+        try {
+            const orderData = {
+                listing:       listing.id,
+                delivery_mode: deliveryMode,
+                meet_location: deliveryMode === 'meeting_point' ? meetLocation : '',
+                pickup_point:  deliveryMode === 'pickup_point'  ? pickupPoint  : null,
+            }
+            const order = await createOrder.mutateAsync(orderData)
+            await pay.mutateAsync({
+                id:   order.data.id,
+                data: { provider, phone_number: phone },
+            })
+        } catch { }
+    }
+
+    const zones = MEETING_ZONES[listing.city] || []
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+                <div className="p-5 border-b flex items-center justify-between">
+                    <h2 className="font-bold text-gray-800">Passer commande</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+                </div>
+
+                <div className="p-5">
+                    <div className="bg-gray-50 rounded-xl p-3 mb-5 flex items-center gap-3">
+                        <div className="text-2xl">📦</div>
+                        <div>
+                            <p className="font-medium text-gray-800 text-sm">{listing.title}</p>
+                            <p className="text-green-600 font-bold">{formatPrice(listing.price_gnf, listing.price_type)}</p>
+                        </div>
+                    </div>
+
+                    {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+
+                    <form onSubmit={handleOrder} className="space-y-4">
+                        {/* Mode de livraison */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Mode de livraison</label>
+                            <div className="grid grid-cols-2 gap-2">
+                                {[
+                                    { value: 'meeting_point', label: 'Remise en main propre', icon: '🤝' },
+                                    { value: 'pickup_point',  label: 'Point de retrait',      icon: '🏪' },
+                                ].map(m => (
+                                    <button
+                                        key={m.value} type="button"
+                                        onClick={() => setDeliveryMode(m.value)}
+                                        className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}
+                                    >
+                                        <div className="text-xl mb-1">{m.icon}</div>
+                                        <div className="text-xs font-medium text-gray-700">{m.label}</div>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Zone de rencontre */}
+                        {deliveryMode === 'meeting_point' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Zone de rencontre</label>
+                                <select
+                                    value={meetLocation}
+                                    onChange={(e) => setMeetLocation(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    required
+                                >
+                                    <option value="">Choisir un lieu</option>
+                                    {zones.map(z => <option key={z}>{z}</option>)}
+                                </select>
+                            </div>
+                        )}
+
+                        {/* Point de retrait */}
+                        {deliveryMode === 'pickup_point' && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">Point de retrait</label>
+                                {pickupPoints.length === 0 ? (
+                                    <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-lg">
+                                        Aucun point de retrait disponible à {listing.city} pour l'instant. Choisissez la remise en main propre.
+                                    </p>
+                                ) : (
+                                    <select
+                                        value={pickupPoint}
+                                        onChange={(e) => setPickupPoint(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        required
+                                    >
+                                        <option value="">Choisir un point</option>
+                                        {pickupPoints.map(p => (
+                                            <option key={p.id} value={p.id}>{p.name} — {p.address}</option>
+                                        ))}
+                                    </select>
+                                )}
+                            </div>
+                        )}
+
+                        {/* Paiement */}
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-2">Paiement</label>
+                            <div className="grid grid-cols-3 gap-2 mb-3">
+                                {[
+                                    { value: 'orange_money', label: 'Orange Money', color: 'orange' },
+                                    { value: 'mtn_momo',     label: 'MTN MoMo',    color: 'yellow' },
+                                    { value: 'cash',         label: 'Espèces',     color: 'green'  },
+                                ].map(p => (
+                                    <button
+                                        key={p.value} type="button"
+                                        onClick={() => setProvider(p.value)}
+                                        className={`p-2 rounded-xl border-2 text-xs font-medium transition ${provider === p.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}
+                                    >
+                                        {p.label}
+                                    </button>
+                                ))}
+                            </div>
+                            {provider !== 'cash' && (
+                                <input
+                                    type="tel" placeholder="+224 6XX XX XX XX"
+                                    value={phone}
+                                    onChange={(e) => setPhone(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    required
+                                />
+                            )}
+                        </div>
+
+                        {/* Info escrow */}
+                        {provider !== 'cash' && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
+                                🔒 <strong>Paiement sécurisé :</strong> votre argent est conservé par GuinéeMarché et libéré au vendeur uniquement après votre confirmation de réception.
+                            </div>
+                        )}
+
+                        <button
+                            type="submit"
+                            disabled={createOrder.isPending || pay.isPending || (deliveryMode === 'pickup_point' && !pickupPoint && pickupPoints.length > 0)}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
+                        >
+                            {(createOrder.isPending || pay.isPending) ? 'Traitement...' : `Payer ${formatPrice(listing.price_gnf, listing.price_type)}`}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function ListingDetailPage() {
     const { id } = useParams()
-    const navigate = useNavigate()
-    const isAuthenticated = useAuthStore((s) => s.isAuthenticated)
-    const [message, setMessage] = useState('')
-    const [sending, setSending] = useState(false)
-    const [sent, setSent] = useState(false)
+    const navigate   = useNavigate()
+    const { isAuthenticated, user } = useAuthStore((s) => ({ isAuthenticated: s.isAuthenticated, user: s.user }))
+    const queryClient = useQueryClient()
+    const [message, setMessage]       = useState('')
+    const [sending, setSending]       = useState(false)
+    const [sent, setSent]             = useState(false)
     const [activePhoto, setActivePhoto] = useState(0)
+    const [showBuyModal, setShowBuyModal] = useState(false)
+    const [orderDone, setOrderDone]   = useState(false)
 
     const { data: listing, isLoading } = useQuery({
         queryKey: ['listing', id],
         queryFn: () => listingsAPI.getOne(id).then(r => r.data),
+    })
+
+    const confirmReceipt = useMutation({
+        mutationFn: (orderId) => ordersAPI.confirmReceipt(orderId),
+        onSuccess: () => queryClient.invalidateQueries(['my-orders']),
     })
 
     const handleContact = async (e) => {
@@ -40,7 +237,6 @@ export default function ListingDetailPage() {
             <div className="text-green-600 text-lg">Chargement...</div>
         </div>
     )
-
     if (!listing) return (
         <div className="min-h-screen flex items-center justify-center">
             <div className="text-gray-500">Annonce introuvable</div>
@@ -49,8 +245,10 @@ export default function ListingDetailPage() {
 
     const CONDITION_LABELS = {
         new: 'Neuf', like_new: 'Comme neuf',
-        good: 'Bon état', fair: 'État correct', poor: 'Très usé'
+        good: 'Bon état', fair: 'État correct', poor: 'Très usé',
     }
+
+    const isSeller = user?.id === listing.seller
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -104,13 +302,13 @@ export default function ListingDetailPage() {
                         </p>
                         <p className="text-gray-600 leading-relaxed">{listing.description}</p>
                         <div className="flex gap-4 mt-4 text-sm text-gray-400">
-                            <span>📍 {listing.city} {listing.quartier && `· ${listing.quartier}`}</span>
+                            <span>📍 {listing.city}{listing.quartier && ` · ${listing.quartier}`}</span>
                             <span>👁 {listing.view_count} vues</span>
                         </div>
                     </div>
                 </div>
 
-                {/* Sidebar vendeur + contact */}
+                {/* Sidebar vendeur + actions */}
                 <div className="space-y-4">
                     <div className="bg-white rounded-2xl shadow p-5">
                         <h2 className="font-semibold text-gray-700 mb-3">Vendeur</h2>
@@ -123,11 +321,30 @@ export default function ListingDetailPage() {
                         </div>
                     </div>
 
+                    {/* Bouton acheter */}
+                    {!isSeller && listing.status === 'active' && (
+                        <div className="bg-white rounded-2xl shadow p-5 space-y-3">
+                            {orderDone ? (
+                                <div className="bg-green-50 text-green-700 p-4 rounded-xl text-sm text-center">
+                                    ✅ Commande passée ! Le vendeur va confirmer sous peu.
+                                </div>
+                            ) : (
+                                <button
+                                    onClick={() => isAuthenticated ? setShowBuyModal(true) : navigate('/login')}
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition"
+                                >
+                                    Acheter maintenant
+                                </button>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Contact vendeur */}
                     <div className="bg-white rounded-2xl shadow p-5">
                         <h2 className="font-semibold text-gray-700 mb-3">Contacter le vendeur</h2>
                         {sent ? (
                             <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center">
-                                ✅ Message envoyé ! Le vendeur vous répondra bientôt.
+                                ✅ Message envoyé !
                             </div>
                         ) : (
                             <form onSubmit={handleContact} className="space-y-3">
@@ -141,7 +358,7 @@ export default function ListingDetailPage() {
                                 />
                                 <button
                                     type="submit" disabled={sending}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-lg text-sm transition disabled:opacity-50"
+                                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg text-sm transition disabled:opacity-50"
                                 >
                                     {sending ? 'Envoi...' : 'Envoyer un message'}
                                 </button>
@@ -155,6 +372,14 @@ export default function ListingDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {showBuyModal && (
+                <OrderModal
+                    listing={listing}
+                    onClose={() => setShowBuyModal(false)}
+                    onSuccess={() => { setShowBuyModal(false); setOrderDone(true) }}
+                />
+            )}
         </div>
     )
 }
