@@ -5,21 +5,25 @@ logger = logging.getLogger(__name__)
 
 
 def send_sms(to: str, body: str) -> bool:
-    """Envoie un SMS via Twilio. Retourne True si succès, False sinon."""
-    sid    = getattr(settings, 'TWILIO_ACCOUNT_SID', '')
-    token  = getattr(settings, 'TWILIO_AUTH_TOKEN', '')
-    from_  = getattr(settings, 'TWILIO_PHONE_NUMBER', '')
+    username = getattr(settings, 'AT_USERNAME', '')
+    api_key  = getattr(settings, 'AT_API_KEY', '')
 
-    if not all([sid, token, from_]):
-        logger.warning("Twilio non configuré — SMS non envoyé à %s: %s", to, body)
+    if not all([username, api_key]):
+        logger.warning("Africa's Talking non configuré — SMS non envoyé à %s", to)
         return False
 
     try:
-        from twilio.rest import Client
-        client = Client(sid, token)
-        client.messages.create(body=body, from_=from_, to=str(to))
-        logger.info("SMS envoyé à %s", to)
-        return True
+        import africastalking
+        africastalking.initialize(username, api_key)
+        sms = africastalking.SMS
+        sender = getattr(settings, 'AT_SENDER_ID', None)
+        response = sms.send(body, [str(to)], sender)
+        recipients = response.get('SMSMessageData', {}).get('Recipients', [])
+        if recipients and recipients[0].get('statusCode') == 101:
+            logger.info("SMS envoyé à %s", to)
+            return True
+        logger.warning("Réponse AT inattendue pour %s: %s", to, response)
+        return False
     except Exception as exc:
         logger.error("Échec envoi SMS à %s: %s", to, exc)
         return False

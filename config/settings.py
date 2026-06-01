@@ -157,9 +157,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 PHONENUMBER_DEFAULT_REGION = 'GN'
 
-TWILIO_ACCOUNT_SID   = env('TWILIO_ACCOUNT_SID',   default='')
-TWILIO_AUTH_TOKEN    = env('TWILIO_AUTH_TOKEN',    default='')
-TWILIO_PHONE_NUMBER  = env('TWILIO_PHONE_NUMBER',  default='')
+AT_USERNAME  = env('AT_USERNAME',  default='')
+AT_API_KEY   = env('AT_API_KEY',   default='')
+AT_SENDER_ID = env('AT_SENDER_ID', default='')
 
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False
