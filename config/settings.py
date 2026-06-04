@@ -11,8 +11,9 @@ from decouple import config as env
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-DEBUG = os.environ.get('DEBUG', 'True') == 'True'
+DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 ALLOWED_HOSTS = ['*']
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 DJANGO_APPS = [
     'django.contrib.admin',
@@ -49,12 +50,14 @@ INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
 
 CLOUDINARY_STORAGE = {
-    'CLOUD_NAME': env('CLOUDINARY_CLOUD_NAME', default=''),
-    'API_KEY':    env('CLOUDINARY_API_KEY',    default=''),
-    'API_SECRET': env('CLOUDINARY_API_SECRET', default=''),
+    'CLOUD_NAME': os.environ.get('CLOUDINARY_CLOUD_NAME') or env('CLOUDINARY_CLOUD_NAME', default=''),
+    'API_KEY':    os.environ.get('CLOUDINARY_API_KEY')    or env('CLOUDINARY_API_KEY',    default=''),
+    'API_SECRET': os.environ.get('CLOUDINARY_API_SECRET') or env('CLOUDINARY_API_SECRET', default=''),
 }
 
-if CLOUDINARY_STORAGE['CLOUD_NAME']:
+_USE_CLOUDINARY = bool(CLOUDINARY_STORAGE['CLOUD_NAME'])
+
+if _USE_CLOUDINARY:
     cloudinary.config(
         cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
         api_key=CLOUDINARY_STORAGE['API_KEY'],
@@ -62,7 +65,18 @@ if CLOUDINARY_STORAGE['CLOUD_NAME']:
         secure=True
     )
 
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+STORAGES = {
+    "default": {
+        "BACKEND": (
+            "cloudinary_storage.storage.MediaCloudinaryStorage"
+            if _USE_CLOUDINARY
+            else "django.core.files.storage.FileSystemStorage"
+        )
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"
+    },
+}
 
 
 MIDDLEWARE = [
@@ -151,7 +165,6 @@ MEDIA_ROOT = BASE_DIR / 'media'
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 

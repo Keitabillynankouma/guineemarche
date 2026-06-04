@@ -93,10 +93,20 @@ class LoginSerializer(serializers.Serializer):
 
 
 class UserProfileSerializer(serializers.ModelSerializer):
+    avatar_url = serializers.SerializerMethodField()
+
     class Meta:
         model  = UserProfile
         fields = ('avatar_url', 'bio', 'rating_avg', 'total_ratings', 'total_sales')
         read_only_fields = ('rating_avg', 'total_ratings', 'total_sales')
+
+    def get_avatar_url(self, obj):
+        if not obj.avatar_url:
+            return None
+        try:
+            return obj.avatar_url.url
+        except Exception:
+            return None
 
 
 class UserSerializer(serializers.ModelSerializer):

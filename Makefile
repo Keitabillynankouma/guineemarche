@@ -13,5 +13,23 @@ test:
 superuser:
 	python manage.py createsuperuser
 
+install:
+	pip install -r requirements.txt
+
 freeze:
-	pip freeze > requirements/base.txt
+	pip freeze > requirements.txt
+
+frontend-install:
+	cd frontend && npm install
+
+frontend-dev:
+	cd frontend && npm run dev
+
+frontend-build:
+	cd frontend && npm run build
+
+collectstatic:
+	python manage.py collectstatic --no-input
+
+deploy-check:
+	python manage.py check --deploy

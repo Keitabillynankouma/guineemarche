@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from django.db import transaction
 from .models import Category, Listing, ListingMedia, Favorite, ListingReport
 
 
@@ -16,9 +17,19 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class ListingMediaSerializer(serializers.ModelSerializer):
+    file = serializers.SerializerMethodField()
+
     class Meta:
         model  = ListingMedia
         fields = ('id', 'file', 'media_type', 'sort_order', 'is_cover')
+
+    def get_file(self, obj):
+        if not obj.file:
+            return None
+        try:
+            return obj.file.url
+        except Exception:
+            return None
 
 
 class ListingSerializer(serializers.ModelSerializer):
@@ -45,6 +56,7 @@ class ListingSerializer(serializers.ModelSerializer):
         )
         read_only_fields = ('id', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted')
 
+    @transaction.atomic
     def create(self, validated_data):
         uploaded_files = validated_data.pop('uploaded_files', [])
         listing = Listing.objects.create(**validated_data)
