@@ -51,10 +51,10 @@ class ListingSerializer(serializers.ModelSerializer):
             'id', 'title', 'description', 'price_gnf', 'price_type',
             'condition', 'status', 'city', 'quartier', 'latitude', 'longitude',
             'view_count', 'is_boosted', 'expires_at', 'created_at',
-            'seller_name', 'seller_phone', 'category', 'category_name',
+            'seller', 'seller_name', 'seller_phone', 'category', 'category_name',
             'media', 'uploaded_files'
         )
-        read_only_fields = ('id', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted')
+        read_only_fields = ('id', 'seller', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted')
 
     @transaction.atomic
     def create(self, validated_data):
