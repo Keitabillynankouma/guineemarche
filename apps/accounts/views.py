@@ -4,10 +4,11 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 
-from .models import User, OTPCode
+from .models import User, OTPCode, Subscription, Badge
 from .serializers import (
     RegisterSerializer, VerifyOTPSerializer, LoginSerializer,
-    UserSerializer, UserProfileSerializer, ChangePasswordSerializer
+    UserSerializer, UserProfileSerializer, ChangePasswordSerializer,
+    SubscriptionSerializer, BadgeSerializer,
 )
 
 
@@ -134,3 +135,39 @@ class ResendOTPView(APIView):
         )
         send_otp_sms(str(user.phone_number), code)
         return Response({'message': 'Nouveau code envoyé.'})
+
+
+class SubscriptionView(APIView):
+    """GET : statut de l'abonnement. POST : activer Pro (simulation)."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        sub, _ = Subscription.objects.get_or_create(user=request.user)
+        return Response(SubscriptionSerializer(sub).data)
+
+    def post(self, request):
+        """
+        Simule l'activation Pro.
+        En production : déclencher un paiement Mobile Money puis valider ici.
+        """
+        sub, _ = Subscription.objects.get_or_create(user=request.user)
+        duration_months = int(request.data.get('months', 1))
+        from dateutil.relativedelta import relativedelta
+        sub.plan        = Subscription.Plan.PRO
+        sub.valid_until = timezone.now() + relativedelta(months=duration_months)
+        sub.save(update_fields=['plan', 'valid_until'])
+        Badge.award(request.user, Badge.Type.PRO)
+        return Response({
+            'message': f'Abonnement Pro activé pour {duration_months} mois.',
+            'subscription': SubscriptionSerializer(sub).data,
+        })
+
+
+class BadgeListView(generics.ListAPIView):
+    """Liste les badges de l'utilisateur connecté."""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class   = BadgeSerializer
+
+    def get_queryset(self):
+        Badge.check_and_award(self.request.user)
+        return Badge.objects.filter(user=self.request.user)

@@ -41,10 +41,14 @@ class Order(BaseModel):
         RELEASED = 'released', 'Fonds libérés'
         REFUNDED = 'refunded', 'Remboursé'
 
+    COMMISSION_PCT = 5  # 5 % de commission plateforme
+
     listing            = models.ForeignKey(Listing,     on_delete=models.PROTECT,  related_name='orders')
     buyer              = models.ForeignKey(User,        on_delete=models.PROTECT,  related_name='orders_as_buyer')
     seller             = models.ForeignKey(User,        on_delete=models.PROTECT,  related_name='orders_as_seller')
     amount_gnf         = models.BigIntegerField()
+    commission_gnf     = models.BigIntegerField(default=0)
+    seller_payout_gnf  = models.BigIntegerField(default=0)
     status             = models.CharField(max_length=12, choices=Status.choices,       default=Status.PENDING)
     delivery_mode      = models.CharField(max_length=15, choices=DeliveryMode.choices, default=DeliveryMode.MEETING_POINT)
     pickup_point       = models.ForeignKey(PickupPoint, on_delete=models.SET_NULL,     null=True, blank=True, related_name='orders')
@@ -79,9 +83,21 @@ class Order(BaseModel):
 
     def release_escrow(self):
         from django.utils import timezone
+        self.commission_gnf    = int(self.amount_gnf * self.COMMISSION_PCT / 100)
+        self.seller_payout_gnf = self.amount_gnf - self.commission_gnf
         self.escrow_status      = self.EscrowStatus.RELEASED
         self.escrow_released_at = timezone.now()
-        self.save(update_fields=['escrow_status', 'escrow_released_at', 'updated_at'])
+        self.save(update_fields=[
+            'commission_gnf', 'seller_payout_gnf',
+            'escrow_status', 'escrow_released_at', 'updated_at',
+        ])
+        # Incrémenter le compteur de ventes du vendeur
+        profile = self.seller.profile
+        profile.total_sales += 1
+        profile.save(update_fields=['total_sales'])
+        # Vérifier les badges après chaque vente
+        from apps.accounts.models import Badge
+        Badge.check_and_award(self.seller)
 
     def refund_escrow(self):
         self.escrow_status = self.EscrowStatus.REFUNDED

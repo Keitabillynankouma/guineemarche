@@ -10,5 +10,7 @@ urlpatterns = [
     path('token/refresh/', TokenRefreshView.as_view(),    name='token-refresh'),
     path('me/',          views.MeView.as_view(),           name='me'),
     path('change-password/', views.ChangePasswordView.as_view(), name='change-password'),
-    path('resend-otp/',  views.ResendOTPView.as_view(),    name='resend-otp'),
+    path('resend-otp/',    views.ResendOTPView.as_view(),    name='resend-otp'),
+    path('subscription/',  views.SubscriptionView.as_view(), name='subscription'),
+    path('badges/',        views.BadgeListView.as_view(),    name='badges'),
 ]

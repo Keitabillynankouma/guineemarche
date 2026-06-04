@@ -10,6 +10,8 @@ import CreateListingPage from './pages/CreateListingPage'
 import MyListingsPage from './pages/MyListingsPage'
 import MessagesPage from './pages/MessagesPage'
 import ProfilePage from './pages/ProfilePage'
+import OrdersPage from './pages/OrdersPage'
+import UpgradePage from './pages/UpgradePage'
 
 const queryClient = new QueryClient()
 
@@ -31,6 +33,8 @@ export default function App() {
           <Route path="/my-listings" element={<PrivateRoute><MyListingsPage /></PrivateRoute>} />
           <Route path="/messages" element={<PrivateRoute><MessagesPage /></PrivateRoute>} />
           <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+          <Route path="/orders" element={<PrivateRoute><OrdersPage /></PrivateRoute>} />
+          <Route path="/upgrade" element={<PrivateRoute><UpgradePage /></PrivateRoute>} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

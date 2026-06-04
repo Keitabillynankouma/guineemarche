@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import { listingsAPI } from '../services/api'
+import { listingsAPI, authAPI } from '../services/api'
 import { useQuery } from '@tanstack/react-query'
 
 const QUARTIERS = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
@@ -48,6 +48,30 @@ export default function CreateListingPage() {
         queryFn: () => listingsAPI.categories().then(r => r.data),
     })
     const categories = Array.isArray(categoriesData) ? categoriesData : categoriesData?.results || []
+
+    const { data: sub } = useQuery({
+        queryKey: ['subscription'],
+        queryFn: () => authAPI.getSubscription().then(r => r.data),
+    })
+
+    if (sub && !sub.can_post) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow p-8 max-w-sm w-full text-center space-y-4">
+                    <p className="text-5xl">🔒</p>
+                    <h2 className="text-xl font-bold text-gray-800">Limite atteinte</h2>
+                    <p className="text-gray-500 text-sm">
+                        Vous avez utilisé vos 5 annonces gratuites. Passez au plan Pro pour publier des annonces illimitées.
+                    </p>
+                    <Link to="/upgrade"
+                        className="block w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition">
+                        💎 Passer au plan Pro
+                    </Link>
+                    <Link to="/" className="block text-sm text-gray-400 hover:text-gray-600">Retour à l'accueil</Link>
+                </div>
+            </div>
+        )
+    }
 
     const handleFiles = async (e) => {
         const selected = Array.from(e.target.files)

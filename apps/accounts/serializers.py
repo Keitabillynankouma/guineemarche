@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import User, UserProfile, OTPCode
+from .models import User, UserProfile, OTPCode, Subscription, Badge
 from core.utils import generate_otp, otp_expiry
 from core.sms import send_otp_sms
 
@@ -109,15 +109,40 @@ class UserProfileSerializer(serializers.ModelSerializer):
             return None
 
 
+class BadgeSerializer(serializers.ModelSerializer):
+    icon  = serializers.SerializerMethodField()
+    label = serializers.CharField(source='get_type_display', read_only=True)
+
+    class Meta:
+        model  = Badge
+        fields = ('type', 'label', 'icon', 'created_at')
+
+    def get_icon(self, obj):
+        return Badge.ICONS.get(obj.type, '🏅')
+
+
+class SubscriptionSerializer(serializers.ModelSerializer):
+    is_pro        = serializers.BooleanField(read_only=True)
+    can_post      = serializers.BooleanField(read_only=True)
+    remaining_free = serializers.IntegerField(read_only=True, allow_null=True)
+
+    class Meta:
+        model  = Subscription
+        fields = ('plan', 'listings_used', 'valid_until', 'is_pro', 'can_post', 'remaining_free')
+        read_only_fields = fields
+
+
 class UserSerializer(serializers.ModelSerializer):
-    profile = UserProfileSerializer(read_only=True)
+    profile      = UserProfileSerializer(read_only=True)
+    badges       = BadgeSerializer(many=True, read_only=True)
+    subscription = SubscriptionSerializer(read_only=True)
 
     class Meta:
         model  = User
         fields = (
             'id', 'phone_number', 'full_name', 'email',
             'role', 'city', 'quartier', 'is_verified',
-            'created_at', 'profile'
+            'created_at', 'profile', 'badges', 'subscription'
         )
         read_only_fields = ('id', 'phone_number', 'is_verified', 'created_at')
 

@@ -39,7 +39,24 @@ class ListingListCreateView(generics.ListCreateAPIView):
         ).prefetch_related('media')
 
     def perform_create(self, serializer):
-        serializer.save(seller=self.request.user, status=Listing.Status.ACTIVE)
+        from apps.accounts.models import Subscription, Badge
+        from rest_framework.exceptions import PermissionDenied
+        user = self.request.user
+        sub, _ = Subscription.objects.get_or_create(user=user)
+        if not sub.can_post:
+            raise PermissionDenied(
+                detail={
+                    'code': 'subscription_required',
+                    'message': f'Vous avez atteint la limite de {Subscription.FREE_LIMIT} annonces gratuites. '
+                               'Passez au plan Pro pour publier des annonces illimitées.',
+                }
+            )
+        serializer.save(seller=user, status=Listing.Status.ACTIVE)
+        sub.listings_used += 1
+        sub.save(update_fields=['listings_used'])
+        # Premier badge si c'est la toute première annonce
+        if sub.listings_used == 1:
+            Badge.award(user, Badge.Type.FIRST_LISTING)
 
 
 class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):

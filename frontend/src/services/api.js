@@ -35,6 +35,9 @@ export const authAPI = {
   logout: (data) => api.post('/accounts/logout/', data),
   me: () => api.get('/accounts/me/'),
   resendOTP: (data) => api.post('/accounts/resend-otp/', data),
+  getSubscription: () => api.get('/accounts/subscription/'),
+  subscribe: (data) => api.post('/accounts/subscription/', data),
+  getBadges: () => api.get('/accounts/badges/'),
 }
 
 export const listingsAPI = {
@@ -66,6 +69,7 @@ export const ordersAPI = {
   confirmReceipt: (id) => api.post(`/orders/${id}/confirm-receipt/`),
   dispute: (id) => api.post(`/orders/${id}/dispute/`),
   getPickupPoints: (city) => api.get('/orders/pickup-points/', { params: city ? { city } : {} }),
+  getSeller: () => api.get('/orders/?role=seller'),
 }
 
 export default api

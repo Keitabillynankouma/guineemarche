@@ -115,3 +115,112 @@ class Session(BaseModel):
 
     def __str__(self):
         return f"Session de {self.user.phone_number}"
+
+
+class Subscription(BaseModel):
+    """Abonnement utilisateur. Gratuit = 5 annonces max, Pro = illimité."""
+
+    class Plan(models.TextChoices):
+        FREE  = 'free',  'Gratuit (5 annonces)'
+        PRO   = 'pro',   'Pro — illimité'
+
+    user           = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
+    plan           = models.CharField(max_length=10, choices=Plan.choices, default=Plan.FREE)
+    listings_used  = models.PositiveIntegerField(default=0)
+    valid_until    = models.DateTimeField(null=True, blank=True)
+
+    FREE_LIMIT = 5
+
+    class Meta:
+        verbose_name = 'Abonnement'
+
+    def __str__(self):
+        return f"{self.user.full_name} — {self.plan}"
+
+    @property
+    def is_pro(self):
+        from django.utils import timezone
+        return self.plan == self.Plan.PRO and (
+            self.valid_until is None or self.valid_until > timezone.now()
+        )
+
+    @property
+    def can_post(self):
+        return self.is_pro or self.listings_used < self.FREE_LIMIT
+
+    @property
+    def remaining_free(self):
+        if self.is_pro:
+            return None  # illimité
+        return max(0, self.FREE_LIMIT - self.listings_used)
+
+
+class Badge(BaseModel):
+    """Badges attribués automatiquement selon les actions de l'utilisateur."""
+
+    class Type(models.TextChoices):
+        VERIFIED      = 'verified',      'Compte vérifié'
+        FIRST_LISTING = 'first_listing', 'Première annonce'
+        SELLER_5      = 'seller_5',      '5 ventes réalisées'
+        SELLER_10     = 'seller_10',     '10 ventes réalisées'
+        TOP_RATED     = 'top_rated',     'Top noté (≥ 4.5/5)'
+        TRUSTED       = 'trusted',       'Vendeur de confiance'
+        PRO           = 'pro',           'Membre Pro'
+
+    ICONS = {
+        'verified':      '✅',
+        'first_listing': '🎉',
+        'seller_5':      '🥈',
+        'seller_10':     '🥇',
+        'top_rated':     '⭐',
+        'trusted':       '🛡️',
+        'pro':           '💎',
+    }
+
+    user  = models.ForeignKey(User, on_delete=models.CASCADE, related_name='badges')
+    type  = models.CharField(max_length=20, choices=Type.choices)
+
+    class Meta:
+        verbose_name      = 'Badge'
+        unique_together   = ('user', 'type')
+        ordering          = ['type']
+
+    def __str__(self):
+        return f"{self.ICONS.get(self.type, '🏅')} {self.get_type_display()} — {self.user.full_name}"
+
+    @classmethod
+    def award(cls, user, badge_type):
+        cls.objects.get_or_create(user=user, type=badge_type)
+
+    @classmethod
+    def revoke(cls, user, badge_type):
+        cls.objects.filter(user=user, type=badge_type).delete()
+
+    @classmethod
+    def check_and_award(cls, user):
+        profile = getattr(user, 'profile', None)
+        if not profile:
+            return
+
+        if user.is_verified:
+            cls.award(user, cls.Type.VERIFIED)
+
+        sales = profile.total_sales
+        if sales >= 1:
+            cls.award(user, cls.Type.FIRST_LISTING)
+        if sales >= 5:
+            cls.award(user, cls.Type.SELLER_5)
+        if sales >= 10:
+            cls.award(user, cls.Type.SELLER_10)
+
+        if profile.rating_avg >= 4.5 and profile.total_ratings >= 10:
+            cls.award(user, cls.Type.TOP_RATED)
+
+        if (user.is_verified and sales >= 5 and profile.rating_avg >= 4.0):
+            cls.award(user, cls.Type.TRUSTED)
+
+        sub = getattr(user, 'subscription', None)
+        if sub and sub.is_pro:
+            cls.award(user, cls.Type.PRO)
+        else:
+            cls.revoke(user, cls.Type.PRO)
