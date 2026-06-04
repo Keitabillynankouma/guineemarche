@@ -27,7 +27,12 @@ class ListingMediaSerializer(serializers.ModelSerializer):
         if not obj.file:
             return None
         try:
-            return obj.file.url
+            url = obj.file.url
+            # Si l'URL est relative ou juste un nom de fichier, retourner None
+            # pour éviter que le frontend affiche une URL cassée
+            if url and url.startswith('http'):
+                return url
+            return None
         except Exception:
             return None
 

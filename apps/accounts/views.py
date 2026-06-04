@@ -92,7 +92,12 @@ class MeView(generics.RetrieveUpdateAPIView):
     serializer_class   = UserSerializer
 
     def get_object(self):
-        return self.request.user
+        user = self.request.user
+        # Créer les objets manquants pour les utilisateurs antérieurs à la migration
+        from apps.accounts.models import Subscription, UserProfile
+        UserProfile.objects.get_or_create(user=user)
+        Subscription.objects.get_or_create(user=user)
+        return user
 
 
 class ChangePasswordView(APIView):

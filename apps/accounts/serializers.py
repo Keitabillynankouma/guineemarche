@@ -135,7 +135,15 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 class UserSerializer(serializers.ModelSerializer):
     profile      = UserProfileSerializer(read_only=True)
     badges       = BadgeSerializer(many=True, read_only=True)
-    subscription = SubscriptionSerializer(read_only=True)
+    subscription = serializers.SerializerMethodField()
+
+    def get_subscription(self, obj):
+        try:
+            sub, _ = Subscription.objects.get_or_create(user=obj)
+            return SubscriptionSerializer(sub).data
+        except Exception:
+            return {'plan': 'free', 'listings_used': 0, 'valid_until': None,
+                    'is_pro': False, 'can_post': True, 'remaining_free': 5}
 
     class Meta:
         model  = User
