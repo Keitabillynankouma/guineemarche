@@ -25,9 +25,18 @@ const useAuthStore = create((set) => ({
     },
 
     fetchMe: async () => {
-        const res = await authAPI.me()
-        set({ user: res.data })
-        return res.data
+        try {
+            const res = await authAPI.me()
+            set({ user: res.data })
+            return res.data
+        } catch (e) {
+            if (e.response?.status === 401) {
+                localStorage.removeItem('access_token')
+                localStorage.removeItem('refresh_token')
+                set({ user: null, isAuthenticated: false })
+            }
+            return null
+        }
     },
 
     setUser: (user) => set({ user }),

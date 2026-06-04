@@ -201,7 +201,8 @@ function OrderModal({ listing, onClose, onSuccess }) {
 export default function ListingDetailPage() {
     const { id } = useParams()
     const navigate   = useNavigate()
-    const { isAuthenticated, user } = useAuthStore((s) => ({ isAuthenticated: s.isAuthenticated, user: s.user }))
+    const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+    const user            = useAuthStore(s => s.user)
     const queryClient = useQueryClient()
     const [message, setMessage]       = useState('')
     const [sending, setSending]       = useState(false)
