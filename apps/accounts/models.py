@@ -117,6 +117,43 @@ class Session(BaseModel):
         return f"Session de {self.user.phone_number}"
 
 
+class Shop(BaseModel):
+    """Profil boutique d'un vendeur professionnel."""
+    owner       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shop')
+    name        = models.CharField(max_length=200)
+    logo        = models.ImageField(upload_to='shops/', null=True, blank=True)
+    description = models.TextField(blank=True)
+    phone       = models.CharField(max_length=20, blank=True)
+    address     = models.CharField(max_length=300, blank=True)
+    city        = models.CharField(max_length=100, default='Conakry')
+    website     = models.CharField(max_length=255, blank=True)
+    is_verified = models.BooleanField(default=False)
+    is_featured = models.BooleanField(default=False)
+    is_active   = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = 'Boutique'
+        verbose_name_plural = 'Boutiques'
+        ordering = ['-is_featured', '-created_at']
+
+    def __str__(self):
+        return f"{self.name} ({self.owner.full_name})"
+
+    @property
+    def logo_url(self):
+        if self.logo:
+            try:
+                url = self.logo.url
+                return url if url.startswith('http') else None
+            except Exception:
+                return None
+        return None
+
+    @property
+    def listing_count(self):
+        return self.owner.listings.filter(status='active').count()
+
+
 class Subscription(BaseModel):
     """Abonnement utilisateur. Gratuit = 5 annonces max, Pro = illimité."""
 

@@ -288,6 +288,21 @@ export default function ListingDetailPage() {
                         )}
                     </div>
 
+                    {/* Attributs spécifiques à la catégorie */}
+                    {listing.attributes && Object.keys(listing.attributes).length > 0 && (
+                        <div className="bg-white rounded-2xl shadow p-5">
+                            <h2 className="font-semibold text-gray-700 mb-3">Caractéristiques</h2>
+                            <div className="grid grid-cols-2 gap-3">
+                                {Object.entries(listing.attributes).map(([k, v]) => (
+                                    <div key={k} className="bg-gray-50 rounded-xl p-3">
+                                        <p className="text-xs text-gray-400 capitalize">{k.replace(/_/g, ' ')}</p>
+                                        <p className="font-semibold text-gray-800 text-sm mt-0.5">{String(v)}</p>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
                     <div className="bg-white rounded-2xl shadow p-5">
                         <div className="flex items-start justify-between mb-3">
                             <h1 className="text-xl font-bold text-gray-800">{listing.title}</h1>

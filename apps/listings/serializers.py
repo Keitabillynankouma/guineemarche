@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.db import transaction
-from .models import Category, Listing, ListingMedia, Favorite, ListingReport
+from .models import Category, Listing, ListingMedia, Favorite, ListingReport, CategoryAttribute, Banner
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -57,7 +57,7 @@ class ListingSerializer(serializers.ModelSerializer):
             'condition', 'status', 'city', 'quartier', 'latitude', 'longitude',
             'view_count', 'is_boosted', 'expires_at', 'created_at',
             'seller', 'seller_name', 'seller_phone', 'category', 'category_name',
-            'media', 'uploaded_files'
+            'attributes', 'media', 'uploaded_files'
         )
         read_only_fields = ('id', 'seller', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted')
 
@@ -101,3 +101,26 @@ class ListingReportSerializer(serializers.ModelSerializer):
         model  = ListingReport
         fields = ('id', 'listing', 'reason', 'note', 'created_at')
         read_only_fields = ('id', 'created_at')
+
+
+class CategoryAttributeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = CategoryAttribute
+        fields = ('id', 'name', 'key', 'field_type', 'choices', 'is_required', 'sort_order')
+
+
+class BannerSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = Banner
+        fields = ('id', 'title', 'image', 'link_url', 'position', 'click_count')
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        try:
+            url = obj.image.url
+            return url if url.startswith('http') else None
+        except Exception:
+            return None

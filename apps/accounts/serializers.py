@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import User, UserProfile, OTPCode, Subscription, Badge
+from .models import User, UserProfile, OTPCode, Subscription, Badge, Shop
 from core.utils import generate_otp, otp_expiry
 from core.sms import send_otp_sms
 
@@ -132,10 +132,38 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ShopSerializer(serializers.ModelSerializer):
+    logo_url      = serializers.SerializerMethodField()
+    listing_count = serializers.IntegerField(read_only=True, source='listing_count')
+    owner_name    = serializers.CharField(source='owner.full_name', read_only=True)
+    owner_phone   = serializers.CharField(source='owner.phone_number', read_only=True)
+
+    class Meta:
+        model  = Shop
+        fields = (
+            'id', 'name', 'logo', 'logo_url', 'description',
+            'phone', 'address', 'city', 'website',
+            'is_verified', 'is_featured', 'listing_count',
+            'owner', 'owner_name', 'owner_phone', 'created_at',
+        )
+        read_only_fields = ('id', 'is_verified', 'is_featured', 'owner', 'owner_name', 'owner_phone', 'created_at')
+        extra_kwargs = {'logo': {'write_only': True, 'required': False}}
+
+    def get_logo_url(self, obj):
+        return obj.logo_url
+
+
 class UserSerializer(serializers.ModelSerializer):
     profile      = UserProfileSerializer(read_only=True)
     badges       = BadgeSerializer(many=True, read_only=True)
     subscription = serializers.SerializerMethodField()
+    shop         = serializers.SerializerMethodField()
+
+    def get_shop(self, obj):
+        try:
+            return ShopSerializer(obj.shop).data
+        except Exception:
+            return None
 
     def get_subscription(self, obj):
         try:
@@ -150,7 +178,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'phone_number', 'full_name', 'email',
             'role', 'city', 'quartier', 'is_verified',
-            'created_at', 'profile', 'badges', 'subscription'
+            'created_at', 'profile', 'badges', 'subscription', 'shop'
         )
         read_only_fields = ('id', 'phone_number', 'is_verified', 'created_at')
 

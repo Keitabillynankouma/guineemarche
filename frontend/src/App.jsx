@@ -13,6 +13,7 @@ import ProfilePage from './pages/ProfilePage'
 import OrdersPage from './pages/OrdersPage'
 import UpgradePage from './pages/UpgradePage'
 import FavoritesPage from './pages/FavoritesPage'
+import ShopPage from './pages/ShopPage'
 
 const queryClient = new QueryClient()
 
@@ -36,7 +37,8 @@ export default function App() {
           <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
           <Route path="/orders" element={<PrivateRoute><OrdersPage /></PrivateRoute>} />
           <Route path="/upgrade"   element={<PrivateRoute><UpgradePage /></PrivateRoute>} />
-          <Route path="/favorites" element={<PrivateRoute><FavoritesPage /></PrivateRoute>} />
+          <Route path="/favorites"    element={<PrivateRoute><FavoritesPage /></PrivateRoute>} />
+          <Route path="/shops/:id"   element={<ShopPage />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

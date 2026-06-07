@@ -5,10 +5,13 @@ from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
 
-from .models import Category, Listing, Favorite, ListingReport
+from django.utils import timezone
+from django.db import models
+from .models import Category, Listing, Favorite, ListingReport, CategoryAttribute, Banner
 from .serializers import (
     CategorySerializer, ListingSerializer,
-    ListingDetailSerializer, FavoriteSerializer, ListingReportSerializer
+    ListingDetailSerializer, FavoriteSerializer, ListingReportSerializer,
+    CategoryAttributeSerializer, BannerSerializer,
 )
 from .filters import ListingFilter
 
@@ -130,3 +133,41 @@ class ListingReportView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         serializer.save(reporter=self.request.user)
+
+
+class CategoryAttributeListView(generics.ListAPIView):
+    """Retourne les attributs dynamiques d'une catégorie (marque, année, etc.)."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = CategoryAttributeSerializer
+
+    def get_queryset(self):
+        category_id = self.kwargs.get('pk')
+        return CategoryAttribute.objects.filter(category_id=category_id)
+
+
+class BannerListView(generics.ListAPIView):
+    """Retourne les panneaux publicitaires actifs."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = BannerSerializer
+
+    def get_queryset(self):
+        now = timezone.now()
+        qs  = Banner.objects.filter(is_active=True)
+        qs  = qs.filter(
+            models.Q(start_date__isnull=True) | models.Q(start_date__lte=now)
+        ).filter(
+            models.Q(end_date__isnull=True) | models.Q(end_date__gte=now)
+        )
+        position = self.request.query_params.get('position')
+        if position:
+            qs = qs.filter(position=position)
+        return qs
+
+
+class BannerClickView(APIView):
+    """Incrémente le compteur de clics d'un banneau."""
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, _request, pk):
+        Banner.objects.filter(pk=pk).update(click_count=models.F('click_count') + 1)
+        return Response({'status': 'ok'})

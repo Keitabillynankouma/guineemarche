@@ -70,6 +70,9 @@ class Listing(BaseModel):
     latitude    = models.FloatField(null=True, blank=True)
     longitude   = models.FloatField(null=True, blank=True)
 
+    # Attributs dynamiques selon catégorie (ex: {"brand":"Toyota","year":"2020"})
+    attributes  = models.JSONField(default=dict, blank=True)
+
     # Stats & boost
     view_count  = models.PositiveIntegerField(default=0)
     is_boosted  = models.BooleanField(default=False)
@@ -121,6 +124,71 @@ class ListingMedia(BaseModel):
         if not self.pk and not ListingMedia.objects.filter(listing=self.listing).exists():
             self.is_cover = True
         super().save(*args, **kwargs)
+
+
+class CategoryAttribute(BaseModel):
+    """Champs spécifiques à saisir selon la catégorie d'annonce."""
+
+    class FieldType(models.TextChoices):
+        TEXT    = 'text',    'Texte libre'
+        NUMBER  = 'number',  'Nombre'
+        SELECT  = 'select',  'Liste de choix'
+        YEAR    = 'year',    'Année'
+        BOOLEAN = 'boolean', 'Oui / Non'
+
+    category    = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='attributes')
+    name        = models.CharField(max_length=100)
+    key         = models.CharField(max_length=50)
+    field_type  = models.CharField(max_length=10, choices=FieldType.choices, default=FieldType.TEXT)
+    choices     = models.JSONField(default=list, blank=True)
+    is_required = models.BooleanField(default=False)
+    sort_order  = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name        = 'Attribut de catégorie'
+        verbose_name_plural = 'Attributs de catégorie'
+        ordering            = ['sort_order', 'name']
+        unique_together     = ('category', 'key')
+
+    def __str__(self):
+        return f"{self.category.name} → {self.name}"
+
+
+class Banner(BaseModel):
+    """Panneau publicitaire affiché sur la homepage."""
+
+    class Position(models.TextChoices):
+        HERO   = 'hero',   'Bandeau principal (haut)'
+        INLINE = 'inline', 'Entre les annonces'
+
+    title       = models.CharField(max_length=200)
+    image       = models.ImageField(upload_to='banners/')
+    link_url    = models.CharField(max_length=500, blank=True)
+    position    = models.CharField(max_length=10, choices=Position.choices, default=Position.HERO)
+    is_active   = models.BooleanField(default=True)
+    start_date  = models.DateTimeField(null=True, blank=True)
+    end_date    = models.DateTimeField(null=True, blank=True)
+    click_count = models.PositiveIntegerField(default=0)
+    sort_order  = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name        = 'Panneau publicitaire'
+        verbose_name_plural = 'Panneaux publicitaires'
+        ordering            = ['sort_order', '-created_at']
+
+    def __str__(self):
+        return self.title
+
+    def is_currently_active(self):
+        from django.utils import timezone
+        now = timezone.now()
+        if not self.is_active:
+            return False
+        if self.start_date and now < self.start_date:
+            return False
+        if self.end_date and now > self.end_date:
+            return False
+        return True
 
 
 class Favorite(BaseModel):

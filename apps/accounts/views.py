@@ -4,11 +4,11 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
 
-from .models import User, OTPCode, Subscription, Badge
+from .models import User, OTPCode, Subscription, Badge, Shop
 from .serializers import (
     RegisterSerializer, VerifyOTPSerializer, LoginSerializer,
     UserSerializer, UserProfileSerializer, ChangePasswordSerializer,
-    SubscriptionSerializer, BadgeSerializer,
+    SubscriptionSerializer, BadgeSerializer, ShopSerializer,
 )
 
 
@@ -176,3 +176,52 @@ class BadgeListView(generics.ListAPIView):
     def get_queryset(self):
         Badge.check_and_award(self.request.user)
         return Badge.objects.filter(user=self.request.user)
+
+
+class ShopListView(generics.ListAPIView):
+    """Boutiques vedettes publiques."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = ShopSerializer
+
+    def get_queryset(self):
+        qs = Shop.objects.filter(is_active=True).select_related('owner')
+        if self.request.query_params.get('featured'):
+            qs = qs.filter(is_featured=True)
+        city = self.request.query_params.get('city')
+        if city:
+            qs = qs.filter(city__iexact=city)
+        return qs
+
+
+class ShopDetailView(generics.RetrieveAPIView):
+    """Détail d'une boutique."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = ShopSerializer
+    queryset           = Shop.objects.filter(is_active=True).select_related('owner')
+
+
+class MyShopView(APIView):
+    """Créer ou mettre à jour sa boutique."""
+    permission_classes = [permissions.IsAuthenticated]
+    parser_classes     = [permissions.IsAuthenticated.__class__]  # placeholder, overridden below
+
+    def get_parsers(self):
+        from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+        return [MultiPartParser(), FormParser(), JSONParser()]
+
+    def get(self, request):
+        try:
+            shop = request.user.shop
+            return Response(ShopSerializer(shop).data)
+        except Shop.DoesNotExist:
+            return Response(None)
+
+    def post(self, request):
+        try:
+            shop = request.user.shop
+            serializer = ShopSerializer(shop, data=request.data, partial=True)
+        except Shop.DoesNotExist:
+            serializer = ShopSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(owner=request.user)
+        return Response(serializer.data)

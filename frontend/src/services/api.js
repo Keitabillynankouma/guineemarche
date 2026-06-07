@@ -48,9 +48,20 @@ export const listingsAPI = {
   delete: (id) => api.delete(`/listings/${id}/`),
   myListings: () => api.get('/listings/my/'),
   categories: () => api.get('/listings/categories/'),
+  categoryAttributes: (id) => api.get(`/listings/categories/${id}/attributes/`),
+  banners: (position) => api.get('/listings/banners/', { params: position ? { position } : {} }),
+  bannerClick: (id) => api.post(`/listings/banners/${id}/click/`),
   addFavorite: (data) => api.post('/listings/favorites/', data),
   removeFavorite: (id) => api.delete(`/listings/favorites/${id}/`),
   getFavorites: () => api.get('/listings/favorites/'),
+}
+
+export const shopsAPI = {
+  list: (params) => api.get('/accounts/shops/', { params }),
+  featured: () => api.get('/accounts/shops/', { params: { featured: true } }),
+  getOne: (id) => api.get(`/accounts/shops/${id}/`),
+  myShop: () => api.get('/accounts/shop/'),
+  saveShop: (data) => api.post('/accounts/shop/', data),
 }
 
 export const messagingAPI = {

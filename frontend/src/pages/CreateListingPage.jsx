@@ -3,6 +3,44 @@ import { useNavigate, Link } from 'react-router-dom'
 import { listingsAPI, authAPI } from '../services/api'
 import { useQuery } from '@tanstack/react-query'
 
+function AttributeField({ attr, value, onChange }) {
+    const base = "w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 text-sm"
+    if (attr.field_type === 'select') {
+        return (
+            <select value={value || ''} onChange={e => onChange(attr.key, e.target.value)} className={base} required={attr.is_required}>
+                <option value="">Choisir...</option>
+                {attr.choices.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+        )
+    }
+    if (attr.field_type === 'year') {
+        const currentYear = new Date().getFullYear()
+        return (
+            <select value={value || ''} onChange={e => onChange(attr.key, e.target.value)} className={base} required={attr.is_required}>
+                <option value="">Choisir une année...</option>
+                {Array.from({ length: 40 }, (_, i) => currentYear - i).map(y => (
+                    <option key={y} value={y}>{y}</option>
+                ))}
+            </select>
+        )
+    }
+    if (attr.field_type === 'boolean') {
+        return (
+            <select value={value || ''} onChange={e => onChange(attr.key, e.target.value)} className={base} required={attr.is_required}>
+                <option value="">Choisir...</option>
+                <option value="true">Oui</option>
+                <option value="false">Non</option>
+            </select>
+        )
+    }
+    return (
+        <input type={attr.field_type === 'number' ? 'number' : 'text'}
+            placeholder={attr.name} value={value || ''}
+            onChange={e => onChange(attr.key, e.target.value)}
+            className={base} required={attr.is_required} />
+    )
+}
+
 const QUARTIERS = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
 const VILLES    = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré']
 
@@ -37,17 +75,27 @@ export default function CreateListingPage() {
         price_type: 'fixed', condition: 'good',
         city: 'Conakry', quartier: '', category: ''
     })
-    const [files, setFiles]     = useState([])
-    const [previews, setPreviews] = useState([])
-    const [error, setError]     = useState('')
-    const [loading, setLoading] = useState(false)
+    const [files, setFiles]         = useState([])
+    const [previews, setPreviews]   = useState([])
+    const [error, setError]         = useState('')
+    const [loading, setLoading]     = useState(false)
+    const [attributes, setAttributes] = useState({})
     const navigate = useNavigate()
+
+    const handleAttrChange = (key, val) => setAttributes(prev => ({ ...prev, [key]: val }))
 
     const { data: categoriesData } = useQuery({
         queryKey: ['categories'],
         queryFn: () => listingsAPI.categories().then(r => r.data),
     })
     const categories = Array.isArray(categoriesData) ? categoriesData : categoriesData?.results || []
+
+    const { data: attrsData } = useQuery({
+        queryKey: ['category-attributes', form.category],
+        queryFn: () => listingsAPI.categoryAttributes(form.category).then(r => r.data),
+        enabled: !!form.category,
+    })
+    const categoryAttrs = Array.isArray(attrsData) ? attrsData : (attrsData?.results || [])
 
     const { data: sub } = useQuery({
         queryKey: ['subscription'],
@@ -89,6 +137,9 @@ export default function CreateListingPage() {
             Object.entries(form).forEach(([k, v]) => {
                 if (v !== '' && v !== null && v !== undefined) formData.append(k, v)
             })
+            if (Object.keys(attributes).length > 0) {
+                formData.append('attributes', JSON.stringify(attributes))
+            }
             files.forEach(f => formData.append('uploaded_files', f))
             await listingsAPI.create(formData)
             navigate('/my-listings')
@@ -146,13 +197,34 @@ export default function CreateListingPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
                             <select
                                 value={form.category}
-                                onChange={(e) => setForm({ ...form, category: e.target.value })}
+                                onChange={(e) => { setForm({ ...form, category: e.target.value }); setAttributes({}) }}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
                             >
                                 <option value="">Sans catégorie</option>
                                 {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                             </select>
                         </div>
+
+                        {/* Attributs dynamiques selon catégorie */}
+                        {categoryAttrs.length > 0 && (
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-4 space-y-3">
+                                <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide">
+                                    Caractéristiques du produit
+                                </p>
+                                {categoryAttrs.map(attr => (
+                                    <div key={attr.key}>
+                                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                                            {attr.name}{attr.is_required && <span className="text-red-500 ml-1">*</span>}
+                                        </label>
+                                        <AttributeField
+                                            attr={attr}
+                                            value={attributes[attr.key]}
+                                            onChange={handleAttrChange}
+                                        />
+                                    </div>
+                                ))}
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-2 gap-4">
                             <div>
