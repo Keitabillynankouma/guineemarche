@@ -75,11 +75,12 @@ export default function CreateListingPage() {
         price_type: 'fixed', condition: 'good',
         city: 'Conakry', quartier: '', category: ''
     })
-    const [files, setFiles]         = useState([])
-    const [previews, setPreviews]   = useState([])
-    const [error, setError]         = useState('')
-    const [loading, setLoading]     = useState(false)
+    const [files, setFiles]           = useState([])
+    const [previews, setPreviews]     = useState([])
+    const [error, setError]           = useState('')
+    const [loading, setLoading]       = useState(false)
     const [attributes, setAttributes] = useState({})
+    const [subCategory, setSubCategory] = useState('')
     const navigate = useNavigate()
 
     const handleAttrChange = (key, val) => setAttributes(prev => ({ ...prev, [key]: val }))
@@ -90,10 +91,16 @@ export default function CreateListingPage() {
     })
     const categories = Array.isArray(categoriesData) ? categoriesData : categoriesData?.results || []
 
+    // Catégorie parente sélectionnée
+    const selectedParent  = categories.find(c => c.id === form.category)
+    const subCategories   = selectedParent?.children || []
+    // ID effectif pour charger les attributs : sous-catégorie si dispo, sinon catégorie parente
+    const effectiveCatId  = subCategory || form.category
+
     const { data: attrsData } = useQuery({
-        queryKey: ['category-attributes', form.category],
-        queryFn: () => listingsAPI.categoryAttributes(form.category).then(r => r.data),
-        enabled: !!form.category,
+        queryKey: ['category-attributes', effectiveCatId],
+        queryFn: () => listingsAPI.categoryAttributes(effectiveCatId).then(r => r.data),
+        enabled: !!effectiveCatId,
     })
     const categoryAttrs = Array.isArray(attrsData) ? attrsData : (attrsData?.results || [])
 
@@ -134,7 +141,8 @@ export default function CreateListingPage() {
         setLoading(true)
         try {
             const formData = new FormData()
-            Object.entries(form).forEach(([k, v]) => {
+            const payload  = { ...form, category: subCategory || form.category }
+            Object.entries(payload).forEach(([k, v]) => {
                 if (v !== '' && v !== null && v !== undefined) formData.append(k, v)
             })
             if (Object.keys(attributes).length > 0) {
@@ -197,13 +205,46 @@ export default function CreateListingPage() {
                             <label className="block text-sm font-medium text-gray-700 mb-1">Catégorie</label>
                             <select
                                 value={form.category}
-                                onChange={(e) => { setForm({ ...form, category: e.target.value }); setAttributes({}) }}
+                                onChange={(e) => {
+                                    setForm({ ...form, category: e.target.value })
+                                    setSubCategory('')
+                                    setAttributes({})
+                                }}
                                 className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
                             >
                                 <option value="">Sans catégorie</option>
-                                {categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                                {categories.map(c => (
+                                    <option key={c.id} value={c.id}>
+                                        {c.icon_url ? c.icon_url + ' ' : ''}{c.name}
+                                    </option>
+                                ))}
                             </select>
                         </div>
+
+                        {/* Sous-catégories (si la catégorie parente en a) */}
+                        {subCategories.length > 0 && (
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">
+                                    Sous-catégorie <span className="text-gray-400 font-normal">(facultatif)</span>
+                                </label>
+                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                                    {subCategories.map(sub => (
+                                        <button
+                                            key={sub.id} type="button"
+                                            onClick={() => { setSubCategory(sub.id); setAttributes({}) }}
+                                            className={`p-2 rounded-xl border-2 text-sm font-medium text-left transition ${
+                                                subCategory === sub.id
+                                                    ? 'border-green-500 bg-green-50 text-green-700'
+                                                    : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                                            }`}
+                                        >
+                                            {sub.icon_url && <span className="mr-1">{sub.icon_url}</span>}
+                                            {sub.name}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* Attributs dynamiques selon catégorie */}
                         {categoryAttrs.length > 0 && (

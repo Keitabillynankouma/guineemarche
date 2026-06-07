@@ -80,7 +80,7 @@ export const ordersAPI = {
   confirmReceipt: (id) => api.post(`/orders/${id}/confirm-receipt/`),
   dispute: (id) => api.post(`/orders/${id}/dispute/`),
   getPickupPoints: (city) => api.get('/orders/pickup-points/', { params: city ? { city } : {} }),
-  getSeller: () => api.get('/orders/?role=seller'),
+  getSeller: () => api.get('/orders/received/'),
 }
 
 export default api

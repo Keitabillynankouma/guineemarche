@@ -145,6 +145,12 @@ export default function ProfilePage() {
                         <span className="font-medium text-gray-700">💬 Mes messages</span>
                         <span className="text-gray-400">›</span>
                     </Link>
+                    {user.role === 'admin' && (
+                        <Link to="/admin" className="flex items-center justify-between p-4 hover:bg-red-50 border-b">
+                            <span className="font-medium text-red-600">🛡️ Administration</span>
+                            <span className="text-red-400">›</span>
+                        </Link>
+                    )}
                     <button onClick={handleLogout}
                         className="w-full flex items-center justify-between p-4 hover:bg-red-50 text-red-500">
                         <span className="font-medium">🚪 Se déconnecter</span>

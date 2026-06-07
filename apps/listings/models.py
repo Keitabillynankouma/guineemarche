@@ -62,10 +62,10 @@ class Listing(BaseModel):
     price_gnf   = models.BigIntegerField(default=0)
     price_type  = models.CharField(max_length=12, choices=PriceType.choices, default=PriceType.FIXED)
     condition   = models.CharField(max_length=10, choices=Condition.choices, default=Condition.GOOD)
-    status      = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT)
+    status      = models.CharField(max_length=10, choices=Status.choices, default=Status.DRAFT, db_index=True)
 
     # Localisation guinéenne
-    city        = models.CharField(max_length=100, default='Conakry')
+    city        = models.CharField(max_length=100, default='Conakry', db_index=True)
     quartier    = models.CharField(max_length=100, blank=True)
     latitude    = models.FloatField(null=True, blank=True)
     longitude   = models.FloatField(null=True, blank=True)
@@ -75,13 +75,19 @@ class Listing(BaseModel):
 
     # Stats & boost
     view_count  = models.PositiveIntegerField(default=0)
-    is_boosted  = models.BooleanField(default=False)
+    is_boosted  = models.BooleanField(default=False, db_index=True)
     expires_at  = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = 'Annonce'
         verbose_name_plural = 'Annonces'
         ordering = ['-is_boosted', '-created_at']
+        indexes = [
+            models.Index(fields=['status', 'city'],       name='listing_status_city_idx'),
+            models.Index(fields=['status', 'is_boosted'], name='listing_status_boosted_idx'),
+            models.Index(fields=['seller', 'status'],     name='listing_seller_status_idx'),
+            models.Index(fields=['-created_at'],          name='listing_created_at_idx'),
+        ]
 
     def __str__(self):
         return f"{self.title} — {self.seller.full_name}"
@@ -95,8 +101,8 @@ class Listing(BaseModel):
         return self.status == self.Status.ACTIVE
 
     def increment_views(self):
-        self.view_count += 1
-        self.save(update_fields=['view_count'])
+        Listing.objects.filter(pk=self.pk).update(view_count=models.F('view_count') + 1)
+        self.refresh_from_db(fields=['view_count'])
 
 
 class ListingMedia(BaseModel):

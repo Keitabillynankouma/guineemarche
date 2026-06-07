@@ -1,4 +1,5 @@
 import json
+from urllib.parse import parse_qs
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from django.contrib.auth.models import AnonymousUser
@@ -54,8 +55,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         scope = self.scope
         # Récupérer le token depuis les query params
         query_string = scope.get('query_string', b'').decode()
-        params = dict(p.split('=') for p in query_string.split('&') if '=' in p)
-        token_str = params.get('token', '')
+        params = parse_qs(query_string)
+        token_str = params.get('token', [''])[0]
         if not token_str:
             return AnonymousUser()
         try:

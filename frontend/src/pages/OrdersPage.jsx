@@ -25,20 +25,32 @@ export default function OrdersPage() {
     const qc = useQueryClient()
     const [active, setActive] = useState('buyer')
 
-    const { data, isLoading } = useQuery({
-        queryKey: ['orders'],
+    const { data: buyerData, isLoading: buyerLoading } = useQuery({
+        queryKey: ['orders-buyer'],
         queryFn: () => ordersAPI.getAll().then(r => r.data),
     })
 
-    const orders = Array.isArray(data) ? data : (data?.results ?? [])
+    const { data: sellerData, isLoading: sellerLoading } = useQuery({
+        queryKey: ['orders-seller'],
+        queryFn: () => ordersAPI.getSeller().then(r => r.data),
+    })
+
+    const isLoading = active === 'buyer' ? buyerLoading : sellerLoading
+    const rawData   = active === 'buyer' ? buyerData    : sellerData
+    const orders    = Array.isArray(rawData) ? rawData : (rawData?.results ?? [])
+
+    const invalidateOrders = () => {
+        qc.invalidateQueries(['orders-buyer'])
+        qc.invalidateQueries(['orders-seller'])
+    }
 
     const confirmMutation = useMutation({
         mutationFn: (id) => ordersAPI.confirmReceipt(id),
-        onSuccess: () => qc.invalidateQueries(['orders']),
+        onSuccess: invalidateOrders,
     })
     const disputeMutation = useMutation({
         mutationFn: (id) => ordersAPI.dispute(id),
-        onSuccess: () => qc.invalidateQueries(['orders']),
+        onSuccess: invalidateOrders,
     })
 
     return (

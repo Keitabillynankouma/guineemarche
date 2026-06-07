@@ -34,7 +34,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'payments', 'created_at', 'updated_at',
         )
         read_only_fields = (
-            'id', 'buyer', 'seller', 'status',
+            'id', 'buyer', 'seller', 'amount_gnf', 'status',
+            'commission_gnf', 'seller_payout_gnf',
             'escrow_status', 'escrow_released_at',
             'created_at', 'updated_at',
         )
@@ -48,7 +49,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 class CreatePaymentSerializer(serializers.Serializer):
     provider     = serializers.ChoiceField(choices=Payment.Provider.choices)
-    phone_number = serializers.CharField(required=False)
+    phone_number = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
         if attrs['provider'] != Payment.Provider.CASH and not attrs.get('phone_number'):

@@ -143,6 +143,16 @@ REST_FRAMEWORK = {
     ],
     'DEFAULT_PAGINATION_CLASS': 'core.pagination.StandardPagination',
     'PAGE_SIZE': 20,
+    'DEFAULT_THROTTLE_CLASSES': [
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ],
+    'DEFAULT_THROTTLE_RATES': {
+        'anon':  '200/day',
+        'user':  '1000/day',
+        'otp':   '5/hour',
+        'login': '10/hour',
+    },
 }
 
 CSRF_TRUSTED_ORIGINS = [
@@ -175,6 +185,11 @@ PHONENUMBER_DEFAULT_REGION = 'GN'
 AT_USERNAME  = env('AT_USERNAME',  default='')
 AT_API_KEY   = env('AT_API_KEY',   default='')
 AT_SENDER_ID = env('AT_SENDER_ID', default='')
+
+# Secrets pour validation des signatures webhook paiement
+# Définir dans les variables d'environnement Render
+ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
+MTN_WEBHOOK_SECRET    = env('MTN_WEBHOOK_SECRET',    default='')
 
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False

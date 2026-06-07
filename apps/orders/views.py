@@ -4,10 +4,14 @@ from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
+from django.conf import settings
+import hashlib
+import hmac
 
 from .models import Order, Payment, PickupPoint
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer
 from .payment_service import initiate_orange_money, initiate_mtn_momo
+from core.permissions import IsAdmin
 
 
 class PickupPointListView(generics.ListAPIView):
@@ -31,7 +35,24 @@ class OrderListCreateView(generics.ListCreateAPIView):
         return Order.objects.filter(buyer=user).select_related('listing', 'buyer', 'seller')
 
     def perform_create(self, serializer):
-        serializer.save(buyer=self.request.user)
+        from rest_framework.exceptions import PermissionDenied, ValidationError
+        listing = serializer.validated_data.get('listing')
+        user    = self.request.user
+        if listing and listing.seller == user:
+            raise PermissionDenied("Vous ne pouvez pas acheter votre propre annonce.")
+        if listing and not listing.is_active:
+            raise ValidationError("Cette annonce n'est plus disponible.")
+        serializer.save(buyer=user)
+
+
+class SellerOrdersView(generics.ListAPIView):
+    """Liste des commandes reçues par le vendeur."""
+    permission_classes = [permissions.IsAuthenticated]
+    serializer_class   = OrderSerializer
+
+    def get_queryset(self):
+        user = self.request.user
+        return Order.objects.filter(seller=user).select_related('listing', 'buyer', 'seller')
 
 
 class OrderDetailView(generics.RetrieveAPIView):
@@ -47,15 +68,38 @@ class OrderUpdateStatusView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk, action):
+        from apps.notifications.models import Notification
         order = get_object_or_404(Order, pk=pk)
         user  = request.user
 
         if action == 'confirm' and order.seller == user:
             order.confirm()
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Commande confirmée',
+                body=f'Le vendeur a confirmé votre commande pour « {order.listing.title} ».',
+                data={'order_id': str(order.id)},
+            )
         elif action == 'complete' and order.buyer == user:
             order.complete()
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Commande terminée',
+                body=f'La commande pour « {order.listing.title} » a été marquée comme terminée.',
+                data={'order_id': str(order.id)},
+            )
         elif action == 'cancel' and user in [order.buyer, order.seller]:
             order.cancel()
+            other = order.seller if user == order.buyer else order.buyer
+            Notification.send(
+                user=other,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Commande annulée',
+                body=f'La commande pour « {order.listing.title} » a été annulée.',
+                data={'order_id': str(order.id)},
+            )
         else:
             return Response({'error': 'Action non autorisée.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -172,6 +216,28 @@ class InitiatePaymentView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+def _verify_orange_signature(request):
+    """Vérifie la signature HMAC-SHA256 d'Orange Money."""
+    secret = getattr(settings, 'ORANGE_WEBHOOK_SECRET', '')
+    if not secret:
+        return True  # non configuré → laisser passer (log warning)
+    sig_header = request.headers.get('X-Orange-Signature', '')
+    body        = request.body
+    expected    = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig_header, expected)
+
+
+def _verify_mtn_signature(request):
+    """Vérifie la signature HMAC-SHA256 de MTN MoMo."""
+    secret = getattr(settings, 'MTN_WEBHOOK_SECRET', '')
+    if not secret:
+        return True  # non configuré → laisser passer
+    sig_header = request.headers.get('X-Callback-Signature', '')
+    body        = request.body
+    expected    = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig_header, expected)
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class PaymentWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -180,9 +246,13 @@ class PaymentWebhookView(APIView):
         data = request.data
 
         if provider == 'orange':
+            if not _verify_orange_signature(request):
+                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('pay_token', '')
             success = data.get('status', '') == 'SUCCESS'
         elif provider == 'mtn':
+            if not _verify_mtn_signature(request):
+                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('externalId', '')
             success = data.get('status', '') == 'SUCCESSFUL'
         else:
@@ -203,3 +273,92 @@ class PaymentWebhookView(APIView):
             pass
 
         return Response({'status': 'ok'})
+
+
+# ── Admin ──────────────────────────────────────────────────────────────────────
+
+class AdminDisputeListView(generics.ListAPIView):
+    """Admin : liste toutes les commandes en litige."""
+    permission_classes = [IsAdmin]
+    serializer_class   = OrderSerializer
+
+    def get_queryset(self):
+        return Order.objects.filter(
+            status=Order.Status.DISPUTED
+        ).select_related('listing', 'buyer', 'seller').prefetch_related('payments')
+
+
+class AdminDisputeResolveView(APIView):
+    """Admin : résoudre un litige — libérer les fonds au vendeur ou rembourser l'acheteur."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        order  = get_object_or_404(Order, pk=pk, status=Order.Status.DISPUTED)
+        action = request.data.get('action')  # 'release' ou 'refund'
+
+        if action not in ('release', 'refund'):
+            return Response(
+                {'error': "action doit être 'release' ou 'refund'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        from apps.notifications.models import Notification
+
+        if action == 'release':
+            order.complete()
+            if order.escrow_status == Order.EscrowStatus.HELD:
+                order.release_escrow()
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Litige résolu — fonds libérés',
+                body=f'Le litige pour « {order.listing.title} » a été résolu en votre faveur. Les fonds vous sont versés.',
+                data={'order_id': str(order.id)},
+            )
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Litige résolu',
+                body=f'Le litige pour « {order.listing.title} » a été résolu. Les fonds ont été versés au vendeur.',
+                data={'order_id': str(order.id)},
+            )
+        else:  # refund
+            order.refund_escrow()
+            order.cancel()
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Litige résolu — remboursement',
+                body=f'Le litige pour « {order.listing.title} » a été résolu en votre faveur. Vous serez remboursé.',
+                data={'order_id': str(order.id)},
+            )
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Litige résolu',
+                body=f'Le litige pour « {order.listing.title} » a été résolu en faveur de l\'acheteur.',
+                data={'order_id': str(order.id)},
+            )
+
+        return Response(OrderSerializer(order).data)
+
+
+class AdminStatsView(APIView):
+    """Admin : statistiques globales de la plateforme."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from apps.accounts.models import User
+        from apps.listings.models import Listing
+        from django.db.models import Sum
+
+        return Response({
+            'users':           User.objects.count(),
+            'active_listings': Listing.objects.filter(status='active').count(),
+            'orders_total':    Order.objects.count(),
+            'orders_disputed': Order.objects.filter(status=Order.Status.DISPUTED).count(),
+            'orders_completed':Order.objects.filter(status=Order.Status.COMPLETED).count(),
+            'revenue_gnf':     Payment.objects.filter(
+                                   status=Payment.Status.SUCCESS
+                               ).aggregate(total=Sum('amount_gnf'))['total'] or 0,
+        })

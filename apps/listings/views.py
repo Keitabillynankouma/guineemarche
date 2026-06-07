@@ -95,7 +95,7 @@ class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'error': 'Vous ne pouvez supprimer que vos propres annonces.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        instance.status = Listing.Status.SOLD
+        instance.status = Listing.Status.SUSPENDED
         instance.save(update_fields=['status'])
         return Response(status=status.HTTP_204_NO_CONTENT)
 

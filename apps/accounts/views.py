@@ -1,8 +1,28 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.utils import timezone
+
+
+class OTPRateThrottle(SimpleRateThrottle):
+    """5 tentatives par heure par IP sur les endpoints OTP."""
+    scope = 'otp'
+    rate  = '5/hour'
+
+    def get_cache_key(self, request, view):
+        return self.cache_format % {
+            'scope': self.scope,
+            'ident': self.get_ident(request),
+        }
+
+
+class LoginRateThrottle(AnonRateThrottle):
+    """10 tentatives par heure par IP sur le login."""
+    scope = 'login'
+    rate  = '10/hour'
 
 from .models import User, OTPCode, Subscription, Badge, Shop
 from .serializers import (
@@ -22,6 +42,7 @@ def get_tokens_for_user(user):
 
 class RegisterView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
 
     def post(self, request):
         serializer = RegisterSerializer(data=request.data)
@@ -35,6 +56,7 @@ class RegisterView(APIView):
 
 class VerifyOTPView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
 
     def post(self, request):
         serializer = VerifyOTPSerializer(data=request.data)
@@ -62,6 +84,7 @@ class VerifyOTPView(APIView):
 
 class LoginView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes   = [LoginRateThrottle]
 
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
@@ -116,6 +139,7 @@ class ChangePasswordView(APIView):
 
 class ResendOTPView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
 
     def post(self, request):
         from core.utils import generate_otp, otp_expiry
@@ -203,11 +227,7 @@ class ShopDetailView(generics.RetrieveAPIView):
 class MyShopView(APIView):
     """Créer ou mettre à jour sa boutique."""
     permission_classes = [permissions.IsAuthenticated]
-    parser_classes     = [permissions.IsAuthenticated.__class__]  # placeholder, overridden below
-
-    def get_parsers(self):
-        from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-        return [MultiPartParser(), FormParser(), JSONParser()]
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
         try:

@@ -14,6 +14,7 @@ import OrdersPage from './pages/OrdersPage'
 import UpgradePage from './pages/UpgradePage'
 import FavoritesPage from './pages/FavoritesPage'
 import ShopPage from './pages/ShopPage'
+import AdminPage from './pages/AdminPage'
 
 const queryClient = new QueryClient()
 
@@ -39,6 +40,7 @@ export default function App() {
           <Route path="/upgrade"   element={<PrivateRoute><UpgradePage /></PrivateRoute>} />
           <Route path="/favorites"    element={<PrivateRoute><FavoritesPage /></PrivateRoute>} />
           <Route path="/shops/:id"   element={<ShopPage />} />
+          <Route path="/admin"       element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

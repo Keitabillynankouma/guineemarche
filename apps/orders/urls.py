@@ -5,6 +5,9 @@ urlpatterns = [
     path('',
         views.OrderListCreateView.as_view(),
         name='order-list'),
+    path('received/',
+        views.SellerOrdersView.as_view(),
+        name='seller-orders'),
     path('pickup-points/',
         views.PickupPointListView.as_view(),
         name='pickup-points'),
@@ -26,4 +29,15 @@ urlpatterns = [
     path('<uuid:pk>/<str:action>/',
         views.OrderUpdateStatusView.as_view(),
         name='order-status'),
+
+    # Admin
+    path('admin/disputes/',
+        views.AdminDisputeListView.as_view(),
+        name='admin-disputes'),
+    path('admin/disputes/<uuid:pk>/resolve/',
+        views.AdminDisputeResolveView.as_view(),
+        name='admin-dispute-resolve'),
+    path('admin/stats/',
+        views.AdminStatsView.as_view(),
+        name='admin-stats'),
 ]
