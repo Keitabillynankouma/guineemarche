@@ -41,7 +41,7 @@ class Order(BaseModel):
         RELEASED = 'released', 'Fonds libérés'
         REFUNDED = 'refunded', 'Remboursé'
 
-    COMMISSION_PCT = 5  # 5 % de commission plateforme
+    COMMISSION_PCT = 4  # 4 % de commission plateforme (transparente pour l'acheteur)
 
     listing            = models.ForeignKey(Listing,     on_delete=models.PROTECT,  related_name='orders')
     buyer              = models.ForeignKey(User,        on_delete=models.PROTECT,  related_name='orders_as_buyer')

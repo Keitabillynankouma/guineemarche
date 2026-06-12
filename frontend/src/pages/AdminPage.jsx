@@ -26,6 +26,11 @@ const adminAPI = {
   getCategories:  ()     => api.get('/listings/admin/categories/'),
   createCategory: (data) => api.post('/listings/admin/categories/', data),
   deleteCategory: (id)   => api.delete(`/listings/admin/categories/${id}/`),
+
+  // Boutiques
+  getShops:     (params) => api.get('/accounts/admin/shops/', { params }),
+  approveShop:  (id, data) => api.post(`/accounts/admin/shops/${id}/approve/`, data),
+  updateShop:   (id, data) => api.patch(`/accounts/admin/shops/${id}/`, data),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -582,6 +587,171 @@ function TabCategories() {
   )
 }
 
+// ── Onglet 5 : Boutiques ──────────────────────────────────────────────────────
+
+function TabShops() {
+  const qc = useQueryClient()
+  const [filter, setFilter]         = useState('pending')
+  const [rejectId, setRejectId]     = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-shops', filter],
+    queryFn:  () => adminAPI.getShops({ status: filter || undefined }).then(r => r.data),
+  })
+
+  const shops = Array.isArray(data) ? data : (data?.results ?? [])
+
+  const approveMutation = useMutation({
+    mutationFn: ({ id, action, plan, reason }) => adminAPI.approveShop(id, { action, plan, reason }),
+    onSuccess:  () => qc.invalidateQueries(['admin-shops']),
+  })
+
+  const STATUS_COLORS = {
+    pending:  'bg-amber-100 text-amber-700',
+    approved: 'bg-green-100 text-green-700',
+    rejected: 'bg-red-100 text-red-600',
+  }
+  const STATUS_LABELS = { pending: 'En attente', approved: 'Approuvée', rejected: 'Rejetée' }
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-gray-800">🏪 Boutiques</h2>
+
+      {/* Filtres */}
+      <div className="flex gap-2">
+        {[['pending', '⏳ En attente'], ['approved', '✅ Approuvées'], ['rejected', '❌ Rejetées'], ['', '🗂 Toutes']].map(([v, l]) => (
+          <button key={v} onClick={() => setFilter(v)}
+            className={`text-xs font-medium px-3 py-2 rounded-xl transition ${filter === v ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-green-400'}`}
+          >{l}</button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-28 animate-pulse" />)}</div>
+      ) : shops.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
+          <p className="text-4xl mb-3">🏪</p>
+          <p>Aucune boutique {filter === 'pending' ? 'en attente' : ''}</p>
+        </div>
+      ) : (
+        <div className="space-y-4">
+          {shops.map(shop => (
+            <div key={shop.id} className="bg-white rounded-2xl shadow p-5 space-y-4">
+              {/* En-tête */}
+              <div className="flex items-start gap-4">
+                <div className="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                  {shop.logo_url
+                    ? <img src={shop.logo_url} alt={shop.name} className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-2xl">🏪</div>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <p className="font-bold text-gray-800">{shop.name}</p>
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_COLORS[shop.status]}`}>
+                      {STATUS_LABELS[shop.status]}
+                    </span>
+                    {shop.plan === 'premium' && (
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">⭐ Premium</span>
+                    )}
+                  </div>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Propriétaire : <span className="font-medium">{shop.owner_name}</span>
+                    {' · '}{shop.owner_phone}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    📍 {shop.city}
+                    {shop.phone && <> · 📞 {shop.phone}</>}
+                    {shop.whatsapp && <> · 💬 {shop.whatsapp}</>}
+                  </p>
+                </div>
+              </div>
+
+              {shop.description && (
+                <p className="text-sm text-gray-600 bg-gray-50 rounded-xl p-3 line-clamp-2">{shop.description}</p>
+              )}
+
+              {shop.reject_reason && (
+                <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-sm text-red-700">
+                  <strong>Raison du rejet :</strong> {shop.reject_reason}
+                </div>
+              )}
+
+              {/* Actions approbation */}
+              {shop.status === 'pending' && (
+                <div className="space-y-3">
+                  {/* Choisir plan avant approbation */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      onClick={() => approveMutation.mutate({ id: shop.id, action: 'approve', plan: 'standard' })}
+                      disabled={approveMutation.isPending}
+                      className="bg-blue-500 hover:bg-blue-600 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
+                    >✅ Approuver Standard</button>
+                    <button
+                      onClick={() => approveMutation.mutate({ id: shop.id, action: 'approve', plan: 'premium' })}
+                      disabled={approveMutation.isPending}
+                      className="bg-amber-500 hover:bg-amber-600 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
+                    >⭐ Approuver Premium</button>
+                  </div>
+
+                  {/* Rejection avec raison */}
+                  {rejectId === shop.id ? (
+                    <div className="space-y-2">
+                      <textarea
+                        rows={2}
+                        placeholder="Raison du rejet (ex: informations incomplètes, photos incorrectes...)"
+                        value={rejectReason}
+                        onChange={e => setRejectReason(e.target.value)}
+                        className="w-full border border-red-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                      />
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => {
+                            approveMutation.mutate({ id: shop.id, action: 'reject', reason: rejectReason })
+                            setRejectId(null); setRejectReason('')
+                          }}
+                          disabled={approveMutation.isPending}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white font-semibold py-2 rounded-xl text-sm transition disabled:opacity-50"
+                        >Confirmer le rejet</button>
+                        <button onClick={() => setRejectId(null)} className="px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm transition">Annuler</button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => { setRejectId(shop.id); setRejectReason('') }}
+                      className="w-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2 rounded-xl text-sm border border-red-200 transition"
+                    >❌ Rejeter</button>
+                  )}
+                </div>
+              )}
+
+              {/* Actions sur boutiques approuvées */}
+              {shop.status === 'approved' && (
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => approveMutation.mutate({ id: shop.id, action: 'approve', plan: shop.plan === 'standard' ? 'premium' : 'standard' })}
+                    disabled={approveMutation.isPending}
+                    className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-medium py-2 rounded-xl text-xs transition"
+                  >
+                    {shop.plan === 'premium' ? '⬇️ Rétrograder Standard' : '⬆️ Promouvoir Premium'}
+                  </button>
+                  <button
+                    onClick={() => adminAPI.updateShop(shop.id, { is_featured: !shop.is_featured }).then(() => qc.invalidateQueries(['admin-shops']))}
+                    className={`flex-1 font-medium py-2 rounded-xl text-xs transition ${shop.is_featured ? 'bg-amber-100 text-amber-700 hover:bg-amber-200' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+                  >
+                    {shop.is_featured ? '⭐ En vedette' : '☆ Mettre en vedette'}
+                  </button>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
 const TABS = [
@@ -589,6 +759,7 @@ const TABS = [
   { id: 'listings',   label: '📦 Annonces' },
   { id: 'banners',    label: '📢 Publicités' },
   { id: 'categories', label: '🏷️ Catégories' },
+  { id: 'shops',      label: '🏪 Boutiques' },
 ]
 
 export default function AdminPage() {
@@ -617,6 +788,16 @@ export default function AdminPage() {
       qc.invalidateQueries(['admin-stats'])
     },
   })
+
+  const { data: pendingShopsData } = useQuery({
+    queryKey: ['admin-shops-pending-count'],
+    queryFn:  () => adminAPI.getShops({ status: 'pending' }).then(r => {
+      const d = r.data
+      return Array.isArray(d) ? d.length : (d?.count ?? d?.results?.length ?? 0)
+    }),
+    refetchInterval: 60000,
+  })
+  const pendingShopsCount = pendingShopsData ?? 0
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -648,6 +829,9 @@ export default function AdminPage() {
               {tab.id === 'overview' && disputes.length > 0 && (
                 <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{disputes.length}</span>
               )}
+              {tab.id === 'shops' && pendingShopsCount > 0 && (
+                <span className="ml-1.5 bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{pendingShopsCount}</span>
+              )}
             </button>
           ))}
         </div>
@@ -657,6 +841,7 @@ export default function AdminPage() {
         {activeTab === 'listings'   && <TabListings />}
         {activeTab === 'banners'    && <TabBanners />}
         {activeTab === 'categories' && <TabCategories />}
+        {activeTab === 'shops'      && <TabShops />}
       </div>
     </div>
   )

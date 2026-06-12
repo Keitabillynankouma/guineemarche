@@ -142,12 +142,40 @@ class ShopSerializer(serializers.ModelSerializer):
         model  = Shop
         fields = (
             'id', 'name', 'logo', 'logo_url', 'description',
-            'phone', 'address', 'city', 'website',
+            'phone', 'whatsapp', 'address', 'city', 'website',
             'is_verified', 'is_featured', 'listing_count',
+            'status', 'plan', 'plan_until',
             'owner', 'owner_name', 'owner_phone', 'created_at',
         )
-        read_only_fields = ('id', 'is_verified', 'is_featured', 'owner', 'owner_name', 'owner_phone', 'created_at')
+        read_only_fields = (
+            'id', 'is_verified', 'is_featured', 'status', 'plan', 'plan_until',
+            'owner', 'owner_name', 'owner_phone', 'created_at',
+        )
         extra_kwargs = {'logo': {'write_only': True, 'required': False}}
+
+    def get_logo_url(self, obj):
+        return obj.logo_url
+
+
+class AdminShopSerializer(serializers.ModelSerializer):
+    """Sérialiseur admin complet — lecture + actions d'approbation."""
+    logo_url      = serializers.SerializerMethodField(read_only=True)
+    listing_count = serializers.IntegerField(read_only=True, source='listing_count')
+    owner_name    = serializers.CharField(source='owner.full_name', read_only=True)
+    owner_phone   = serializers.CharField(source='owner.phone_number', read_only=True)
+
+    class Meta:
+        model  = Shop
+        fields = (
+            'id', 'name', 'logo_url', 'description',
+            'phone', 'whatsapp', 'address', 'city', 'website',
+            'is_verified', 'is_featured', 'listing_count',
+            'status', 'plan', 'plan_until', 'reject_reason',
+            'owner', 'owner_name', 'owner_phone', 'created_at',
+        )
+        read_only_fields = (
+            'id', 'listing_count', 'owner', 'owner_name', 'owner_phone', 'created_at',
+        )
 
     def get_logo_url(self, obj):
         return obj.logo_url

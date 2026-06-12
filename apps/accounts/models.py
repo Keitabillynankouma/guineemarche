@@ -119,6 +119,16 @@ class Session(BaseModel):
 
 class Shop(BaseModel):
     """Profil boutique d'un vendeur professionnel."""
+
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'En attente de validation'
+        APPROVED = 'approved', 'Approuvée'
+        REJECTED = 'rejected', 'Rejetée'
+
+    class Plan(models.TextChoices):
+        STANDARD = 'standard', 'Boutique Standard'
+        PREMIUM  = 'premium',  'Boutique Premium'
+
     owner       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='shop')
     name        = models.CharField(max_length=200)
     logo        = models.ImageField(upload_to='shops/', null=True, blank=True)
@@ -127,6 +137,11 @@ class Shop(BaseModel):
     address     = models.CharField(max_length=300, blank=True)
     city        = models.CharField(max_length=100, default='Conakry')
     website     = models.CharField(max_length=255, blank=True)
+    whatsapp    = models.CharField(max_length=20, blank=True)
+    status      = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING, db_index=True)
+    plan        = models.CharField(max_length=10, choices=Plan.choices, default=Plan.STANDARD)
+    plan_until  = models.DateTimeField(null=True, blank=True)
+    reject_reason = models.TextField(blank=True)
     is_verified = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     is_active   = models.BooleanField(default=True)

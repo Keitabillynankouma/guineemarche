@@ -16,4 +16,9 @@ urlpatterns = [
     path('shop/',              views.MyShopView.as_view(),        name='my-shop'),
     path('shops/',             views.ShopListView.as_view(),      name='shop-list'),
     path('shops/<uuid:pk>/',   views.ShopDetailView.as_view(),    name='shop-detail'),
+
+    # Admin
+    path('admin/shops/',                    views.AdminShopListView.as_view(),    name='admin-shop-list'),
+    path('admin/shops/<uuid:pk>/approve/',  views.AdminShopApproveView.as_view(), name='admin-shop-approve'),
+    path('admin/shops/<uuid:pk>/',          views.AdminShopUpdateView.as_view(),  name='admin-shop-update'),
 ]

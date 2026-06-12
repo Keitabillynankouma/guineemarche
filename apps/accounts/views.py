@@ -28,8 +28,9 @@ from .models import User, OTPCode, Subscription, Badge, Shop
 from .serializers import (
     RegisterSerializer, VerifyOTPSerializer, LoginSerializer,
     UserSerializer, UserProfileSerializer, ChangePasswordSerializer,
-    SubscriptionSerializer, BadgeSerializer, ShopSerializer,
+    SubscriptionSerializer, BadgeSerializer, ShopSerializer, AdminShopSerializer,
 )
+from core.permissions import IsAdmin
 
 
 def get_tokens_for_user(user):
@@ -203,12 +204,12 @@ class BadgeListView(generics.ListAPIView):
 
 
 class ShopListView(generics.ListAPIView):
-    """Boutiques vedettes publiques."""
+    """Boutiques publiques — uniquement les boutiques approuvées."""
     permission_classes = [permissions.AllowAny]
     serializer_class   = ShopSerializer
 
     def get_queryset(self):
-        qs = Shop.objects.filter(is_active=True).select_related('owner')
+        qs = Shop.objects.filter(is_active=True, status=Shop.Status.APPROVED).select_related('owner')
         if self.request.query_params.get('featured'):
             qs = qs.filter(is_featured=True)
         city = self.request.query_params.get('city')
@@ -225,7 +226,7 @@ class ShopDetailView(generics.RetrieveAPIView):
 
 
 class MyShopView(APIView):
-    """Créer ou mettre à jour sa boutique."""
+    """Créer ou mettre à jour sa boutique (soumis à validation admin)."""
     permission_classes = [permissions.IsAuthenticated]
     parser_classes     = [MultiPartParser, FormParser, JSONParser]
 
@@ -243,5 +244,97 @@ class MyShopView(APIView):
         except Shop.DoesNotExist:
             serializer = ShopSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        serializer.save(owner=request.user)
-        return Response(serializer.data)
+        # Nouvelle boutique → statut "pending" automatiquement
+        shop = serializer.save(owner=request.user, status=Shop.Status.PENDING)
+        # Notification admin (optionnel — ne bloque pas si pas de canal)
+        try:
+            from apps.notifications.models import Notification
+            for admin_user in User.objects.filter(role=User.Role.ADMIN):
+                Notification.send(
+                    user=admin_user,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='Nouvelle boutique à approuver',
+                    body=f'La boutique « {shop.name} » attend votre validation.',
+                    data={'shop_id': str(shop.id)},
+                )
+        except Exception:
+            pass
+        return Response(ShopSerializer(shop).data)
+
+
+# ── Vues Admin Boutiques ───────────────────────────────────────────────────────
+
+class AdminShopListView(generics.ListAPIView):
+    """Admin : liste toutes les boutiques avec filtre par statut."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminShopSerializer
+
+    def get_queryset(self):
+        qs = Shop.objects.select_related('owner').all()
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs.order_by('-created_at')
+
+
+class AdminShopApproveView(APIView):
+    """Admin : approuver ou rejeter une boutique."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from django.shortcuts import get_object_or_404
+        shop   = get_object_or_404(Shop, pk=pk)
+        action = request.data.get('action')  # 'approve' | 'reject'
+        plan   = request.data.get('plan', Shop.Plan.STANDARD)
+        reason = request.data.get('reason', '')
+
+        if action == 'approve':
+            shop.status      = Shop.Status.APPROVED
+            shop.is_verified = True
+            shop.plan        = plan
+            shop.reject_reason = ''
+            # Plan premium → 1 mois par défaut si pas de date définie
+            if plan == Shop.Plan.PREMIUM and not shop.plan_until:
+                from django.utils import timezone
+                from dateutil.relativedelta import relativedelta
+                shop.plan_until = timezone.now() + relativedelta(months=1)
+            shop.save(update_fields=['status', 'is_verified', 'plan', 'plan_until', 'reject_reason', 'updated_at'])
+            # Notifier le propriétaire
+            try:
+                from apps.notifications.models import Notification
+                Notification.send(
+                    user=shop.owner,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='✅ Boutique approuvée !',
+                    body=f'Votre boutique « {shop.name} » a été approuvée. Elle est maintenant visible sur GuinéeMarché.',
+                    data={'shop_id': str(shop.id)},
+                )
+            except Exception:
+                pass
+
+        elif action == 'reject':
+            shop.status        = Shop.Status.REJECTED
+            shop.reject_reason = reason
+            shop.save(update_fields=['status', 'reject_reason', 'updated_at'])
+            try:
+                from apps.notifications.models import Notification
+                Notification.send(
+                    user=shop.owner,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='❌ Boutique non approuvée',
+                    body=f'Votre boutique « {shop.name} » n\'a pas pu être approuvée. Raison : {reason or "Non précisée"}. Vous pouvez la modifier et la soumettre à nouveau.',
+                    data={'shop_id': str(shop.id)},
+                )
+            except Exception:
+                pass
+        else:
+            return Response({'error': "action doit être 'approve' ou 'reject'."}, status=400)
+
+        return Response(AdminShopSerializer(shop).data)
+
+
+class AdminShopUpdateView(generics.UpdateAPIView):
+    """Admin : modifier un plan ou featured status d'une boutique."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminShopSerializer
+    queryset           = Shop.objects.all()
