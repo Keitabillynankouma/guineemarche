@@ -1,13 +1,34 @@
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
 import api from '../services/api'
 
+// ── API ──────────────────────────────────────────────────────────────────────
+
 const adminAPI = {
+  // Ordres / litiges
   getStats:    () => api.get('/orders/admin/stats/'),
   getDisputes: () => api.get('/orders/admin/disputes/'),
   resolve:     (id, action) => api.post(`/orders/admin/disputes/${id}/resolve/`, { action }),
+
+  // Annonces
+  getListings:    (params) => api.get('/listings/admin/listings/', { params }),
+  suspendListing: (id)     => api.delete(`/listings/admin/listings/${id}/`),
+
+  // Publicités
+  getBanners:   ()          => api.get('/listings/admin/banners/'),
+  createBanner: (data)      => api.post('/listings/admin/banners/', data),
+  deleteBanner: (id)        => api.delete(`/listings/admin/banners/${id}/`),
+  toggleBanner: (id, data)  => api.patch(`/listings/admin/banners/${id}/`, data),
+
+  // Catégories
+  getCategories:  ()     => api.get('/listings/admin/categories/'),
+  createCategory: (data) => api.post('/listings/admin/categories/', data),
+  deleteCategory: (id)   => api.delete(`/listings/admin/categories/${id}/`),
 }
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function fmt(n) {
   return new Intl.NumberFormat('fr-GN').format(n) + ' GNF'
@@ -15,9 +36,9 @@ function fmt(n) {
 
 function StatCard({ label, value, icon, color = 'green' }) {
   const colors = {
-    green:  'bg-green-50 text-green-700 border-green-100',
-    red:    'bg-red-50 text-red-700 border-red-100',
-    blue:   'bg-blue-50 text-blue-700 border-blue-100',
+    green:  'bg-green-50  text-green-700  border-green-100',
+    red:    'bg-red-50    text-red-700    border-red-100',
+    blue:   'bg-blue-50   text-blue-700   border-blue-100',
     yellow: 'bg-yellow-50 text-yellow-700 border-yellow-100',
   }
   return (
@@ -29,27 +50,569 @@ function StatCard({ label, value, icon, color = 'green' }) {
   )
 }
 
+// ── Onglet 1 : Stats + Litiges ────────────────────────────────────────────────
+
+function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
+  return (
+    <div className="space-y-8">
+      {stats && (
+        <div>
+          <h2 className="text-lg font-bold text-gray-800 mb-4">Vue d'ensemble</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <StatCard label="Utilisateurs"           value={stats.users}            icon="👥" color="blue" />
+            <StatCard label="Annonces actives"        value={stats.active_listings}  icon="📦" color="green" />
+            <StatCard label="Commandes totales"       value={stats.orders_total}     icon="🛍️" color="blue" />
+            <StatCard label="Commandes terminées"     value={stats.orders_completed} icon="✅" color="green" />
+            <StatCard label="Litiges en cours"        value={stats.orders_disputed}  icon="⚠️" color="red" />
+            <StatCard
+              label="Revenus plateforme (5%)"
+              value={Math.round((stats.revenue_gnf || 0) * 0.05).toLocaleString('fr-GN') + ' GNF'}
+              icon="💰" color="yellow"
+            />
+          </div>
+        </div>
+      )}
+
+      <div>
+        <h2 className="text-lg font-bold text-gray-800 mb-4">
+          ⚠️ Litiges en attente
+          {disputes.length > 0 && (
+            <span className="ml-2 text-sm bg-red-100 text-red-600 px-2 py-0.5 rounded-full">{disputes.length}</span>
+          )}
+        </h2>
+        {isLoading ? (
+          <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-32 animate-pulse" />)}</div>
+        ) : disputes.length === 0 ? (
+          <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
+            <p className="text-5xl mb-3">✅</p>
+            <p className="font-medium">Aucun litige en cours</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {disputes.map(order => (
+              <div key={order.id} className="bg-white rounded-2xl shadow p-5 space-y-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-bold text-gray-800">{order.listing_title}</p>
+                    <p className="text-sm text-gray-500 mt-0.5">
+                      Acheteur : <span className="font-medium text-gray-700">{order.buyer_name}</span>
+                      {' · '}
+                      Vendeur : <span className="font-medium text-gray-700">{order.seller_name}</span>
+                    </p>
+                  </div>
+                  <span className="text-sm font-bold text-green-600">{fmt(order.amount_gnf)}</span>
+                </div>
+                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
+                  <strong>Comment trancher ?</strong> Contacte les deux parties, vérifie les preuves (photos, messages), puis décide.
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => { if (confirm(`Libérer ${fmt(order.amount_gnf)} au vendeur ${order.seller_name} ?`)) resolveMutation.mutate({ id: order.id, action: 'release' }) }}
+                    disabled={resolveMutation.isPending}
+                    className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
+                  >✅ Libérer au vendeur</button>
+                  <button
+                    onClick={() => { if (confirm(`Rembourser l'acheteur ${order.buyer_name} ?`)) resolveMutation.mutate({ id: order.id, action: 'refund' }) }}
+                    disabled={resolveMutation.isPending}
+                    className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
+                  >🔄 Rembourser l'acheteur</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Onglet 2 : Annonces ───────────────────────────────────────────────────────
+
+function TabListings() {
+  const qc = useQueryClient()
+  const [search, setSearch]           = useState('')
+  const [statusFilter, setStatusFilter] = useState('')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-listings', search, statusFilter],
+    queryFn:  () => adminAPI.getListings({ search: search || undefined, status: statusFilter || undefined }).then(r => r.data),
+  })
+
+  const listings = Array.isArray(data) ? data : (data?.results ?? [])
+
+  const suspendMutation = useMutation({
+    mutationFn: (id) => adminAPI.suspendListing(id),
+    onSuccess:  () => qc.invalidateQueries(['admin-listings']),
+  })
+
+  const STATUS_LABELS = {
+    active:    { label: 'Active',    color: 'bg-green-100 text-green-700' },
+    draft:     { label: 'Brouillon', color: 'bg-gray-100 text-gray-500' },
+    sold:      { label: 'Vendue',    color: 'bg-blue-100 text-blue-700' },
+    expired:   { label: 'Expirée',   color: 'bg-orange-100 text-orange-600' },
+    suspended: { label: 'Suspendue', color: 'bg-red-100 text-red-600' },
+  }
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-gray-800">📦 Toutes les annonces</h2>
+
+      <div className="flex gap-3 flex-wrap">
+        <input
+          type="text" placeholder="Rechercher par titre, ville, vendeur..."
+          value={search} onChange={(e) => setSearch(e.target.value)}
+          className="flex-1 min-w-40 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+        <select
+          value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}
+          className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        >
+          <option value="">Tous les statuts</option>
+          {Object.entries(STATUS_LABELS).map(([v, { label }]) => (
+            <option key={v} value={v}>{label}</option>
+          ))}
+        </select>
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-xl h-20 animate-pulse" />)}</div>
+      ) : listings.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
+          <p className="text-4xl mb-3">📭</p>
+          <p>Aucune annonce trouvée</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {listings.map(l => {
+            const s = STATUS_LABELS[l.status] || { label: l.status, color: 'bg-gray-100 text-gray-500' }
+            return (
+              <div key={l.id} className="bg-white rounded-2xl shadow p-4 flex items-center gap-4">
+                <div className="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                  {l.media?.[0]?.file
+                    ? <img src={l.media[0].file} alt="" className="w-full h-full object-cover" />
+                    : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                  }
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">{l.title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {l.seller_name} · {l.city} · {new Intl.NumberFormat('fr-GN').format(l.price_gnf)} GNF
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
+                  <Link
+                    to={`/listings/${l.id}`}
+                    className="text-xs bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg transition"
+                  >Voir</Link>
+                  {l.status !== 'suspended' && (
+                    <button
+                      onClick={() => { if (confirm('Suspendre cette annonce ?')) suspendMutation.mutate(l.id) }}
+                      disabled={suspendMutation.isPending}
+                      className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                    >Suspendre</button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Onglet 3 : Publicités ─────────────────────────────────────────────────────
+
+function TabBanners() {
+  const qc      = useQueryClient()
+  const fileRef = useRef(null)
+  const [form, setForm]     = useState({ title: '', link_url: '', position: 'hero', start_date: '', end_date: '', sort_order: 0 })
+  const [file, setFile]     = useState(null)
+  const [preview, setPreview] = useState(null)
+  const [error, setError]   = useState('')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-banners'],
+    queryFn:  () => adminAPI.getBanners().then(r => r.data),
+  })
+  const banners = Array.isArray(data) ? data : (data?.results ?? [])
+
+  const createMutation = useMutation({
+    mutationFn: (fd) => adminAPI.createBanner(fd),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-banners'])
+      setForm({ title: '', link_url: '', position: 'hero', start_date: '', end_date: '', sort_order: 0 })
+      setFile(null); setPreview(null); setError('')
+    },
+    onError: (err) => setError(JSON.stringify(err.response?.data || 'Erreur')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => adminAPI.deleteBanner(id),
+    onSuccess:  () => qc.invalidateQueries(['admin-banners']),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, is_active }) => adminAPI.toggleBanner(id, { is_active }),
+    onSuccess:  () => qc.invalidateQueries(['admin-banners']),
+  })
+
+  const handleFile = (e) => {
+    const f = e.target.files[0]
+    if (!f) return
+    setFile(f)
+    setPreview(URL.createObjectURL(f))
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!file) { setError('Veuillez sélectionner une image.'); return }
+    const fd = new FormData()
+    fd.append('image_file', file)
+    Object.entries(form).forEach(([k, v]) => { if (v !== '') fd.append(k, v) })
+    createMutation.mutate(fd)
+  }
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-lg font-bold text-gray-800">📢 Publicités (Banners)</h2>
+
+      {/* Formulaire */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <h3 className="font-semibold text-gray-700 mb-4">Ajouter une publicité</h3>
+        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Titre *</label>
+              <input
+                type="text" required value={form.title}
+                onChange={(e) => setForm(f => ({ ...f, title: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Ex: Promo Ramadan 2026"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Lien URL (optionnel)</label>
+              <input
+                type="url" value={form.link_url}
+                onChange={(e) => setForm(f => ({ ...f, link_url: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="https://..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Position</label>
+              <select
+                value={form.position} onChange={(e) => setForm(f => ({ ...f, position: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="hero">Bandeau principal (haut de page)</option>
+                <option value="inline">Entre les annonces</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ordre d'affichage</label>
+              <input
+                type="number" min="0" value={form.sort_order}
+                onChange={(e) => setForm(f => ({ ...f, sort_order: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de début (optionnel)</label>
+              <input
+                type="datetime-local" value={form.start_date}
+                onChange={(e) => setForm(f => ({ ...f, start_date: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Date de fin (optionnel)</label>
+              <input
+                type="datetime-local" value={form.end_date}
+                onChange={(e) => setForm(f => ({ ...f, end_date: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Image *</label>
+            <div
+              onClick={() => fileRef.current?.click()}
+              className="border-2 border-dashed border-gray-300 rounded-xl p-4 cursor-pointer hover:border-green-400 transition text-center"
+            >
+              {preview ? (
+                <img src={preview} alt="preview" className="max-h-32 mx-auto rounded-lg object-contain" />
+              ) : (
+                <div className="text-gray-400">
+                  <p className="text-3xl mb-1">🖼️</p>
+                  <p className="text-sm">Cliquer pour choisir une image</p>
+                  <p className="text-xs mt-1">Recommandé : 1200×400 px, JPG ou PNG</p>
+                </div>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
+          </div>
+
+          <button
+            type="submit" disabled={createMutation.isPending}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-50"
+          >
+            {createMutation.isPending ? 'Envoi en cours...' : '➕ Ajouter la publicité'}
+          </button>
+        </form>
+      </div>
+
+      {/* Liste */}
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-24 animate-pulse" />)}</div>
+      ) : banners.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-10 text-center text-gray-400">
+          <p className="text-4xl mb-2">📭</p>
+          <p>Aucune publicité pour l'instant</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {banners.map(b => (
+            <div key={b.id} className="bg-white rounded-2xl shadow p-4 flex items-center gap-4">
+              <div className="w-24 h-16 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                {b.image_url
+                  ? <img src={b.image_url} alt={b.title} className="w-full h-full object-cover" />
+                  : <div className="w-full h-full flex items-center justify-center text-2xl">🖼️</div>
+                }
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-gray-800">{b.title}</p>
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {b.position === 'hero' ? 'Bandeau principal' : 'Entre les annonces'}
+                  {b.link_url && <> · <a href={b.link_url} target="_blank" rel="noreferrer" className="text-green-600 underline">Lien</a></>}
+                  {' · '}{b.click_count} clics
+                </p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => toggleMutation.mutate({ id: b.id, is_active: !b.is_active })}
+                  className={`text-xs font-medium px-3 py-1.5 rounded-lg transition ${b.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+                >{b.is_active ? '✅ Active' : '⏸ Inactif'}</button>
+                <button
+                  onClick={() => { if (confirm('Supprimer cette publicité définitivement ?')) deleteMutation.mutate(b.id) }}
+                  className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition"
+                >🗑 Supprimer</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Onglet 4 : Catégories ─────────────────────────────────────────────────────
+
+function TabCategories() {
+  const qc = useQueryClient()
+  const [form, setForm]   = useState({ name: '', icon_url: '', parent: '', sort_order: 0 })
+  const [error, setError] = useState('')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-categories'],
+    queryFn:  () => adminAPI.getCategories().then(r => r.data),
+  })
+
+  const allCats  = Array.isArray(data) ? data : (data?.results ?? [])
+  const parents  = allCats.filter(c => !c.parent)
+  const childMap = allCats.reduce((acc, c) => {
+    if (c.parent) { acc[c.parent] = [...(acc[c.parent] || []), c] }
+    return acc
+  }, {})
+
+  const createMutation = useMutation({
+    mutationFn: (d) => adminAPI.createCategory(d),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-categories'])
+      setForm({ name: '', icon_url: '', parent: '', sort_order: 0 })
+      setError('')
+    },
+    onError: (err) => setError(JSON.stringify(err.response?.data || 'Erreur')),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => adminAPI.deleteCategory(id),
+    onSuccess:  () => qc.invalidateQueries(['admin-categories']),
+  })
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!form.name.trim()) { setError('Le nom est obligatoire.'); return }
+    const payload = { name: form.name.trim(), icon_url: form.icon_url.trim(), sort_order: Number(form.sort_order) || 0 }
+    if (form.parent) payload.parent = form.parent
+    createMutation.mutate(payload)
+  }
+
+  const iconOf = (c) => c.icon_url && !c.icon_url.startsWith('http') ? c.icon_url : null
+
+  return (
+    <div className="space-y-8">
+      <h2 className="text-lg font-bold text-gray-800">🏷️ Catégories &amp; Sous-catégories</h2>
+
+      {/* Formulaire */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <h3 className="font-semibold text-gray-700 mb-4">
+          {form.parent ? '➕ Nouvelle sous-catégorie' : '➕ Nouvelle catégorie principale'}
+        </h3>
+        {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nom *</label>
+              <input
+                type="text" required value={form.name}
+                onChange={(e) => setForm(f => ({ ...f, name: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                placeholder="Ex: Voitures, Toyota, Téléphones..."
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Icône (emoji ou URL image)</label>
+              <div className="flex gap-2 items-center">
+                {form.icon_url && !form.icon_url.startsWith('http') && (
+                  <span className="text-2xl">{form.icon_url}</span>
+                )}
+                <input
+                  type="text" value={form.icon_url}
+                  onChange={(e) => setForm(f => ({ ...f, icon_url: e.target.value }))}
+                  className="flex-1 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                  placeholder="🚗 ou https://..."
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Catégorie parente <span className="text-gray-400">(laisser vide = catégorie principale)</span>
+              </label>
+              <select
+                value={form.parent} onChange={(e) => setForm(f => ({ ...f, parent: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              >
+                <option value="">— Catégorie principale —</option>
+                {parents.map(p => (
+                  <option key={p.id} value={p.id}>{iconOf(p) ? iconOf(p) + ' ' : ''}{p.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Ordre d'affichage</label>
+              <input
+                type="number" min="0" value={form.sort_order}
+                onChange={(e) => setForm(f => ({ ...f, sort_order: e.target.value }))}
+                className="w-full border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+              />
+            </div>
+          </div>
+          <button
+            type="submit" disabled={createMutation.isPending}
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition disabled:opacity-50"
+          >
+            {createMutation.isPending ? 'Création...' : `➕ Créer ${form.parent ? 'la sous-catégorie' : 'la catégorie'}`}
+          </button>
+        </form>
+      </div>
+
+      {/* Résumé */}
+      {!isLoading && (
+        <div className="flex gap-4 text-sm text-gray-500">
+          <span>🗂 {parents.length} catégorie{parents.length !== 1 ? 's' : ''} principales</span>
+          <span>·</span>
+          <span>📂 {allCats.length - parents.length} sous-catégorie{allCats.length - parents.length !== 1 ? 's' : ''}</span>
+        </div>
+      )}
+
+      {/* Arbre */}
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="bg-white rounded-xl h-16 animate-pulse" />)}</div>
+      ) : (
+        <div className="space-y-2">
+          {parents.map(cat => {
+            const subs = childMap[cat.id] || []
+            return (
+              <div key={cat.id} className="bg-white rounded-2xl shadow overflow-hidden">
+                <div className="flex items-center gap-3 p-4 bg-gray-50 border-b">
+                  <span className="text-2xl w-8 text-center">{iconOf(cat) || '📁'}</span>
+                  <div className="flex-1">
+                    <p className="font-bold text-gray-800">{cat.name}</p>
+                    <p className="text-xs text-gray-400">{subs.length} sous-catégorie{subs.length !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium ${cat.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                      {cat.is_active ? 'Active' : 'Inactive'}
+                    </span>
+                    <button
+                      onClick={() => { if (confirm(`Désactiver « ${cat.name} » et toutes ses sous-catégories ?`)) deleteMutation.mutate(cat.id) }}
+                      disabled={deleteMutation.isPending}
+                      className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                    >Désactiver</button>
+                  </div>
+                </div>
+                {subs.map(sub => (
+                  <div key={sub.id} className="flex items-center gap-3 px-5 py-3 border-b last:border-b-0 hover:bg-gray-50 transition">
+                    <span className="text-gray-300 text-sm">└</span>
+                    <span className="text-lg w-6 text-center">{iconOf(sub) || '📂'}</span>
+                    <p className="flex-1 text-sm text-gray-700 font-medium">{sub.name}</p>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs px-2 py-1 rounded-full font-medium ${sub.is_active ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-600'}`}>
+                        {sub.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                      <button
+                        onClick={() => { if (confirm(`Désactiver « ${sub.name} » ?`)) deleteMutation.mutate(sub.id) }}
+                        disabled={deleteMutation.isPending}
+                        className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
+                      >Désactiver</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Page principale ───────────────────────────────────────────────────────────
+
+const TABS = [
+  { id: 'overview',    label: '📊 Tableau de bord' },
+  { id: 'listings',   label: '📦 Annonces' },
+  { id: 'banners',    label: '📢 Publicités' },
+  { id: 'categories', label: '🏷️ Catégories' },
+]
+
 export default function AdminPage() {
   const user = useAuthStore(s => s.user)
   const qc   = useQueryClient()
+  const [activeTab, setActiveTab] = useState('overview')
 
   if (!user || user.role !== 'admin') return <Navigate to="/" />
 
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
-    queryFn: () => adminAPI.getStats().then(r => r.data),
+    queryFn:  () => adminAPI.getStats().then(r => r.data),
   })
 
-  const { data: disputesData, isLoading } = useQuery({
+  const { data: disputesData, isLoading: disputesLoading } = useQuery({
     queryKey: ['admin-disputes'],
-    queryFn: () => adminAPI.getDisputes().then(r => r.data),
+    queryFn:  () => adminAPI.getDisputes().then(r => r.data),
   })
 
   const disputes = Array.isArray(disputesData) ? disputesData : (disputesData?.results ?? [])
 
   const resolveMutation = useMutation({
     mutationFn: ({ id, action }) => adminAPI.resolve(id, action),
-    onSuccess: () => {
+    onSuccess:  () => {
       qc.invalidateQueries(['admin-disputes'])
       qc.invalidateQueries(['admin-stats'])
     },
@@ -68,97 +631,32 @@ export default function AdminPage() {
         </div>
       </nav>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-
-        {/* Stats */}
-        {stats && (
-          <div>
-            <h2 className="text-lg font-bold text-gray-800 mb-4">Vue d'ensemble</h2>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-              <StatCard label="Utilisateurs"       value={stats.users}             icon="👥" color="blue" />
-              <StatCard label="Annonces actives"   value={stats.active_listings}   icon="📦" color="green" />
-              <StatCard label="Commandes totales"  value={stats.orders_total}      icon="🛍️" color="blue" />
-              <StatCard label="Commandes terminées" value={stats.orders_completed} icon="✅" color="green" />
-              <StatCard label="Litiges en cours"   value={stats.orders_disputed}   icon="⚠️" color="red" />
-              <StatCard label="Revenus plateforme (5%)" value={Math.round(stats.revenue_gnf * 0.05).toLocaleString('fr-GN') + ' GNF'} icon="💰" color="yellow" />
-            </div>
-          </div>
-        )}
-
-        {/* Litiges */}
-        <div>
-          <h2 className="text-lg font-bold text-gray-800 mb-4">
-            ⚠️ Litiges en attente
-            {disputes.length > 0 && (
-              <span className="ml-2 text-sm bg-red-100 text-red-600 px-2 py-0.5 rounded-full">
-                {disputes.length}
-              </span>
-            )}
-          </h2>
-
-          {isLoading ? (
-            <div className="space-y-3">
-              {[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-32 animate-pulse" />)}
-            </div>
-          ) : disputes.length === 0 ? (
-            <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
-              <p className="text-5xl mb-3">✅</p>
-              <p className="font-medium">Aucun litige en cours</p>
-              <p className="text-sm mt-1">Tous les litiges ont été résolus.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {disputes.map(order => (
-                <div key={order.id} className="bg-white rounded-2xl shadow p-5 space-y-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <p className="font-bold text-gray-800">{order.listing_title}</p>
-                      <p className="text-sm text-gray-500 mt-0.5">
-                        Acheteur : <span className="font-medium text-gray-700">{order.buyer_name}</span>
-                        {' · '}
-                        Vendeur : <span className="font-medium text-gray-700">{order.seller_name}</span>
-                      </p>
-                    </div>
-                    <span className="text-sm font-bold text-green-600">{fmt(order.amount_gnf)}</span>
-                  </div>
-
-                  <div className="flex items-center gap-2 text-xs text-gray-400">
-                    <span>🔒 Escrow : {order.escrow_status}</span>
-                    <span>·</span>
-                    <span>{new Date(order.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
-                  </div>
-
-                  <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-800">
-                    <strong>Comment trancher ?</strong> Contacte les deux parties, vérifie les preuves (photos, messages), puis décide.
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => {
-                        if (confirm(`Libérer ${fmt(order.amount_gnf)} au vendeur ${order.seller_name} ?`))
-                          resolveMutation.mutate({ id: order.id, action: 'release' })
-                      }}
-                      disabled={resolveMutation.isPending}
-                      className="bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
-                    >
-                      ✅ Libérer au vendeur
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (confirm(`Rembourser l'acheteur ${order.buyer_name} ?`))
-                          resolveMutation.mutate({ id: order.id, action: 'refund' })
-                      }}
-                      disabled={resolveMutation.isPending}
-                      className="bg-red-500 hover:bg-red-600 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50"
-                    >
-                      🔄 Rembourser l'acheteur
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
+        {/* Onglets */}
+        <div className="bg-white rounded-2xl shadow p-1.5 flex gap-1 overflow-x-auto">
+          {TABS.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex-1 min-w-max text-sm font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap ${
+                activeTab === tab.id
+                  ? 'bg-green-600 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100'
+              }`}
+            >
+              {tab.label}
+              {tab.id === 'overview' && disputes.length > 0 && (
+                <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{disputes.length}</span>
+              )}
+            </button>
+          ))}
         </div>
+
+        {/* Contenu */}
+        {activeTab === 'overview'   && <TabOverview stats={stats} disputes={disputes} isLoading={disputesLoading} resolveMutation={resolveMutation} />}
+        {activeTab === 'listings'   && <TabListings />}
+        {activeTab === 'banners'    && <TabBanners />}
+        {activeTab === 'categories' && <TabCategories />}
       </div>
     </div>
   )

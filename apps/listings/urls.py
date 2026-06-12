@@ -12,4 +12,12 @@ urlpatterns = [
     path('favorites/',           views.FavoriteListCreateView.as_view(),   name='favorites'),
     path('favorites/<uuid:pk>/', views.FavoriteDeleteView.as_view(),      name='favorite-delete'),
     path('report/',              views.ListingReportView.as_view(),        name='listing-report'),
+
+    # Admin
+    path('admin/listings/',           views.AdminListingListView.as_view(),    name='admin-listing-list'),
+    path('admin/listings/<uuid:pk>/', views.AdminListingDetailView.as_view(),  name='admin-listing-detail'),
+    path('admin/banners/',            views.AdminBannerListCreateView.as_view(), name='admin-banner-list'),
+    path('admin/banners/<uuid:pk>/',  views.AdminBannerDetailView.as_view(),   name='admin-banner-detail'),
+    path('admin/categories/',         views.AdminCategoryListCreateView.as_view(), name='admin-category-list'),
+    path('admin/categories/<uuid:pk>/', views.AdminCategoryDetailView.as_view(), name='admin-category-detail'),
 ]

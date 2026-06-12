@@ -124,3 +124,64 @@ class BannerSerializer(serializers.ModelSerializer):
             return url if url.startswith('http') else None
         except Exception:
             return None
+
+
+# ── Sérialiseurs Admin (lecture + écriture) ────────────────────────────────
+
+class AdminBannerSerializer(serializers.ModelSerializer):
+    """Sérialiseur complet pour la gestion admin des publicités."""
+    image_url  = serializers.SerializerMethodField(read_only=True)
+    image_file = serializers.ImageField(write_only=True, required=False, source='image')
+
+    class Meta:
+        model  = Banner
+        fields = (
+            'id', 'title', 'image_url', 'image_file', 'link_url',
+            'position', 'is_active', 'start_date', 'end_date',
+            'sort_order', 'click_count', 'created_at',
+        )
+        read_only_fields = ('id', 'click_count', 'created_at')
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        try:
+            url = obj.image.url
+            return url if url.startswith('http') else None
+        except Exception:
+            return None
+
+
+class AdminCategorySerializer(serializers.ModelSerializer):
+    """Sérialiseur pour la gestion admin des catégories et sous-catégories."""
+    children_count = serializers.SerializerMethodField(read_only=True)
+    parent_name    = serializers.CharField(source='parent.name', read_only=True)
+
+    class Meta:
+        model  = Category
+        fields = (
+            'id', 'name', 'slug', 'icon_url', 'parent', 'parent_name',
+            'is_active', 'sort_order', 'children_count',
+        )
+        read_only_fields = ('id', 'slug', 'children_count', 'parent_name')
+
+    def get_children_count(self, obj):
+        return obj.children.count()
+
+
+class AdminListingSerializer(serializers.ModelSerializer):
+    """Sérialiseur lecture pour la liste admin des annonces."""
+    seller_name   = serializers.CharField(source='seller.full_name', read_only=True)
+    seller_phone  = serializers.CharField(source='seller.phone_number', read_only=True)
+    category_name = serializers.CharField(source='category.name', read_only=True)
+    media         = ListingMediaSerializer(many=True, read_only=True)
+
+    class Meta:
+        model  = Listing
+        fields = (
+            'id', 'title', 'price_gnf', 'price_type', 'condition', 'status',
+            'city', 'view_count', 'is_boosted', 'created_at',
+            'seller', 'seller_name', 'seller_phone',
+            'category', 'category_name', 'media',
+        )
+        read_only_fields = fields

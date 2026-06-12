@@ -12,8 +12,10 @@ from .serializers import (
     CategorySerializer, ListingSerializer,
     ListingDetailSerializer, FavoriteSerializer, ListingReportSerializer,
     CategoryAttributeSerializer, BannerSerializer,
+    AdminBannerSerializer, AdminCategorySerializer, AdminListingSerializer,
 )
 from .filters import ListingFilter
+from core.permissions import IsAdmin
 
 
 class CategoryListView(generics.ListAPIView):
@@ -171,3 +173,83 @@ class BannerClickView(APIView):
     def post(self, _request, pk):
         Banner.objects.filter(pk=pk).update(click_count=models.F('click_count') + 1)
         return Response({'status': 'ok'})
+
+
+# ── Vues Admin ────────────────────────────────────────────────────────────────
+
+class AdminListingListView(generics.ListAPIView):
+    """Admin : liste toutes les annonces (toutes statuts)."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminListingSerializer
+    filter_backends    = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields      = ['title', 'city', 'seller__first_name', 'seller__last_name']
+    ordering_fields    = ['created_at', 'price_gnf', 'view_count', 'status']
+    ordering           = ['-created_at']
+
+    def get_queryset(self):
+        qs = Listing.objects.select_related('seller', 'category').prefetch_related('media')
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs
+
+
+class AdminListingDetailView(generics.RetrieveDestroyAPIView):
+    """Admin : détail et suspension d'une annonce."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminListingSerializer
+    queryset           = Listing.objects.select_related('seller', 'category').prefetch_related('media')
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.status = Listing.Status.SUSPENDED
+        instance.save(update_fields=['status', 'updated_at'])
+        return Response({'status': 'suspended'}, status=status.HTTP_200_OK)
+
+
+class AdminBannerListCreateView(generics.ListCreateAPIView):
+    """Admin : liste et création de publicités."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminBannerSerializer
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
+    queryset           = Banner.objects.all().order_by('sort_order', '-created_at')
+
+
+class AdminBannerDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin : détail, modification et suppression d'une publicité."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminBannerSerializer
+    parser_classes     = [MultiPartParser, FormParser, JSONParser]
+    queryset           = Banner.objects.all()
+
+
+class AdminCategoryListCreateView(generics.ListCreateAPIView):
+    """Admin : liste et création de catégories / sous-catégories."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminCategorySerializer
+    queryset           = Category.objects.all().order_by('parent', 'sort_order', 'name')
+
+    def perform_create(self, serializer):
+        from django.utils.text import slugify
+        name = serializer.validated_data.get('name', '')
+        base_slug = slugify(name)
+        slug = base_slug
+        n = 1
+        while Category.objects.filter(slug=slug).exists():
+            slug = f"{base_slug}-{n}"
+            n += 1
+        serializer.save(slug=slug)
+
+
+class AdminCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
+    """Admin : détail, modification et suppression d'une catégorie."""
+    permission_classes = [IsAdmin]
+    serializer_class   = AdminCategorySerializer
+    queryset           = Category.objects.all()
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        # Désactiver plutôt que supprimer (évite les FK cassées)
+        instance.is_active = False
+        instance.save(update_fields=['is_active'])
+        return Response({'status': 'deactivated'}, status=status.HTTP_200_OK)
