@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSettings } from './hooks/useSettings'
@@ -35,6 +36,54 @@ function MaintenanceBanner() {
   )
 }
 
+// Bouton support flottant — WhatsApp + Email, configurable depuis l'admin
+function SupportButton() {
+  const { settings } = useSettings()
+  const [open, setOpen] = useState(false)
+
+  if (!settings.whatsapp_contact && !settings.support_email) return null
+
+  const waUrl = settings.whatsapp_contact
+    ? `https://wa.me/${settings.whatsapp_contact.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour, j\'ai besoin d\'aide sur GuinéeMarché.')}`
+    : null
+
+  return (
+    <div className="fixed bottom-6 right-4 z-50 flex flex-col items-end gap-2">
+      {open && (
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 p-4 w-64 mb-1 animate-fade-in">
+          <p className="text-sm font-semibold text-gray-700 mb-3">💬 Contacter le support</p>
+          {waUrl && (
+            <a href={waUrl} target="_blank" rel="noopener noreferrer"
+              className="flex items-center gap-3 p-3 bg-green-50 hover:bg-green-100 rounded-xl mb-2 transition">
+              <span className="text-2xl">📱</span>
+              <div>
+                <p className="text-sm font-semibold text-green-700">WhatsApp</p>
+                <p className="text-xs text-gray-500">Réponse rapide</p>
+              </div>
+            </a>
+          )}
+          {settings.support_email && (
+            <a href={`mailto:${settings.support_email}?subject=Support GuinéeMarché`}
+              className="flex items-center gap-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
+              <span className="text-2xl">✉️</span>
+              <div>
+                <p className="text-sm font-semibold text-blue-700">Email</p>
+                <p className="text-xs text-gray-500 truncate">{settings.support_email}</p>
+              </div>
+            </a>
+          )}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-14 h-14 bg-green-600 hover:bg-green-700 text-white rounded-full shadow-lg flex items-center justify-center text-2xl transition active:scale-95"
+        aria-label="Support">
+        {open ? '✕' : '💬'}
+      </button>
+    </div>
+  )
+}
+
 // Routes séparées pour pouvoir utiliser useSettings (doit être dans QueryClientProvider)
 function AppRoutes() {
   const { settings } = useSettings()
@@ -42,6 +91,7 @@ function AppRoutes() {
   return (
     <>
       <MaintenanceBanner />
+      <SupportButton />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />

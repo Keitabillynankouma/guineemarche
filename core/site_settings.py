@@ -44,8 +44,13 @@ class SiteSettings(models.Model):
     # ── Contact ───────────────────────────────────────────────────────────────
     whatsapp_contact = models.CharField(
         max_length=30, blank=True, default='',
-        verbose_name="WhatsApp contact admin",
-        help_text="Numéro WhatsApp pour les boosts / publicités (ex: 224XXXXXXXXX).",
+        verbose_name="WhatsApp support",
+        help_text="Numéro WhatsApp support visible sur le site (ex: 224XXXXXXXXX).",
+    )
+    support_email = models.EmailField(
+        blank=True, default='',
+        verbose_name="Email support",
+        help_text="Adresse email de support visible sur le site.",
     )
     site_name = models.CharField(max_length=100, default='GuinéeMarché')
     tagline    = models.CharField(max_length=200, blank=True, default='Le marché en ligne de la Guinée')

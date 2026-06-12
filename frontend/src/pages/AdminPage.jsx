@@ -798,12 +798,18 @@ function TabSettings() {
 
   const toggle = (key) => (val) => mutation.mutate({ [key]: val })
 
-  const [wpEdit, setWpEdit] = useState(false)
-  const [wpVal, setWpVal]   = useState('')
+  const [wpEdit, setWpEdit]       = useState(false)
+  const [wpVal, setWpVal]         = useState('')
+  const [emailEdit, setEmailEdit] = useState(false)
+  const [emailVal, setEmailVal]   = useState('')
 
   const saveWhatsApp = () => {
     mutation.mutate({ whatsapp_contact: wpVal })
     setWpEdit(false)
+  }
+  const saveEmail = () => {
+    mutation.mutate({ support_email: emailVal })
+    setEmailEdit(false)
   }
 
   if (isLoading) return (
@@ -878,19 +884,20 @@ function TabSettings() {
         />
       </div>
 
-      {/* Contact */}
+      {/* Contact support */}
       <div className="bg-white rounded-2xl shadow p-5">
-        <h3 className="font-bold text-gray-700 mb-4">📞 Contact admin</h3>
-        <div className="flex items-center justify-between gap-4">
+        <h3 className="font-bold text-gray-700 mb-1">📞 Contact &amp; Support</h3>
+        <p className="text-xs text-gray-400 mb-4">Affiché dans le bouton support flottant sur tout le site.</p>
+
+        {/* WhatsApp */}
+        <div className="flex items-center justify-between gap-4 py-3 border-b border-gray-100">
           <div className="flex-1">
-            <p className="font-medium text-gray-800 text-sm">WhatsApp boosts & publicités</p>
-            <p className="text-xs text-gray-400">Affiché sur la page Tarifs pour les boosts</p>
+            <p className="font-medium text-gray-800 text-sm">📱 WhatsApp support</p>
+            <p className="text-xs text-gray-400">Numéro international sans + (ex: 224623000000)</p>
           </div>
           {wpEdit ? (
             <div className="flex gap-2">
-              <input
-                value={wpVal}
-                onChange={e => setWpVal(e.target.value)}
+              <input value={wpVal} onChange={e => setWpVal(e.target.value)}
                 placeholder="224XXXXXXXXX"
                 className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-green-400"
               />
@@ -898,11 +905,33 @@ function TabSettings() {
               <button onClick={() => setWpEdit(false)} className="bg-gray-100 text-gray-600 text-sm px-3 py-1.5 rounded-xl">✕</button>
             </div>
           ) : (
-            <button
-              onClick={() => { setWpEdit(true); setWpVal(s.whatsapp_contact ?? '') }}
-              className="text-sm text-green-600 font-medium border border-green-200 px-3 py-1.5 rounded-xl hover:bg-green-50 transition"
-            >
+            <button onClick={() => { setWpEdit(true); setWpVal(s.whatsapp_contact ?? '') }}
+              className="text-sm text-green-600 font-medium border border-green-200 px-3 py-1.5 rounded-xl hover:bg-green-50 transition">
               {s.whatsapp_contact || '+ Ajouter'}
+            </button>
+          )}
+        </div>
+
+        {/* Email */}
+        <div className="flex items-center justify-between gap-4 py-3">
+          <div className="flex-1">
+            <p className="font-medium text-gray-800 text-sm">✉️ Email support</p>
+            <p className="text-xs text-gray-400">Adresse email de contact pour les utilisateurs</p>
+          </div>
+          {emailEdit ? (
+            <div className="flex gap-2">
+              <input value={emailVal} onChange={e => setEmailVal(e.target.value)}
+                placeholder="support@guineemarche.com"
+                type="email"
+                className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              />
+              <button onClick={saveEmail} className="bg-blue-500 text-white text-sm px-3 py-1.5 rounded-xl">✓</button>
+              <button onClick={() => setEmailEdit(false)} className="bg-gray-100 text-gray-600 text-sm px-3 py-1.5 rounded-xl">✕</button>
+            </div>
+          ) : (
+            <button onClick={() => { setEmailEdit(true); setEmailVal(s.support_email ?? '') }}
+              className="text-sm text-blue-600 font-medium border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-50 transition">
+              {s.support_email || '+ Ajouter'}
             </button>
           )}
         </div>

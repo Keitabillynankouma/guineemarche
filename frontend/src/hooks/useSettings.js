@@ -13,6 +13,7 @@ const DEFAULTS = {
   escrow_enabled:         true,
   shop_approval_required: true,
   whatsapp_contact:       '',
+  support_email:          '',
   site_name:              'GuinéeMarché',
   tagline:                'Le marché en ligne de la Guinée',
   maintenance_mode:       false,
