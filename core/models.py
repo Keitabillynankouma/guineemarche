@@ -1,5 +1,6 @@
 import uuid
 from django.db import models
+from core.site_settings import SiteSettings  # noqa — importé pour que Django le découvre
 
 
 class BaseModel(models.Model):

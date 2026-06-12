@@ -251,6 +251,20 @@ export default function ListingDetailPage() {
 
     const isSeller = user?.id === listing.seller
 
+    // ── Boost ──────────────────────────────────────────────────────────────────
+    const [boostOpen, setBoostOpen]     = useState(false)
+    const [boostDays, setBoostDays]     = useState(7)
+    const [boostProvider, setBoostProvider] = useState('cash')
+    const [boostPhone, setBoostPhone]   = useState('')
+    const qc = useQueryClient()
+
+    const boostMutation = useMutation({
+        mutationFn: () => listingsAPI.boost(listing.id, { days: boostDays, provider: boostProvider, phone: boostPhone }),
+        onSuccess:  () => { qc.invalidateQueries(['listing', listing.id]); setBoostOpen(false) },
+    })
+
+    const BOOST_PRICES = { 3: '5 000 GNF', 7: '10 000 GNF' }
+
     const shareOnWhatsApp = () => {
         const url  = encodeURIComponent(window.location.href)
         const text = encodeURIComponent(
@@ -354,6 +368,66 @@ export default function ListingDetailPage() {
                             </div>
                         </div>
                     </div>
+
+                    {/* ── Booster mon annonce (vendeur uniquement) ── */}
+                    {isSeller && listing.status === 'active' && (
+                        <div className="bg-white rounded-2xl shadow p-5 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <div>
+                                    <p className="font-bold text-gray-800">⚡ Booster cette annonce</p>
+                                    <p className="text-xs text-gray-400 mt-0.5">Mise en avant dans les résultats de recherche</p>
+                                </div>
+                                {listing.is_boosted && (
+                                    <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded-full">
+                                        ⚡ Actif
+                                        {listing.expires_at && ` · expire le ${new Date(listing.expires_at).toLocaleDateString('fr-FR')}`}
+                                    </span>
+                                )}
+                            </div>
+                            {!boostOpen ? (
+                                <button onClick={() => setBoostOpen(true)}
+                                    className="w-full bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl text-sm transition">
+                                    ⚡ {listing.is_boosted ? 'Prolonger le boost' : 'Booster maintenant'}
+                                </button>
+                            ) : (
+                                <div className="space-y-3">
+                                    {/* Durée */}
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[3, 7].map(d => (
+                                            <button key={d} onClick={() => setBoostDays(d)}
+                                                className={`py-2.5 rounded-xl text-sm font-medium border transition ${boostDays === d ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-700 border-gray-200 hover:border-amber-300'}`}>
+                                                {d} jours — {BOOST_PRICES[d]}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    {/* Paiement */}
+                                    <select value={boostProvider} onChange={e => setBoostProvider(e.target.value)}
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
+                                        <option value="cash">Espèces / En personne</option>
+                                        <option value="orange_money">Orange Money</option>
+                                        <option value="mtn_momo">MTN MoMo</option>
+                                    </select>
+                                    {boostProvider !== 'cash' && (
+                                        <input value={boostPhone} onChange={e => setBoostPhone(e.target.value)}
+                                            placeholder="Numéro Mobile Money (ex: 224 6XX XXX XXX)"
+                                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
+                                    )}
+                                    {boostMutation.isError && (
+                                        <p className="text-sm text-red-500">{boostMutation.error?.response?.data?.error || 'Erreur de paiement'}</p>
+                                    )}
+                                    <div className="flex gap-2">
+                                        <button onClick={() => boostMutation.mutate()} disabled={boostMutation.isPending}
+                                            className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl text-sm transition disabled:opacity-50">
+                                            {boostMutation.isPending ? 'Traitement...' : `Payer ${BOOST_PRICES[boostDays]}`}
+                                        </button>
+                                        <button onClick={() => setBoostOpen(false)} className="px-4 bg-gray-100 text-gray-600 rounded-xl text-sm transition hover:bg-gray-200">
+                                            Annuler
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Bouton acheter */}
                     {!isSeller && listing.status === 'active' && (

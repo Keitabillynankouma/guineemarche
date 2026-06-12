@@ -47,6 +47,7 @@ export const listingsAPI = {
   update: (id, data) => api.put(`/listings/${id}/`, data),
   delete: (id) => api.delete(`/listings/${id}/`),
   myListings: () => api.get('/listings/my/'),
+  boost: (id, data) => api.post(`/listings/${id}/boost/`, data),
   categories: () => api.get('/listings/categories/'),
   categoryAttributes: (id) => api.get(`/listings/categories/${id}/attributes/`),
   banners: (position) => api.get('/listings/banners/', { params: position ? { position } : {} }),

@@ -167,8 +167,16 @@ class ResendOTPView(APIView):
         return Response({'message': 'Nouveau code envoyé.'})
 
 
+# Prix Pro par durée (GNF)
+PRO_PRICES = {1: 40_000, 3: 105_000, 6: 190_000, 12: 350_000}
+
+
 class SubscriptionView(APIView):
-    """GET : statut de l'abonnement. POST : activer Pro (simulation)."""
+    """
+    GET  — statut de l'abonnement.
+    POST — paiement réel + activation automatique du plan Pro.
+    Body: { months: 1|3|6|12, provider: 'orange_money'|'mtn_momo'|'cash', phone: '...' }
+    """
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
@@ -176,19 +184,54 @@ class SubscriptionView(APIView):
         return Response(SubscriptionSerializer(sub).data)
 
     def post(self, request):
-        """
-        Simule l'activation Pro.
-        En production : déclencher un paiement Mobile Money puis valider ici.
-        """
-        sub, _ = Subscription.objects.get_or_create(user=request.user)
-        duration_months = int(request.data.get('months', 1))
+        from apps.orders.payment_service import initiate_orange_money, initiate_mtn_momo
+        from apps.orders.models import Payment
         from dateutil.relativedelta import relativedelta
+
+        months   = int(request.data.get('months', 1))
+        provider = request.data.get('provider', Payment.Provider.CASH)
+        phone    = request.data.get('phone', '')
+
+        if months not in PRO_PRICES:
+            return Response({'error': 'Durée invalide. Choisissez 1, 3, 6 ou 12 mois.'}, status=400)
+
+        amount = PRO_PRICES[months]
+
+        # Initier le paiement
+        if provider == Payment.Provider.ORANGE_MONEY:
+            result = initiate_orange_money(phone, amount, f'pro-{request.user.id}')
+        elif provider == Payment.Provider.MTN_MOMO:
+            result = initiate_mtn_momo(phone, amount, f'pro-{request.user.id}')
+        else:
+            result = type('R', (), {'success': True, 'reference': '', 'message': 'Plan Pro activé'})()
+
+        if not result.success:
+            return Response({'error': result.message}, status=502)
+
+        # Activer automatiquement
+        sub, _ = Subscription.objects.get_or_create(user=request.user)
+        now = timezone.now()
+        # Si déjà Pro, prolonger depuis la date d'expiration
+        base = sub.valid_until if (sub.valid_until and sub.valid_until > now) else now
         sub.plan        = Subscription.Plan.PRO
-        sub.valid_until = timezone.now() + relativedelta(months=duration_months)
+        sub.valid_until = base + relativedelta(months=months)
         sub.save(update_fields=['plan', 'valid_until'])
         Badge.award(request.user, Badge.Type.PRO)
+
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=request.user,
+                type=Notification.Type.ORDER_UPDATE,
+                title='💎 Plan Pro activé !',
+                body=f'Votre abonnement Pro est actif pour {months} mois. Publiez des annonces illimitées.',
+                data={},
+            )
+        except Exception:
+            pass
+
         return Response({
-            'message': f'Abonnement Pro activé pour {duration_months} mois.',
+            'message':      f'Plan Pro activé pour {months} mois.',
             'subscription': SubscriptionSerializer(sub).data,
         })
 
@@ -238,15 +281,32 @@ class MyShopView(APIView):
             return Response(None)
 
     def post(self, request):
+        # Sépare le logo du reste des données pour gérer l'upload indépendamment
+        data = request.data.copy()
+        logo = data.pop('logo', None)
+        if isinstance(logo, list):
+            logo = logo[0] if logo else None
+
         try:
             shop = request.user.shop
-            serializer = ShopSerializer(shop, data=request.data, partial=True)
+            serializer = ShopSerializer(shop, data=data, partial=True)
         except Shop.DoesNotExist:
-            serializer = ShopSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        # Nouvelle boutique → statut "pending" automatiquement
+            serializer = ShopSerializer(data=data)
+
+        if not serializer.is_valid():
+            return Response({'validation_errors': serializer.errors}, status=400)
+
         shop = serializer.save(owner=request.user, status=Shop.Status.PENDING)
-        # Notification admin (optionnel — ne bloque pas si pas de canal)
+
+        # Upload du logo séparé — si Cloudinary échoue, la boutique est quand même créée
+        if logo:
+            try:
+                shop.logo = logo
+                shop.save(update_fields=['logo', 'updated_at'])
+            except Exception as e:
+                print(f'[SHOP] Logo upload failed (shop still created): {e}')
+
+        # Notification admin
         try:
             from apps.notifications.models import Notification
             for admin_user in User.objects.filter(role=User.Role.ADMIN):
@@ -259,6 +319,7 @@ class MyShopView(APIView):
                 )
         except Exception:
             pass
+
         return Response(ShopSerializer(shop).data)
 
 

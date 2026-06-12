@@ -39,27 +39,34 @@ class ListingListCreateView(generics.ListCreateAPIView):
         return [permissions.IsAuthenticated()]
 
     def get_queryset(self):
-        return Listing.objects.filter(status=Listing.Status.ACTIVE).select_related(
-            'seller', 'category'
-        ).prefetch_related('media')
+        # Auto-expire silencieux : les annonces expirées n'apparaissent plus
+        return Listing.objects.filter(
+            status=Listing.Status.ACTIVE
+        ).exclude(
+            expires_at__isnull=False, expires_at__lt=timezone.now()
+        ).select_related('seller', 'category').prefetch_related('media')
 
     def perform_create(self, serializer):
         from apps.accounts.models import Subscription, Badge
         from rest_framework.exceptions import PermissionDenied
+        from core.site_settings import SiteSettings
         user = self.request.user
+        site = SiteSettings.get()
         sub, _ = Subscription.objects.get_or_create(user=user)
-        if not sub.can_post:
-            raise PermissionDenied(
-                detail={
-                    'code': 'subscription_required',
-                    'message': f'Vous avez atteint la limite de {Subscription.FREE_LIMIT} annonces gratuites. '
-                               'Passez au plan Pro pour publier des annonces illimitées.',
-                }
-            )
+        # Vérifier quotas seulement si abonnements actifs ET gratuites désactivées
+        if not site.free_listings_enabled and site.subscriptions_enabled:
+            limit = site.max_free_listings
+            if not sub.can_post:
+                raise PermissionDenied(
+                    detail={
+                        'code': 'subscription_required',
+                        'message': f'Vous avez atteint la limite de {limit} annonces gratuites. '
+                                   'Passez au plan Pro pour publier des annonces illimitées.',
+                    }
+                )
         serializer.save(seller=user, status=Listing.Status.ACTIVE)
         sub.listings_used += 1
         sub.save(update_fields=['listings_used'])
-        # Premier badge si c'est la toute première annonce
         if sub.listings_used == 1:
             Badge.award(user, Badge.Type.FIRST_LISTING)
 
@@ -173,6 +180,72 @@ class BannerClickView(APIView):
     def post(self, _request, pk):
         Banner.objects.filter(pk=pk).update(click_count=models.F('click_count') + 1)
         return Response({'status': 'ok'})
+
+
+# ── Boost automatique ────────────────────────────────────────────────────────
+
+BOOST_PRICES = {3: 5_000, 7: 10_000}   # jours → GNF
+
+class BoostListingView(APIView):
+    """
+    POST /listings/{id}/boost/
+    Body: { days: 3|7, provider: 'orange_money'|'mtn_momo'|'cash', phone: '...' }
+    → Initie le paiement, et si succès active le boost immédiatement.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        from apps.orders.payment_service import initiate_orange_money, initiate_mtn_momo
+        from apps.orders.models import Payment
+
+        listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+        days     = int(request.data.get('days', 7))
+        provider = request.data.get('provider', Payment.Provider.CASH)
+        phone    = request.data.get('phone', '')
+
+        if days not in BOOST_PRICES:
+            return Response({'error': 'Durée invalide. Choisissez 3 ou 7 jours.'}, status=400)
+
+        amount = BOOST_PRICES[days]
+
+        # Initier le paiement
+        if provider == Payment.Provider.ORANGE_MONEY:
+            result = initiate_orange_money(phone, amount, f'boost-{listing.id}')
+        elif provider == Payment.Provider.MTN_MOMO:
+            result = initiate_mtn_momo(phone, amount, f'boost-{listing.id}')
+        else:
+            result = type('R', (), {'success': True, 'reference': '', 'message': 'Boost activé (espèces)'})()
+
+        if not result.success:
+            return Response({'error': result.message}, status=502)
+
+        # Activer le boost automatiquement
+        listing.is_boosted = True
+        now = timezone.now()
+        # Si déjà boosted, prolonger
+        base = listing.expires_at if (listing.expires_at and listing.expires_at > now) else now
+        from datetime import timedelta
+        listing.expires_at = base + timedelta(days=days)
+        listing.save(update_fields=['is_boosted', 'expires_at', 'updated_at'])
+
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=request.user,
+                type=Notification.Type.ORDER_UPDATE,
+                title='⚡ Annonce boostée !',
+                body=f'Votre annonce « {listing.title} » est maintenant mise en avant pour {days} jours.',
+                data={'listing_id': str(listing.id)},
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'message':    f'Boost activé pour {days} jours.',
+            'is_boosted': listing.is_boosted,
+            'expires_at': listing.expires_at,
+            'listing':    ListingSerializer(listing, context={'request': request}).data,
+        })
 
 
 # ── Vues Admin ────────────────────────────────────────────────────────────────

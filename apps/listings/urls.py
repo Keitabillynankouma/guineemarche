@@ -2,9 +2,10 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    path('',                     views.ListingListCreateView.as_view(),    name='listing-list'),
-    path('<uuid:pk>/',           views.ListingDetailView.as_view(),        name='listing-detail'),
-    path('my/',                  views.MyListingsView.as_view(),           name='my-listings'),
+    path('',                          views.ListingListCreateView.as_view(),  name='listing-list'),
+    path('<uuid:pk>/',                views.ListingDetailView.as_view(),      name='listing-detail'),
+    path('<uuid:pk>/boost/',          views.BoostListingView.as_view(),       name='listing-boost'),
+    path('my/',                       views.MyListingsView.as_view(),         name='my-listings'),
     path('categories/',          views.CategoryListView.as_view(),         name='category-list'),
     path('categories/<uuid:pk>/attributes/', views.CategoryAttributeListView.as_view(), name='category-attributes'),
     path('banners/',             views.BannerListView.as_view(),           name='banner-list'),

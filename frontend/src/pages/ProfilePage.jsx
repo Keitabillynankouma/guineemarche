@@ -132,6 +132,39 @@ export default function ProfilePage() {
                     )}
                 </div>
 
+                {/* Boutique */}
+                {user.shop ? (
+                    <Link to="/my-shop" className="bg-white rounded-2xl shadow p-4 flex items-center gap-3 hover:shadow-md transition">
+                        <div className="w-12 h-12 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                            {user.shop.logo_url
+                                ? <img src={user.shop.logo_url} alt={user.shop.name} className="w-full h-full object-cover" />
+                                : <span className="text-2xl">🏪</span>
+                            }
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-800 truncate">{user.shop.name}</p>
+                            <p className={`text-xs mt-0.5 font-medium ${
+                                user.shop.status === 'approved' ? 'text-green-600' :
+                                user.shop.status === 'rejected' ? 'text-red-500' : 'text-amber-600'
+                            }`}>
+                                {user.shop.status === 'approved' ? '✅ Approuvée' :
+                                 user.shop.status === 'rejected' ? '❌ Non approuvée' : '⏳ En attente de validation'}
+                            </p>
+                        </div>
+                        <span className="text-gray-400">›</span>
+                    </Link>
+                ) : (
+                    <Link to="/my-shop"
+                        className="bg-white rounded-2xl shadow p-4 flex items-center gap-3 hover:shadow-md transition border-2 border-dashed border-green-200">
+                        <span className="text-2xl">🏪</span>
+                        <div className="flex-1">
+                            <p className="font-semibold text-green-700">Créer ma boutique</p>
+                            <p className="text-xs text-gray-400">Donnez une vitrine professionnelle à vos annonces</p>
+                        </div>
+                        <span className="text-green-400">›</span>
+                    </Link>
+                )}
+
                 <div className="bg-white rounded-2xl shadow overflow-hidden">
                     <Link to="/my-listings" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
                         <span className="font-medium text-gray-700">📋 Mes annonces</span>

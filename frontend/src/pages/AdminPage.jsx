@@ -31,6 +31,10 @@ const adminAPI = {
   getShops:     (params) => api.get('/accounts/admin/shops/', { params }),
   approveShop:  (id, data) => api.post(`/accounts/admin/shops/${id}/approve/`, data),
   updateShop:   (id, data) => api.patch(`/accounts/admin/shops/${id}/`, data),
+
+  // Paramètres
+  getSettings:    () => api.get('/core/settings/'),
+  patchSettings:  (data) => api.patch('/core/settings/', data),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -752,6 +756,186 @@ function TabShops() {
   )
 }
 
+// ── Onglet 6 : Paramètres du site ────────────────────────────────────────────
+
+function Toggle({ label, description, checked, onChange, disabled }) {
+  return (
+    <div className="flex items-start justify-between gap-4 py-4 border-b border-gray-100 last:border-0">
+      <div className="flex-1 min-w-0">
+        <p className="font-medium text-gray-800 text-sm">{label}</p>
+        {description && <p className="text-xs text-gray-400 mt-0.5">{description}</p>}
+      </div>
+      <button
+        type="button"
+        disabled={disabled}
+        onClick={() => onChange(!checked)}
+        className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-colors duration-200 focus:outline-none ${
+          checked ? 'bg-green-500' : 'bg-gray-300'
+        } ${disabled ? 'opacity-40 cursor-not-allowed' : 'cursor-pointer'}`}
+      >
+        <span className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-transform duration-200 ${
+          checked ? 'translate-x-7' : 'translate-x-1'
+        }`} />
+      </button>
+    </div>
+  )
+}
+
+function TabSettings() {
+  const qc = useQueryClient()
+
+  const { data: rawSettings, isLoading } = useQuery({
+    queryKey: ['site-settings'],
+    queryFn:  () => adminAPI.getSettings().then(r => r.data),
+  })
+
+  const mutation = useMutation({
+    mutationFn: (patch) => adminAPI.patchSettings(patch),
+    onSuccess:  (res) => qc.setQueryData(['site-settings'], res.data),
+  })
+
+  const s = rawSettings ?? {}
+
+  const toggle = (key) => (val) => mutation.mutate({ [key]: val })
+
+  const [wpEdit, setWpEdit] = useState(false)
+  const [wpVal, setWpVal]   = useState('')
+
+  const saveWhatsApp = () => {
+    mutation.mutate({ whatsapp_contact: wpVal })
+    setWpEdit(false)
+  }
+
+  if (isLoading) return (
+    <div className="space-y-3">{[...Array(5)].map((_, i) => <div key={i} className="bg-white rounded-xl h-14 animate-pulse" />)}</div>
+  )
+
+  return (
+    <div className="space-y-6">
+      <h2 className="text-lg font-bold text-gray-800">⚙️ Paramètres du site</h2>
+
+      {/* Monétisation */}
+      <div className="bg-white rounded-2xl shadow p-5">
+        <h3 className="font-bold text-gray-700 mb-1">💰 Monétisation</h3>
+        <p className="text-xs text-gray-400 mb-4">Contrôle les restrictions de publication et les abonnements.</p>
+
+        <Toggle
+          label="Publications gratuites illimitées"
+          description="Tous les utilisateurs peuvent publier sans limite. Désactivez pour appliquer les quotas."
+          checked={!!s.free_listings_enabled}
+          onChange={toggle('free_listings_enabled')}
+        />
+        <Toggle
+          label="Activer les abonnements payants"
+          description="Affiche la page Tarifs et applique les limites par plan. N'a d'effet que si publications gratuites est désactivé."
+          checked={!!s.subscriptions_enabled}
+          onChange={toggle('subscriptions_enabled')}
+        />
+
+        <div className="flex items-center justify-between py-4 border-b border-gray-100">
+          <div>
+            <p className="font-medium text-gray-800 text-sm">Limite annonces gratuites</p>
+            <p className="text-xs text-gray-400">Nombre d'annonces sur le plan gratuit</p>
+          </div>
+          <select
+            value={s.max_free_listings ?? 5}
+            onChange={e => mutation.mutate({ max_free_listings: Number(e.target.value) })}
+            className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          >
+            {[3, 5, 10, 20, 50].map(n => <option key={n} value={n}>{n} annonces</option>)}
+          </select>
+        </div>
+
+        <div className="flex items-center justify-between py-4">
+          <div>
+            <p className="font-medium text-gray-800 text-sm">Commission escrow</p>
+            <p className="text-xs text-gray-400">Prélevée sur les paiements Mobile Money</p>
+          </div>
+          <select
+            value={s.commission_pct ?? 4}
+            onChange={e => mutation.mutate({ commission_pct: Number(e.target.value) })}
+            className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+          >
+            {[1, 2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n}%</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* Fonctionnalités */}
+      <div className="bg-white rounded-2xl shadow p-5">
+        <h3 className="font-bold text-gray-700 mb-4">🔧 Fonctionnalités</h3>
+        <Toggle
+          label="Paiement escrow (Mobile Money sécurisé)"
+          description="Désactivez pour masquer le bouton Payer sur les annonces."
+          checked={!!s.escrow_enabled}
+          onChange={toggle('escrow_enabled')}
+        />
+        <Toggle
+          label="Validation admin pour les boutiques"
+          description="Les nouvelles boutiques passent en statut 'En attente' avant d'être visibles."
+          checked={!!s.shop_approval_required}
+          onChange={toggle('shop_approval_required')}
+        />
+      </div>
+
+      {/* Contact */}
+      <div className="bg-white rounded-2xl shadow p-5">
+        <h3 className="font-bold text-gray-700 mb-4">📞 Contact admin</h3>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex-1">
+            <p className="font-medium text-gray-800 text-sm">WhatsApp boosts & publicités</p>
+            <p className="text-xs text-gray-400">Affiché sur la page Tarifs pour les boosts</p>
+          </div>
+          {wpEdit ? (
+            <div className="flex gap-2">
+              <input
+                value={wpVal}
+                onChange={e => setWpVal(e.target.value)}
+                placeholder="224XXXXXXXXX"
+                className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm w-40 focus:outline-none focus:ring-2 focus:ring-green-400"
+              />
+              <button onClick={saveWhatsApp} className="bg-green-500 text-white text-sm px-3 py-1.5 rounded-xl">✓</button>
+              <button onClick={() => setWpEdit(false)} className="bg-gray-100 text-gray-600 text-sm px-3 py-1.5 rounded-xl">✕</button>
+            </div>
+          ) : (
+            <button
+              onClick={() => { setWpEdit(true); setWpVal(s.whatsapp_contact ?? '') }}
+              className="text-sm text-green-600 font-medium border border-green-200 px-3 py-1.5 rounded-xl hover:bg-green-50 transition"
+            >
+              {s.whatsapp_contact || '+ Ajouter'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Maintenance */}
+      <div className="bg-white rounded-2xl shadow p-5">
+        <Toggle
+          label="🚧 Mode maintenance"
+          description="Affiche une bannière jaune sur toutes les pages du site."
+          checked={!!s.maintenance_mode}
+          onChange={toggle('maintenance_mode')}
+        />
+        {s.maintenance_mode && (
+          <div className="mt-3">
+            <textarea
+              rows={2}
+              placeholder="Message affiché aux utilisateurs..."
+              defaultValue={s.maintenance_message}
+              onBlur={e => mutation.mutate({ maintenance_message: e.target.value })}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+          </div>
+        )}
+      </div>
+
+      {mutation.isPending && (
+        <p className="text-xs text-center text-green-600 animate-pulse">Enregistrement…</p>
+      )}
+    </div>
+  )
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
 const TABS = [
@@ -760,6 +944,7 @@ const TABS = [
   { id: 'banners',    label: '📢 Publicités' },
   { id: 'categories', label: '🏷️ Catégories' },
   { id: 'shops',      label: '🏪 Boutiques' },
+  { id: 'settings',   label: '⚙️ Paramètres' },
 ]
 
 export default function AdminPage() {
@@ -842,6 +1027,7 @@ export default function AdminPage() {
         {activeTab === 'banners'    && <TabBanners />}
         {activeTab === 'categories' && <TabCategories />}
         {activeTab === 'shops'      && <TabShops />}
+        {activeTab === 'settings'   && <TabSettings />}
       </div>
     </div>
   )

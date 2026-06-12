@@ -134,7 +134,7 @@ class SubscriptionSerializer(serializers.ModelSerializer):
 
 class ShopSerializer(serializers.ModelSerializer):
     logo_url      = serializers.SerializerMethodField()
-    listing_count = serializers.IntegerField(read_only=True, source='listing_count')
+    listing_count = serializers.IntegerField(read_only=True)
     owner_name    = serializers.CharField(source='owner.full_name', read_only=True)
     owner_phone   = serializers.CharField(source='owner.phone_number', read_only=True)
 
@@ -160,7 +160,7 @@ class ShopSerializer(serializers.ModelSerializer):
 class AdminShopSerializer(serializers.ModelSerializer):
     """Sérialiseur admin complet — lecture + actions d'approbation."""
     logo_url      = serializers.SerializerMethodField(read_only=True)
-    listing_count = serializers.IntegerField(read_only=True, source='listing_count')
+    listing_count = serializers.IntegerField(read_only=True)
     owner_name    = serializers.CharField(source='owner.full_name', read_only=True)
     owner_phone   = serializers.CharField(source='owner.phone_number', read_only=True)
 
