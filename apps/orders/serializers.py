@@ -5,7 +5,7 @@ from .models import Order, Payment, PickupPoint
 class PickupPointSerializer(serializers.ModelSerializer):
     class Meta:
         model  = PickupPoint
-        fields = ('id', 'name', 'address', 'city', 'commune', 'phone')
+        fields = ('id', 'name', 'address', 'city', 'commune', 'phone', 'is_active')
 
 
 class PaymentSerializer(serializers.ModelSerializer):

@@ -31,6 +31,12 @@ urlpatterns = [
         name='order-status'),
 
     # Admin
+    path('admin/pickup-points/',
+        views.AdminPickupPointView.as_view(),
+        name='admin-pickup-points'),
+    path('admin/pickup-points/<uuid:pk>/',
+        views.AdminPickupPointDetailView.as_view(),
+        name='admin-pickup-point-detail'),
     path('admin/disputes/',
         views.AdminDisputeListView.as_view(),
         name='admin-disputes'),

@@ -15,6 +15,7 @@ from core.permissions import IsAdmin
 
 
 class PickupPointListView(generics.ListAPIView):
+    """Public : liste les points de retrait actifs, filtrables par ville."""
     permission_classes = [permissions.AllowAny]
     serializer_class   = PickupPointSerializer
 
@@ -24,6 +25,38 @@ class PickupPointListView(generics.ListAPIView):
         if city:
             qs = qs.filter(city__iexact=city)
         return qs
+
+
+class AdminPickupPointView(APIView):
+    """Admin : CRUD complet sur les points de retrait."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        qs = PickupPoint.objects.all().order_by('city', 'name')
+        return Response(PickupPointSerializer(qs, many=True).data)
+
+    def post(self, request):
+        serializer = PickupPointSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+
+class AdminPickupPointDetailView(APIView):
+    """Admin : modifier ou supprimer un point de retrait."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        obj = get_object_or_404(PickupPoint, pk=pk)
+        serializer = PickupPointSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        obj = get_object_or_404(PickupPoint, pk=pk)
+        obj.delete()
+        return Response(status=204)
 
 
 class OrderListCreateView(generics.ListCreateAPIView):

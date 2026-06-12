@@ -33,8 +33,14 @@ const adminAPI = {
   updateShop:   (id, data) => api.patch(`/accounts/admin/shops/${id}/`, data),
 
   // Paramètres
-  getSettings:    () => api.get('/core/settings/'),
-  patchSettings:  (data) => api.patch('/core/settings/', data),
+  getSettings:   () => api.get('/core/settings/'),
+  patchSettings: (data) => api.patch('/core/settings/', data),
+
+  // Points de retrait
+  getPickupPoints:    () => api.get('/orders/admin/pickup-points/'),
+  createPickupPoint:  (data) => api.post('/orders/admin/pickup-points/', data),
+  updatePickupPoint:  (id, data) => api.patch(`/orders/admin/pickup-points/${id}/`, data),
+  deletePickupPoint:  (id) => api.delete(`/orders/admin/pickup-points/${id}/`),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -965,15 +971,171 @@ function TabSettings() {
   )
 }
 
+// ── Onglet Points de retrait ──────────────────────────────────────────────────
+const VILLES_GN = ['Conakry','Kindia','Mamou','Labé','Kankan','Faranah','Kissidougou','Guéckédou','Macenta','Nzérékoré','Boké','Fria','Coyah','Dubréka','Siguiri','Koundara','Gaoual','Dinguiraye','Kérouané','Pita','Télimélé']
+
+function TabPickupPoints() {
+  const qc = useQueryClient()
+  const [form, setForm] = useState({ name: '', address: '', city: 'Conakry', commune: '', phone: '' })
+  const [editId, setEditId] = useState(null)
+  const [showForm, setShowForm] = useState(false)
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['admin-pickup-points'],
+    queryFn:  () => adminAPI.getPickupPoints().then(r => r.data),
+  })
+  const points = Array.isArray(data) ? data : (data?.results ?? [])
+
+  const saveMutation = useMutation({
+    mutationFn: (d) => editId
+      ? adminAPI.updatePickupPoint(editId, d)
+      : adminAPI.createPickupPoint(d),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-pickup-points'])
+      setForm({ name: '', address: '', city: 'Conakry', commune: '', phone: '' })
+      setEditId(null)
+      setShowForm(false)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => adminAPI.deletePickupPoint(id),
+    onSuccess:  () => qc.invalidateQueries(['admin-pickup-points']),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, is_active }) => adminAPI.updatePickupPoint(id, { is_active }),
+    onSuccess:  () => qc.invalidateQueries(['admin-pickup-points']),
+  })
+
+  const startEdit = (p) => {
+    setForm({ name: p.name, address: p.address, city: p.city, commune: p.commune || '', phone: p.phone || '' })
+    setEditId(p.id)
+    setShowForm(true)
+  }
+
+  const handleSubmit = (e) => { e.preventDefault(); saveMutation.mutate(form) }
+
+  const byCity = points.reduce((acc, p) => {
+    if (!acc[p.city]) acc[p.city] = []
+    acc[p.city].push(p)
+    return acc
+  }, {})
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">📍 Points de retrait</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Lieux où les acheteurs peuvent retirer leurs commandes</p>
+        </div>
+        <button onClick={() => { setEditId(null); setForm({ name:'',address:'',city:'Conakry',commune:'',phone:'' }); setShowForm(s => !s) }}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
+          {showForm ? 'Annuler' : '+ Ajouter un point'}
+        </button>
+      </div>
+
+      {/* Formulaire */}
+      {showForm && (
+        <div className="bg-white rounded-2xl shadow p-5">
+          <h3 className="font-semibold text-gray-700 mb-4">{editId ? '✏️ Modifier le point' : '➕ Nouveau point de retrait'}</h3>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Nom du lieu *</label>
+              <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))}
+                placeholder="Ex: Marché Madina — Entrée principale"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Ville *</label>
+              <select value={form.city} onChange={e => setForm(f => ({...f, city: e.target.value}))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                {VILLES_GN.map(v => <option key={v}>{v}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Adresse / Quartier *</label>
+              <input value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))}
+                placeholder="Ex: Quartier Madina, en face du marché central"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Commune / Secteur</label>
+              <input value={form.commune} onChange={e => setForm(f => ({...f, commune: e.target.value}))}
+                placeholder="Ex: Matam"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">Téléphone du point</label>
+              <input value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}
+                placeholder="Ex: +224 6XX XXX XXX"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            <div className="md:col-span-2 flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowForm(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition">Annuler</button>
+              <button type="submit" disabled={saveMutation.isPending}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition disabled:opacity-50">
+                {saveMutation.isPending ? 'Enregistrement...' : editId ? '✓ Enregistrer' : '+ Créer'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {/* Liste par ville */}
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-16 animate-pulse" />)}</div>
+      ) : points.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-10 text-center text-gray-400">
+          <p className="text-4xl mb-3">📍</p>
+          <p className="text-sm">Aucun point de retrait configuré</p>
+          <p className="text-xs mt-1">Ajoutez des points pour que les acheteurs puissent retirer leurs commandes</p>
+        </div>
+      ) : (
+        Object.entries(byCity).map(([city, pts]) => (
+          <div key={city} className="bg-white rounded-2xl shadow overflow-hidden">
+            <div className="px-5 py-3 bg-gray-50 border-b">
+              <h3 className="font-semibold text-gray-700 text-sm">📍 {city} <span className="text-gray-400 font-normal">({pts.length})</span></h3>
+            </div>
+            <div className="divide-y">
+              {pts.map(p => (
+                <div key={p.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium text-sm ${p.is_active ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{p.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{p.address}{p.commune && ` · ${p.commune}`}</p>
+                    {p.phone && <p className="text-xs text-green-600">{p.phone}</p>}
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => toggleMutation.mutate({ id: p.id, is_active: !p.is_active })}
+                      className={`text-xs px-2 py-1 rounded-lg font-medium transition ${p.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                      {p.is_active ? 'Actif' : 'Inactif'}
+                    </button>
+                    <button onClick={() => startEdit(p)}
+                      className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">✏️</button>
+                    <button onClick={() => { if (window.confirm(`Supprimer "${p.name}" ?`)) deleteMutation.mutate(p.id) }}
+                      className="text-xs px-2 py-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition">🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'overview',    label: '📊 Tableau de bord' },
-  { id: 'listings',   label: '📦 Annonces' },
-  { id: 'banners',    label: '📢 Publicités' },
-  { id: 'categories', label: '🏷️ Catégories' },
-  { id: 'shops',      label: '🏪 Boutiques' },
-  { id: 'settings',   label: '⚙️ Paramètres' },
+  { id: 'overview',      label: '📊 Tableau de bord' },
+  { id: 'listings',      label: '📦 Annonces' },
+  { id: 'banners',       label: '📢 Publicités' },
+  { id: 'categories',    label: '🏷️ Catégories' },
+  { id: 'shops',         label: '🏪 Boutiques' },
+  { id: 'pickup-points', label: '📍 Points retrait' },
+  { id: 'settings',      label: '⚙️ Paramètres' },
 ]
 
 export default function AdminPage() {
@@ -1055,8 +1217,9 @@ export default function AdminPage() {
         {activeTab === 'listings'   && <TabListings />}
         {activeTab === 'banners'    && <TabBanners />}
         {activeTab === 'categories' && <TabCategories />}
-        {activeTab === 'shops'      && <TabShops />}
-        {activeTab === 'settings'   && <TabSettings />}
+        {activeTab === 'shops'         && <TabShops />}
+        {activeTab === 'pickup-points' && <TabPickupPoints />}
+        {activeTab === 'settings'      && <TabSettings />}
       </div>
     </div>
   )

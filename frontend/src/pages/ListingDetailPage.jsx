@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
+import { MEETING_ZONES } from '../constants/meetingZones'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -22,14 +23,6 @@ const CONDITION_LABELS = {
 
 const BOOST_PRICES = { 3: '5 000 GNF', 7: '10 000 GNF' }
 
-const MEETING_ZONES = {
-    Conakry:    ['Carrefour Kipé','Carrefour Bambéto','Carrefour Cosa','Marché Madina','Carrefour Hamdallaye','Marché Dixinn','Centre Commercial Kaloum','Carrefour Sonfonia'],
-    Kankan:     ['Grand Marché Kankan','Carrefour Central Kankan'],
-    Labé:       ['Grand Marché Labé','Carrefour Central Labé'],
-    Kindia:     ['Grand Marché Kindia'],
-    Faranah:    ['Grand Marché Faranah'],
-    Nzérékoré: ['Grand Marché Nzérékoré'],
-}
 
 // ── Image Lightbox ─────────────────────────────────────────────────────────────
 function ImageLightbox({ images, startIndex, onClose }) {
