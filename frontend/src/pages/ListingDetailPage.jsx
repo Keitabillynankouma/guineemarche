@@ -1,25 +1,101 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
     return new Intl.NumberFormat('fr-GN').format(price) + ' GNF'
 }
 
+function isNew(dateStr) {
+    if (!dateStr) return false
+    return (Date.now() - new Date(dateStr).getTime()) < 24 * 60 * 60 * 1000
+}
+
+const CONDITION_LABELS = {
+    new: 'Neuf', like_new: 'Comme neuf',
+    good: 'Bon état', fair: 'État correct', poor: 'Très usé',
+}
+
+const BOOST_PRICES = { 3: '5 000 GNF', 7: '10 000 GNF' }
+
 const MEETING_ZONES = {
-    Conakry:    ['Carrefour Kipé', 'Carrefour Bambéto', 'Carrefour Cosa', 'Marché Madina', 'Carrefour Hamdallaye', 'Marché Dixinn', 'Centre Commercial Kaloum', 'Carrefour Sonfonia'],
-    Kankan:     ['Grand Marché Kankan', 'Carrefour Central Kankan'],
-    Labé:       ['Grand Marché Labé', 'Carrefour Central Labé'],
+    Conakry:    ['Carrefour Kipé','Carrefour Bambéto','Carrefour Cosa','Marché Madina','Carrefour Hamdallaye','Marché Dixinn','Centre Commercial Kaloum','Carrefour Sonfonia'],
+    Kankan:     ['Grand Marché Kankan','Carrefour Central Kankan'],
+    Labé:       ['Grand Marché Labé','Carrefour Central Labé'],
     Kindia:     ['Grand Marché Kindia'],
     Faranah:    ['Grand Marché Faranah'],
     Nzérékoré: ['Grand Marché Nzérékoré'],
 }
 
+// ── Image Lightbox ─────────────────────────────────────────────────────────────
+function ImageLightbox({ images, startIndex, onClose }) {
+    const [current, setCurrent] = useState(startIndex)
+
+    const prev = useCallback(() => setCurrent(c => (c - 1 + images.length) % images.length), [images.length])
+    const next = useCallback(() => setCurrent(c => (c + 1) % images.length), [images.length])
+
+    useEffect(() => {
+        const handler = (e) => {
+            if (e.key === 'Escape') onClose()
+            if (e.key === 'ArrowLeft')  prev()
+            if (e.key === 'ArrowRight') next()
+        }
+        window.addEventListener('keydown', handler)
+        return () => window.removeEventListener('keydown', handler)
+    }, [onClose, prev, next])
+
+    return (
+        <div className="fixed inset-0 bg-black/95 z-50 flex flex-col" onClick={onClose}>
+            {/* Header */}
+            <div className="flex justify-between items-center px-4 py-3" onClick={e => e.stopPropagation()}>
+                <span className="text-white/60 text-sm">{current + 1} / {images.length}</span>
+                <button onClick={onClose} className="text-white text-3xl leading-none hover:text-gray-300 transition">✕</button>
+            </div>
+
+            {/* Image principale */}
+            <div className="flex-1 flex items-center justify-center relative px-4" onClick={e => e.stopPropagation()}>
+                {images.length > 1 && (
+                    <button onClick={prev}
+                        className="absolute left-2 md:left-6 bg-white/10 hover:bg-white/25 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl transition z-10">
+                        ‹
+                    </button>
+                )}
+                <img
+                    src={images[current]?.file}
+                    alt=""
+                    className="max-h-[70vh] max-w-full object-contain rounded-lg select-none"
+                    draggable={false}
+                />
+                {images.length > 1 && (
+                    <button onClick={next}
+                        className="absolute right-2 md:right-6 bg-white/10 hover:bg-white/25 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl transition z-10">
+                        ›
+                    </button>
+                )}
+            </div>
+
+            {/* Thumbnails */}
+            {images.length > 1 && (
+                <div className="flex gap-2 justify-center p-4 overflow-x-auto" onClick={e => e.stopPropagation()}>
+                    {images.map((img, i) => (
+                        <img key={i} src={img.file} alt=""
+                            onClick={() => setCurrent(i)}
+                            className={`h-14 w-14 object-cover rounded-lg cursor-pointer border-2 transition flex-shrink-0 ${i === current ? 'border-white' : 'border-white/20 opacity-60 hover:opacity-100'}`}
+                        />
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
+// ── Order Modal ────────────────────────────────────────────────────────────────
 function OrderModal({ listing, onClose, onSuccess }) {
-    const [step, setStep]           = useState(1)
+    const [step, setStep]               = useState(1)
     const [deliveryMode, setDeliveryMode] = useState('meeting_point')
     const [meetLocation, setMeetLocation] = useState('')
     const [pickupPoint, setPickupPoint]   = useState('')
@@ -30,8 +106,8 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
     const { data: pickupPoints = [] } = useQuery({
         queryKey: ['pickup-points', listing.city],
-        queryFn: () => ordersAPI.getPickupPoints(listing.city).then(r => r.data?.results || r.data || []),
-        enabled: deliveryMode === 'pickup_point',
+        queryFn:  () => ordersAPI.getPickupPoints(listing.city).then(r => r.data?.results || r.data || []),
+        enabled:  deliveryMode === 'pickup_point',
     })
 
     const createOrder = useMutation({
@@ -41,32 +117,21 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
     const pay = useMutation({
         mutationFn: ({ id, data }) => ordersAPI.pay(id, data),
-        onSuccess: () => {
-            queryClient.invalidateQueries(['listing', listing.id])
-            onSuccess()
-        },
+        onSuccess: () => { queryClient.invalidateQueries(['listing', listing.id]); onSuccess() },
         onError: (err) => setError(err.response?.data?.error || 'Erreur paiement.'),
     })
 
     const handleOrder = async (e) => {
-        e.preventDefault()
-        setError('')
+        e.preventDefault(); setError('')
         try {
-            const orderData = {
-                listing:       listing.id,
-                delivery_mode: deliveryMode,
+            const order = await createOrder.mutateAsync({
+                listing: listing.id, delivery_mode: deliveryMode,
                 meet_location: deliveryMode === 'meeting_point' ? meetLocation : '',
                 pickup_point:  deliveryMode === 'pickup_point'  ? pickupPoint  : null,
-            }
-            const order = await createOrder.mutateAsync(orderData)
-            await pay.mutateAsync({
-                id:   order.data.id,
-                data: { provider, phone_number: phone },
             })
-        } catch { }
+            await pay.mutateAsync({ id: order.data.id, data: { provider, phone_number: phone } })
+        } catch {}
     }
-
-    const zones = MEETING_ZONES[listing.city] || []
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
@@ -75,120 +140,74 @@ function OrderModal({ listing, onClose, onSuccess }) {
                     <h2 className="font-bold text-gray-800">Passer commande</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                 </div>
-
                 <div className="p-5">
                     <div className="bg-gray-50 rounded-xl p-3 mb-5 flex items-center gap-3">
-                        <div className="text-2xl">📦</div>
+                        <span className="text-2xl">📦</span>
                         <div>
                             <p className="font-medium text-gray-800 text-sm">{listing.title}</p>
                             <p className="text-green-600 font-bold">{formatPrice(listing.price_gnf, listing.price_type)}</p>
                         </div>
                     </div>
-
                     {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
-
                     <form onSubmit={handleOrder} className="space-y-4">
-                        {/* Mode de livraison */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Mode de livraison</label>
                             <div className="grid grid-cols-2 gap-2">
-                                {[
-                                    { value: 'meeting_point', label: 'Remise en main propre', icon: '🤝' },
-                                    { value: 'pickup_point',  label: 'Point de retrait',      icon: '🏪' },
-                                ].map(m => (
-                                    <button
-                                        key={m.value} type="button"
-                                        onClick={() => setDeliveryMode(m.value)}
-                                        className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}
-                                    >
+                                {[{ value:'meeting_point',label:'Remise en main propre',icon:'🤝'},{ value:'pickup_point',label:'Point de retrait',icon:'🏪'}].map(m => (
+                                    <button key={m.value} type="button" onClick={() => setDeliveryMode(m.value)}
+                                        className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
                                         <div className="text-xl mb-1">{m.icon}</div>
                                         <div className="text-xs font-medium text-gray-700">{m.label}</div>
                                     </button>
                                 ))}
                             </div>
                         </div>
-
-                        {/* Zone de rencontre */}
                         {deliveryMode === 'meeting_point' && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Zone de rencontre</label>
-                                <select
-                                    value={meetLocation}
-                                    onChange={(e) => setMeetLocation(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    required
-                                >
+                                <select value={meetLocation} onChange={e => setMeetLocation(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
                                     <option value="">Choisir un lieu</option>
-                                    {zones.map(z => <option key={z}>{z}</option>)}
+                                    {(MEETING_ZONES[listing.city] || []).map(z => <option key={z}>{z}</option>)}
                                 </select>
                             </div>
                         )}
-
-                        {/* Point de retrait */}
                         {deliveryMode === 'pickup_point' && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Point de retrait</label>
                                 {pickupPoints.length === 0 ? (
-                                    <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-lg">
-                                        Aucun point de retrait disponible à {listing.city} pour l'instant. Choisissez la remise en main propre.
-                                    </p>
+                                    <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-lg">Aucun point disponible à {listing.city}.</p>
                                 ) : (
-                                    <select
-                                        value={pickupPoint}
-                                        onChange={(e) => setPickupPoint(e.target.value)}
-                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                        required
-                                    >
+                                    <select value={pickupPoint} onChange={e => setPickupPoint(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
                                         <option value="">Choisir un point</option>
-                                        {pickupPoints.map(p => (
-                                            <option key={p.id} value={p.id}>{p.name} — {p.address}</option>
-                                        ))}
+                                        {pickupPoints.map(p => <option key={p.id} value={p.id}>{p.name} — {p.address}</option>)}
                                     </select>
                                 )}
                             </div>
                         )}
-
-                        {/* Paiement */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Paiement</label>
                             <div className="grid grid-cols-3 gap-2 mb-3">
-                                {[
-                                    { value: 'orange_money', label: 'Orange Money', color: 'orange' },
-                                    { value: 'mtn_momo',     label: 'MTN MoMo',    color: 'yellow' },
-                                    { value: 'cash',         label: 'Espèces',     color: 'green'  },
-                                ].map(p => (
-                                    <button
-                                        key={p.value} type="button"
-                                        onClick={() => setProvider(p.value)}
-                                        className={`p-2 rounded-xl border-2 text-xs font-medium transition ${provider === p.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}
-                                    >
+                                {[{value:'orange_money',label:'Orange Money'},{value:'mtn_momo',label:'MTN MoMo'},{value:'cash',label:'Espèces'}].map(p => (
+                                    <button key={p.value} type="button" onClick={() => setProvider(p.value)}
+                                        className={`p-2 rounded-xl border-2 text-xs font-medium transition ${provider === p.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
                                         {p.label}
                                     </button>
                                 ))}
                             </div>
                             {provider !== 'cash' && (
-                                <input
-                                    type="tel" placeholder="+224 6XX XX XX XX"
-                                    value={phone}
-                                    onChange={(e) => setPhone(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    required
-                                />
+                                <input type="tel" placeholder="+224 6XX XX XX XX" value={phone} onChange={e => setPhone(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
                             )}
                         </div>
-
-                        {/* Info escrow */}
                         {provider !== 'cash' && (
                             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
-                                🔒 <strong>Paiement sécurisé :</strong> votre argent est conservé par GuinéeMarché et libéré au vendeur uniquement après votre confirmation de réception.
+                                🔒 <strong>Paiement sécurisé :</strong> votre argent est libéré au vendeur uniquement après votre confirmation de réception.
                             </div>
                         )}
-
-                        <button
-                            type="submit"
-                            disabled={createOrder.isPending || pay.isPending || (deliveryMode === 'pickup_point' && !pickupPoint && pickupPoints.length > 0)}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
-                        >
+                        <button type="submit" disabled={createOrder.isPending || pay.isPending}
+                            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50">
                             {(createOrder.isPending || pay.isPending) ? 'Traitement...' : `Payer ${formatPrice(listing.price_gnf, listing.price_type)}`}
                         </button>
                     </form>
@@ -198,92 +217,157 @@ function OrderModal({ listing, onClose, onSuccess }) {
     )
 }
 
+// ── Skeleton loader ────────────────────────────────────────────────────────────
+function Skeleton() {
+    return (
+        <div className="min-h-screen bg-gray-50">
+            <div className="bg-white shadow h-14" />
+            <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="md:col-span-2 space-y-4">
+                    <div className="bg-gray-200 rounded-2xl h-72 animate-pulse" />
+                    <div className="bg-white rounded-2xl shadow p-5 space-y-3">
+                        <div className="h-6 bg-gray-200 rounded animate-pulse w-2/3" />
+                        <div className="h-8 bg-gray-200 rounded animate-pulse w-1/3" />
+                        <div className="h-4 bg-gray-100 rounded animate-pulse" />
+                        <div className="h-4 bg-gray-100 rounded animate-pulse w-4/5" />
+                    </div>
+                </div>
+                <div className="space-y-4">
+                    <div className="bg-white rounded-2xl shadow p-5 h-28 animate-pulse" />
+                    <div className="bg-white rounded-2xl shadow p-5 h-36 animate-pulse" />
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ── Carte annonce similaire ────────────────────────────────────────────────────
+function SimilarCard({ listing }) {
+    const cover = listing.media?.find(m => m.is_cover) || listing.media?.[0]
+    return (
+        <Link to={`/listings/${listing.id}`}
+            className="flex-shrink-0 w-44 bg-white rounded-xl shadow hover:shadow-md transition overflow-hidden group">
+            <div className="h-28 bg-gray-100 overflow-hidden relative">
+                {cover
+                    ? <img src={cover.file} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                    : <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
+                }
+                {listing.is_boosted && (
+                    <span className="absolute top-1.5 left-1.5 bg-amber-400 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">⚡</span>
+                )}
+                {isNew(listing.created_at) && (
+                    <span className="absolute top-1.5 right-1.5 bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">Nouveau</span>
+                )}
+            </div>
+            <div className="p-2.5">
+                <p className="text-xs font-semibold text-gray-800 truncate">{listing.title}</p>
+                <p className="text-green-600 font-bold text-xs mt-0.5">{formatPrice(listing.price_gnf, listing.price_type)}</p>
+                <p className="text-xs text-gray-400 truncate mt-0.5">📍 {listing.city}</p>
+            </div>
+        </Link>
+    )
+}
+
+// ── Page principale ────────────────────────────────────────────────────────────
 export default function ListingDetailPage() {
-    const { id } = useParams()
-    const navigate   = useNavigate()
+    const { id }          = useParams()
+    const navigate        = useNavigate()
     const isAuthenticated = useAuthStore(s => s.isAuthenticated)
     const user            = useAuthStore(s => s.user)
-    const queryClient = useQueryClient()
-    const [message, setMessage]       = useState('')
-    const [sending, setSending]       = useState(false)
-    const [sent, setSent]             = useState(false)
-    const [activePhoto, setActivePhoto] = useState(0)
+    const queryClient     = useQueryClient()
+    const { addListing }  = useRecentlyViewed()
+
+    // ── TOUS les hooks au sommet (avant tout return conditionnel) ──────────────
+    const [activePhoto, setActivePhoto]   = useState(0)
+    const [lightboxOpen, setLightboxOpen] = useState(false)
     const [showBuyModal, setShowBuyModal] = useState(false)
-    const [orderDone, setOrderDone]   = useState(false)
+    const [orderDone, setOrderDone]       = useState(false)
+    const [message, setMessage]           = useState('')
+    const [sending, setSending]           = useState(false)
+    const [sent, setSent]                 = useState(false)
+    const [boostOpen, setBoostOpen]       = useState(false)
+    const [boostDays, setBoostDays]       = useState(7)
+    const [boostProvider, setBoostProvider] = useState('cash')
+    const [boostPhone, setBoostPhone]     = useState('')
 
     const { data: listing, isLoading } = useQuery({
         queryKey: ['listing', id],
-        queryFn: () => listingsAPI.getOne(id).then(r => r.data),
+        queryFn:  () => listingsAPI.getOne(id).then(r => r.data),
     })
 
-    const confirmReceipt = useMutation({
-        mutationFn: (orderId) => ordersAPI.confirmReceipt(orderId),
-        onSuccess: () => queryClient.invalidateQueries(['my-orders']),
+    // Annonces similaires
+    const { data: similarData } = useQuery({
+        queryKey: ['similar', listing?.category, id],
+        queryFn:  () => listingsAPI.getAll({ category: listing.category, page: 1 }).then(r => r.data),
+        enabled:  !!listing?.category,
+        staleTime: 5 * 60 * 1000,
+    })
+    const similarListings = (similarData?.results ?? []).filter(l => l.id !== id).slice(0, 8)
+
+    // Sauvegarder dans "Vu récemment"
+    useEffect(() => {
+        if (listing) addListing(listing)
+    }, [listing?.id])
+
+    const boostMutation = useMutation({
+        mutationFn: () => listingsAPI.boost(listing.id, { days: boostDays, provider: boostProvider, phone: boostPhone }),
+        onSuccess:  () => { queryClient.invalidateQueries(['listing', id]); setBoostOpen(false) },
     })
 
     const handleContact = async (e) => {
         e.preventDefault()
         if (!isAuthenticated) return navigate('/login')
         setSending(true)
-        try {
-            await messagingAPI.startConversation({ listing_id: id, message })
-            setSent(true)
-            setMessage('')
-        } catch { }
-        finally { setSending(false) }
+        try { await messagingAPI.startConversation({ listing_id: id, message }); setSent(true); setMessage('') }
+        catch {} finally { setSending(false) }
     }
-
-    if (isLoading) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div className="text-green-600 text-lg">Chargement...</div>
-        </div>
-    )
-    if (!listing) return (
-        <div className="min-h-screen flex items-center justify-center">
-            <div className="text-gray-500">Annonce introuvable</div>
-        </div>
-    )
-
-    const CONDITION_LABELS = {
-        new: 'Neuf', like_new: 'Comme neuf',
-        good: 'Bon état', fair: 'État correct', poor: 'Très usé',
-    }
-
-    const isSeller = user?.id === listing.seller
-
-    // ── Boost ──────────────────────────────────────────────────────────────────
-    const [boostOpen, setBoostOpen]     = useState(false)
-    const [boostDays, setBoostDays]     = useState(7)
-    const [boostProvider, setBoostProvider] = useState('cash')
-    const [boostPhone, setBoostPhone]   = useState('')
-    const qc = useQueryClient()
-
-    const boostMutation = useMutation({
-        mutationFn: () => listingsAPI.boost(listing.id, { days: boostDays, provider: boostProvider, phone: boostPhone }),
-        onSuccess:  () => { qc.invalidateQueries(['listing', listing.id]); setBoostOpen(false) },
-    })
-
-    const BOOST_PRICES = { 3: '5 000 GNF', 7: '10 000 GNF' }
 
     const shareOnWhatsApp = () => {
+        if (!listing) return
         const url  = encodeURIComponent(window.location.href)
-        const text = encodeURIComponent(
-            `🛒 *${listing.title}* — ${formatPrice(listing.price_gnf, listing.price_type)}\n📍 ${listing.city}\nVoir l'annonce sur GuinéeMarché :`
-        )
+        const text = encodeURIComponent(`🛒 *${listing.title}* — ${formatPrice(listing.price_gnf, listing.price_type)}\n📍 ${listing.city}\nVoir sur GuinéeMarché :`)
         window.open(`https://wa.me/?text=${text}%20${url}`, '_blank')
     }
 
+    // ── Early returns APRÈS tous les hooks ────────────────────────────────────
+    if (isLoading) return <Skeleton />
+    if (!listing)  return (
+        <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center">
+                <p className="text-5xl mb-4">📭</p>
+                <p className="text-gray-500">Annonce introuvable</p>
+                <Link to="/" className="mt-4 inline-block text-green-600 underline text-sm">Retour à l'accueil</Link>
+            </div>
+        </div>
+    )
+
+    // isSeller — comparaison robuste en string
+    const isSeller = !!(user && String(user.id) === String(listing.seller))
+    const images   = listing.media || []
+    const timeAgo  = (() => {
+        const diff = Date.now() - new Date(listing.created_at).getTime()
+        const h = Math.floor(diff / 3600000)
+        const d = Math.floor(diff / 86400000)
+        if (h < 1) return 'à l\'instant'
+        if (h < 24) return `il y a ${h}h`
+        if (d < 7)  return `il y a ${d}j`
+        return new Date(listing.created_at).toLocaleDateString('fr-FR')
+    })()
+
     return (
         <div className="min-h-screen bg-gray-50">
+            {/* Lightbox */}
+            {lightboxOpen && images.length > 0 && (
+                <ImageLightbox images={images} startIndex={activePhoto} onClose={() => setLightboxOpen(false)} />
+            )}
+
+            {/* Navbar */}
             <nav className="bg-white shadow sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
                     <Link to="/" className="text-green-700 font-bold text-lg">GuinéeMarché</Link>
                     <div className="flex items-center gap-3">
-                        <button
-                            onClick={shareOnWhatsApp}
-                            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition"
-                            title="Partager sur WhatsApp"
-                        >
+                        <button onClick={shareOnWhatsApp}
+                            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">
                             <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                             Partager
                         </button>
@@ -293,37 +377,65 @@ export default function ListingDetailPage() {
             </nav>
 
             <div className="max-w-5xl mx-auto px-4 py-6 grid grid-cols-1 md:grid-cols-3 gap-6">
-                {/* Photos + détails */}
+                {/* ── Colonne principale ── */}
                 <div className="md:col-span-2 space-y-4">
+
+                    {/* Galerie photos */}
                     <div className="bg-white rounded-2xl shadow overflow-hidden">
-                        <div className="h-72 bg-gray-100">
-                            {listing.media?.length > 0 ? (
-                                <img
-                                    src={listing.media[activePhoto]?.file}
-                                    alt={listing.title}
-                                    className="w-full h-full object-cover"
-                                />
+                        <div className="relative h-72 bg-gray-100 cursor-zoom-in"
+                            onClick={() => images.length > 0 && setLightboxOpen(true)}>
+                            {images.length > 0 ? (
+                                <img src={images[activePhoto]?.file} alt={listing.title}
+                                    className="w-full h-full object-cover select-none" />
                             ) : (
                                 <div className="w-full h-full flex items-center justify-center text-6xl">📦</div>
                             )}
+                            {/* Badges */}
+                            <div className="absolute top-3 left-3 flex gap-2">
+                                {listing.is_boosted && (
+                                    <span className="bg-amber-400 text-white text-xs font-bold px-2 py-1 rounded-full shadow">⚡ Boosté</span>
+                                )}
+                                {isNew(listing.created_at) && (
+                                    <span className="bg-green-500 text-white text-xs font-bold px-2 py-1 rounded-full shadow">🆕 Nouveau</span>
+                                )}
+                            </div>
+                            {/* Hint zoom */}
+                            {images.length > 0 && (
+                                <div className="absolute bottom-3 right-3 bg-black/40 text-white text-xs px-2 py-1 rounded-full">
+                                    🔍 Cliquez pour agrandir
+                                </div>
+                            )}
+                            {/* Navigation photo inline */}
+                            {images.length > 1 && (
+                                <>
+                                    <button onClick={e => { e.stopPropagation(); setActivePhoto(p => (p - 1 + images.length) % images.length) }}
+                                        className="absolute left-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition">
+                                        ‹
+                                    </button>
+                                    <button onClick={e => { e.stopPropagation(); setActivePhoto(p => (p + 1) % images.length) }}
+                                        className="absolute right-2 top-1/2 -translate-y-1/2 bg-black/40 hover:bg-black/60 text-white w-9 h-9 rounded-full flex items-center justify-center text-lg transition">
+                                        ›
+                                    </button>
+                                </>
+                            )}
                         </div>
-                        {listing.media?.length > 1 && (
+                        {/* Thumbnails */}
+                        {images.length > 1 && (
                             <div className="flex gap-2 p-3 overflow-x-auto">
-                                {listing.media.map((m, i) => (
-                                    <img
-                                        key={m.id} src={m.file} alt=""
+                                {images.map((m, i) => (
+                                    <img key={m.id || i} src={m.file} alt=""
                                         onClick={() => setActivePhoto(i)}
-                                        className={`h-16 w-16 object-cover rounded-lg cursor-pointer border-2 ${i === activePhoto ? 'border-green-500' : 'border-transparent'}`}
+                                        className={`h-16 w-16 object-cover rounded-lg cursor-pointer border-2 flex-shrink-0 transition ${i === activePhoto ? 'border-green-500 scale-105' : 'border-transparent opacity-70 hover:opacity-100'}`}
                                     />
                                 ))}
                             </div>
                         )}
                     </div>
 
-                    {/* Attributs spécifiques à la catégorie */}
+                    {/* Caractéristiques */}
                     {listing.attributes && Object.keys(listing.attributes).length > 0 && (
                         <div className="bg-white rounded-2xl shadow p-5">
-                            <h2 className="font-semibold text-gray-700 mb-3">Caractéristiques</h2>
+                            <h2 className="font-semibold text-gray-700 mb-3">📋 Caractéristiques</h2>
                             <div className="grid grid-cols-2 gap-3">
                                 {Object.entries(listing.attributes).map(([k, v]) => (
                                     <div key={k} className="bg-gray-50 rounded-xl p-3">
@@ -335,29 +447,48 @@ export default function ListingDetailPage() {
                         </div>
                     )}
 
+                    {/* Titre + description */}
                     <div className="bg-white rounded-2xl shadow p-5">
-                        <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-start justify-between gap-3 mb-2">
                             <h1 className="text-xl font-bold text-gray-800">{listing.title}</h1>
-                            <span className="text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
-                                {CONDITION_LABELS[listing.condition]}
+                            <span className="flex-shrink-0 text-xs bg-green-100 text-green-700 px-2 py-1 rounded-full">
+                                {CONDITION_LABELS[listing.condition] || listing.condition}
                             </span>
                         </div>
-                        <p className="text-2xl font-bold text-green-600 mb-4">
+                        <p className="text-2xl font-bold text-green-600 mb-1">
                             {formatPrice(listing.price_gnf, listing.price_type)}
                             {listing.price_type === 'negotiable' && (
                                 <span className="text-sm font-normal text-gray-400 ml-2">· Prix négociable</span>
                             )}
                         </p>
-                        <p className="text-gray-600 leading-relaxed">{listing.description}</p>
-                        <div className="flex gap-4 mt-4 text-sm text-gray-400">
+                        <div className="flex flex-wrap gap-3 text-sm text-gray-400 mb-4">
                             <span>📍 {listing.city}{listing.quartier && ` · ${listing.quartier}`}</span>
-                            <span>👁 {listing.view_count} vues</span>
+                            <span>👁 {listing.view_count} vue{listing.view_count !== 1 ? 's' : ''}</span>
+                            <span>🕐 {timeAgo}</span>
+                            {listing.category_name && <span>📂 {listing.category_name}</span>}
                         </div>
+                        {listing.view_count > 10 && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700 mb-4">
+                                🔥 Cette annonce est populaire — {listing.view_count} personnes l'ont regardée
+                            </div>
+                        )}
+                        <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{listing.description}</p>
                     </div>
+
+                    {/* Annonces similaires */}
+                    {similarListings.length > 0 && (
+                        <div className="bg-white rounded-2xl shadow p-5">
+                            <h2 className="font-semibold text-gray-700 mb-3">🔍 Annonces similaires</h2>
+                            <div className="flex gap-3 overflow-x-auto pb-1">
+                                {similarListings.map(l => <SimilarCard key={l.id} listing={l} />)}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                {/* Sidebar vendeur + actions */}
+                {/* ── Sidebar ── */}
                 <div className="space-y-4">
+                    {/* Vendeur */}
                     <div className="bg-white rounded-2xl shadow p-5">
                         <h2 className="font-semibold text-gray-700 mb-3">Vendeur</h2>
                         <div className="flex items-center gap-3">
@@ -369,18 +500,17 @@ export default function ListingDetailPage() {
                         </div>
                     </div>
 
-                    {/* ── Booster mon annonce (vendeur uniquement) ── */}
+                    {/* ⚡ Boost — vendeur uniquement */}
                     {isSeller && listing.status === 'active' && (
-                        <div className="bg-white rounded-2xl shadow p-5 space-y-3">
+                        <div className="bg-gradient-to-br from-amber-50 to-orange-50 border border-amber-200 rounded-2xl p-5 space-y-3">
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p className="font-bold text-gray-800">⚡ Booster cette annonce</p>
-                                    <p className="text-xs text-gray-400 mt-0.5">Mise en avant dans les résultats de recherche</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">Mis en avant dans les résultats</p>
                                 </div>
                                 {listing.is_boosted && (
-                                    <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2 py-1 rounded-full">
-                                        ⚡ Actif
-                                        {listing.expires_at && ` · expire le ${new Date(listing.expires_at).toLocaleDateString('fr-FR')}`}
+                                    <span className="text-xs bg-amber-400 text-white font-bold px-2 py-1 rounded-full">
+                                        ⚡ Actif{listing.expires_at && ` · exp. ${new Date(listing.expires_at).toLocaleDateString('fr-FR')}`}
                                     </span>
                                 )}
                             </div>
@@ -391,16 +521,14 @@ export default function ListingDetailPage() {
                                 </button>
                             ) : (
                                 <div className="space-y-3">
-                                    {/* Durée */}
                                     <div className="grid grid-cols-2 gap-2">
                                         {[3, 7].map(d => (
                                             <button key={d} onClick={() => setBoostDays(d)}
                                                 className={`py-2.5 rounded-xl text-sm font-medium border transition ${boostDays === d ? 'bg-amber-500 text-white border-amber-500' : 'bg-white text-gray-700 border-gray-200 hover:border-amber-300'}`}>
-                                                {d} jours — {BOOST_PRICES[d]}
+                                                {d} jours<br /><span className="text-xs">{BOOST_PRICES[d]}</span>
                                             </button>
                                         ))}
                                     </div>
-                                    {/* Paiement */}
                                     <select value={boostProvider} onChange={e => setBoostProvider(e.target.value)}
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
                                         <option value="cash">Espèces / En personne</option>
@@ -420,7 +548,8 @@ export default function ListingDetailPage() {
                                             className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-semibold py-3 rounded-xl text-sm transition disabled:opacity-50">
                                             {boostMutation.isPending ? 'Traitement...' : `Payer ${BOOST_PRICES[boostDays]}`}
                                         </button>
-                                        <button onClick={() => setBoostOpen(false)} className="px-4 bg-gray-100 text-gray-600 rounded-xl text-sm transition hover:bg-gray-200">
+                                        <button onClick={() => setBoostOpen(false)}
+                                            className="px-4 bg-white border border-gray-200 text-gray-600 rounded-xl text-sm transition hover:bg-gray-50">
                                             Annuler
                                         </button>
                                     </div>
@@ -437,56 +566,53 @@ export default function ListingDetailPage() {
                                     ✅ Commande passée ! Le vendeur va confirmer sous peu.
                                 </div>
                             ) : (
-                                <button
-                                    onClick={() => isAuthenticated ? setShowBuyModal(true) : navigate('/login')}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition"
-                                >
-                                    Acheter maintenant
+                                <button onClick={() => isAuthenticated ? setShowBuyModal(true) : navigate('/login')}
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition text-base">
+                                    🛒 Acheter maintenant
                                 </button>
                             )}
                         </div>
                     )}
 
                     {/* Contact vendeur */}
-                    <div className="bg-white rounded-2xl shadow p-5">
-                        <h2 className="font-semibold text-gray-700 mb-3">Contacter le vendeur</h2>
-                        {sent ? (
-                            <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center">
-                                ✅ Message envoyé !
-                            </div>
-                        ) : (
-                            <form onSubmit={handleContact} className="space-y-3">
-                                <textarea
-                                    rows={3}
-                                    placeholder="Bonjour, est-ce encore disponible ?"
-                                    value={message}
-                                    onChange={(e) => setMessage(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    required
-                                />
-                                <button
-                                    type="submit" disabled={sending}
-                                    className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg text-sm transition disabled:opacity-50"
-                                >
-                                    {sending ? 'Envoi...' : 'Envoyer un message'}
-                                </button>
-                                {!isAuthenticated && (
-                                    <p className="text-xs text-center text-gray-400">
-                                        <Link to="/login" className="text-green-600 underline">Connectez-vous</Link> pour contacter
-                                    </p>
-                                )}
-                            </form>
-                        )}
+                    {!isSeller && (
+                        <div className="bg-white rounded-2xl shadow p-5">
+                            <h2 className="font-semibold text-gray-700 mb-3">💬 Contacter le vendeur</h2>
+                            {sent ? (
+                                <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center">✅ Message envoyé !</div>
+                            ) : (
+                                <form onSubmit={handleContact} className="space-y-3">
+                                    <textarea rows={3} placeholder="Bonjour, est-ce encore disponible ?"
+                                        value={message} onChange={e => setMessage(e.target.value)}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                                    <button type="submit" disabled={sending}
+                                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg text-sm transition disabled:opacity-50">
+                                        {sending ? 'Envoi...' : 'Envoyer un message'}
+                                    </button>
+                                    {!isAuthenticated && (
+                                        <p className="text-xs text-center text-gray-400">
+                                            <Link to="/login" className="text-green-600 underline">Connectez-vous</Link> pour contacter
+                                        </p>
+                                    )}
+                                </form>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Infos supplémentaires */}
+                    <div className="bg-white rounded-2xl shadow p-5 space-y-2 text-sm text-gray-500">
+                        <p>🔖 Référence : <span className="font-mono text-xs text-gray-400">{listing.id?.slice(0,8)}</span></p>
+                        <p>📅 Publié {timeAgo}</p>
+                        <p>👁 {listing.view_count} vue{listing.view_count !== 1 ? 's' : ''}</p>
                     </div>
                 </div>
             </div>
 
+            {/* Modal commande */}
             {showBuyModal && (
-                <OrderModal
-                    listing={listing}
+                <OrderModal listing={listing}
                     onClose={() => setShowBuyModal(false)}
-                    onSuccess={() => { setShowBuyModal(false); setOrderDone(true) }}
-                />
+                    onSuccess={() => { setShowBuyModal(false); setOrderDone(true) }} />
             )}
         </div>
     )
