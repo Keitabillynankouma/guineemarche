@@ -355,7 +355,9 @@ export default function ListingDetailPage() {
 
     // isSeller — comparaison robuste en string
     const isSeller = !!(user && String(user.id) === String(listing.seller))
-    const images   = listing.media || []
+    const allMedia = listing.media || []
+    const images   = allMedia.filter(m => m.media_type !== 'video')
+    const videos   = allMedia.filter(m => m.media_type === 'video')
     const timeAgo  = (() => {
         const diff = Date.now() - new Date(listing.created_at).getTime()
         const h = Math.floor(diff / 3600000)
@@ -452,6 +454,18 @@ export default function ListingDetailPage() {
                             </div>
                         )}
                     </div>
+
+                    {/* Vidéo */}
+                    {videos.length > 0 && (
+                        <div className="bg-white rounded-2xl shadow p-4">
+                            <h2 className="font-semibold text-gray-700 mb-3">🎥 Vidéo de l'annonce</h2>
+                            <video
+                                src={videos[0].file}
+                                controls
+                                className="w-full rounded-xl bg-black max-h-72"
+                            />
+                        </div>
+                    )}
 
                     {/* Caractéristiques */}
                     {listing.attributes && Object.keys(listing.attributes).length > 0 && (

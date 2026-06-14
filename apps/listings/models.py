@@ -112,7 +112,7 @@ class ListingMedia(BaseModel):
         VIDEO = 'video', 'Vidéo'
 
     listing    = models.ForeignKey(Listing, on_delete=models.CASCADE, related_name='media')
-    file       = models.ImageField(upload_to='listings/%Y/%m/')
+    file       = models.FileField(upload_to='listings/%Y/%m/')
     media_type = models.CharField(max_length=10, choices=MediaType.choices, default=MediaType.IMAGE)
     sort_order = models.PositiveIntegerField(default=0)
     is_cover   = models.BooleanField(default=False)

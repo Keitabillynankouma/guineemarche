@@ -34,13 +34,13 @@ function SellerDashboard({ userId }) {
         queryKey: ['seller-dashboard-orders'],
         queryFn: () => ordersAPI.getSeller().then(r => r.data),
     })
-    const { data: listingsRaw } = useQuery({
-        queryKey: ['seller-dashboard-listings'],
-        queryFn: () => listingsAPI.myListings().then(r => r.data),
+    const { data: sellerStats } = useQuery({
+        queryKey: ['seller-stats-advanced'],
+        queryFn: () => listingsAPI.sellerStats().then(r => r.data),
     })
 
-    const orders   = Array.isArray(ordersRaw)   ? ordersRaw   : (ordersRaw?.results ?? [])
-    const listings = Array.isArray(listingsRaw) ? listingsRaw : (listingsRaw?.results ?? [])
+    const orders    = Array.isArray(ordersRaw) ? ordersRaw : (ordersRaw?.results ?? [])
+    const stats     = sellerStats || {}
 
     // Commandes par mois (6 derniers mois)
     const months = Array.from({ length: 6 }, (_, i) => {
@@ -62,14 +62,21 @@ function SellerDashboard({ userId }) {
         if (m) m.value += (o.seller_payout_gnf || o.amount_gnf || 0)
     }
 
-    // Stats globales
-    const totalRev     = orders.filter(o => o.status === 'completed').reduce((s, o) => s + (o.seller_payout_gnf || 0), 0)
-    const completed    = orders.filter(o => o.status === 'completed').length
-    const pending      = orders.filter(o => o.status === 'pending').length
-    const convRate     = orders.length ? Math.round((completed / orders.length) * 100) : 0
+    // Stats commandes
+    const totalRev  = orders.filter(o => o.status === 'completed').reduce((s, o) => s + (o.seller_payout_gnf || 0), 0)
+    const completed = orders.filter(o => o.status === 'completed').length
+    const pending   = orders.filter(o => o.status === 'pending').length
+    const convRate  = orders.length ? Math.round((completed / orders.length) * 100) : 0
 
-    // Top annonces par vues
-    const topListings  = [...listings].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)).slice(0, 5)
+    // Comparaison mois
+    const listingsThisMonth = stats.listings_this_month ?? 0
+    const listingsLastMonth = stats.listings_last_month ?? 0
+    const listingsTrend = listingsLastMonth > 0
+        ? Math.round(((listingsThisMonth - listingsLastMonth) / listingsLastMonth) * 100)
+        : null
+
+    // Vues mensuelles pour graphique
+    const viewsChartData = (stats.monthly_views || []).map(m => ({ label: m.month, value: m.views }))
 
     const fmt = n => new Intl.NumberFormat('fr-GN').format(n) + ' GNF'
 
@@ -77,7 +84,7 @@ function SellerDashboard({ userId }) {
         <div className="bg-white rounded-2xl shadow p-5 space-y-5">
             <h2 className="font-bold text-gray-800">📊 Tableau de bord vendeur</h2>
 
-            {/* KPIs */}
+            {/* KPIs commandes */}
             <div className="grid grid-cols-2 gap-3">
                 {[
                     { label: 'Ventes terminées', value: completed, icon: '✅', color: 'text-green-600' },
@@ -93,24 +100,77 @@ function SellerDashboard({ userId }) {
                 ))}
             </div>
 
+            {/* KPIs portée & engagement */}
+            {sellerStats && (
+                <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Portée & engagement</p>
+                    <div className="grid grid-cols-2 gap-3">
+                        {[
+                            { label: 'Vues totales', value: (stats.total_views || 0).toLocaleString('fr-FR'), icon: '👁', color: 'text-indigo-600' },
+                            { label: 'Moy. vues/annonce', value: stats.avg_views_per_listing ?? 0, icon: '📊', color: 'text-indigo-500' },
+                            { label: 'Favoris reçus', value: stats.total_favorites || 0, icon: '❤️', color: 'text-red-500' },
+                            { label: 'Taux engagement', value: (stats.engagement_rate || 0) + '%', icon: '🎯', color: 'text-purple-600' },
+                        ].map(k => (
+                            <div key={k.label} className="bg-indigo-50 rounded-xl p-3">
+                                <p className="text-xl mb-1">{k.icon}</p>
+                                <p className={`font-bold text-xl ${k.color}`}>{k.value}</p>
+                                <p className="text-xs text-gray-500 mt-0.5">{k.label}</p>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            {/* Comparaison avec mois précédent */}
+            {sellerStats && (
+                <div className="bg-gray-50 rounded-xl p-4 flex items-center justify-between">
+                    <div>
+                        <p className="text-xs text-gray-500 font-medium">Annonces ce mois-ci</p>
+                        <p className="text-2xl font-bold text-gray-800">{listingsThisMonth}</p>
+                        <p className="text-xs text-gray-400">{listingsLastMonth} le mois dernier</p>
+                    </div>
+                    {listingsTrend !== null && (
+                        <div className={`text-right ${listingsTrend >= 0 ? 'text-green-600' : 'text-red-500'}`}>
+                            <p className="text-2xl font-bold">{listingsTrend >= 0 ? '↑' : '↓'} {Math.abs(listingsTrend)}%</p>
+                            <p className="text-xs opacity-80">vs mois dernier</p>
+                        </div>
+                    )}
+                    {listingsTrend === null && listingsLastMonth === 0 && listingsThisMonth > 0 && (
+                        <div className="text-green-600 text-right">
+                            <p className="text-2xl font-bold">🆕</p>
+                            <p className="text-xs">Première annonce !</p>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Graphique vues mensuelles */}
+            {viewsChartData.length > 0 && (
+                <BarChart data={viewsChartData} color="#6366f1" label="Vues des annonces (6 derniers mois)" />
+            )}
+
             {/* Graphique commandes */}
             <BarChart data={months} color="#16a34a" label="Commandes reçues (6 derniers mois)" />
 
             {/* Graphique revenus */}
             <BarChart data={revMonths.map(m => ({ ...m, label: m.label }))} color="#2563eb" label="Revenus nets (GNF)" />
 
-            {/* Top annonces */}
-            {topListings.length > 0 && (
+            {/* Top annonces avec taux d'engagement */}
+            {(stats.top_listings || []).length > 0 && (
                 <div>
-                    <p className="text-xs text-gray-500 mb-2 font-medium">Top annonces par vues</p>
+                    <p className="text-xs text-gray-500 mb-2 font-medium">🏆 Top annonces</p>
                     <div className="space-y-2">
-                        {topListings.map((l, i) => (
+                        {(stats.top_listings || []).map((l, i) => (
                             <Link key={l.id} to={`/listings/${l.id}`}
                                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
                                 <span className="text-sm font-bold text-gray-400 w-4">#{i + 1}</span>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-sm font-medium text-gray-800 truncate">{l.title}</p>
-                                    <p className="text-xs text-gray-400">👁 {l.view_count || 0} vues · {l.is_boosted ? '⚡ Boosté' : l.status}</p>
+                                    <p className="text-xs text-gray-400">
+                                        👁 {l.view_count || 0} vues · ❤️ {l.favorites || 0}
+                                        {l.listing_engagement > 0 && ` · 🎯 ${l.listing_engagement}%`}
+                                        {l.is_boosted && ' · ⚡ Boosté'}
+                                    </p>
                                 </div>
                             </Link>
                         ))}

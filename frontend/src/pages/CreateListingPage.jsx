@@ -77,6 +77,8 @@ export default function CreateListingPage() {
     })
     const [files, setFiles]           = useState([])
     const [previews, setPreviews]     = useState([])
+    const [videoFile, setVideoFile]   = useState(null)
+    const [videoPreview, setVideoPreview] = useState(null)
     const [error, setError]           = useState('')
     const [loading, setLoading]       = useState(false)
     const [attributes, setAttributes] = useState({})
@@ -135,6 +137,17 @@ export default function CreateListingPage() {
         setPreviews(compressed.map(f => URL.createObjectURL(f)))
     }
 
+    const handleVideo = (e) => {
+        const file = e.target.files[0]
+        if (!file) return
+        if (file.size > 50 * 1024 * 1024) {
+            setError('La vidéo doit faire moins de 50 Mo.')
+            return
+        }
+        setVideoFile(file)
+        setVideoPreview(URL.createObjectURL(file))
+    }
+
     const handleSubmit = async (e) => {
         e.preventDefault()
         setError('')
@@ -149,6 +162,7 @@ export default function CreateListingPage() {
                 formData.append('attributes', JSON.stringify(attributes))
             }
             files.forEach(f => formData.append('uploaded_files', f))
+            if (videoFile) formData.append('uploaded_video', videoFile)
             const res = await listingsAPI.create(formData)
             const listingStatus = res.data?.status
 
@@ -362,6 +376,41 @@ export default function CreateListingPage() {
                                     {previews.map((p, i) => (
                                         <img key={i} src={p} alt="" className="h-20 w-20 object-cover rounded-lg border" />
                                     ))}
+                                </div>
+                            )}
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">
+                                Vidéo <span className="text-gray-400 font-normal">(optionnelle, max 50 Mo)</span>
+                            </label>
+                            <div className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center">
+                                <input
+                                    type="file" accept="video/*"
+                                    onChange={handleVideo}
+                                    className="hidden" id="video"
+                                />
+                                <label htmlFor="video" className="cursor-pointer block">
+                                    <p className="text-4xl mb-2">🎥</p>
+                                    <p className="text-gray-500 text-sm">Cliquer pour ajouter une vidéo</p>
+                                    {videoFile && (
+                                        <p className="text-green-600 mt-1 font-medium text-sm">
+                                            ✅ {videoFile.name} ({(videoFile.size / 1024 / 1024).toFixed(1)} Mo)
+                                        </p>
+                                    )}
+                                </label>
+                            </div>
+                            {videoPreview && (
+                                <div className="mt-3">
+                                    <video
+                                        src={videoPreview} controls
+                                        className="w-full max-h-48 rounded-lg border bg-black"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => { setVideoFile(null); setVideoPreview(null) }}
+                                        className="mt-1 text-xs text-red-500 hover:text-red-700"
+                                    >Supprimer la vidéo</button>
                                 </div>
                             )}
                         </div>

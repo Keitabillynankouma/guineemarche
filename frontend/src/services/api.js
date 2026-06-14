@@ -56,6 +56,7 @@ export const listingsAPI = {
   removeFavorite: (id) => api.delete(`/listings/favorites/${id}/`),
   getFavorites: () => api.get('/listings/favorites/'),
   toggleFavorite: (listingId) => api.post(`/listings/${listingId}/favorite/`),
+  sellerStats: () => api.get('/listings/my/stats/'),
 }
 
 export const shopsAPI = {

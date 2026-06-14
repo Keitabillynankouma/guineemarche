@@ -66,21 +66,23 @@ class ListingListCreateView(generics.ListCreateAPIView):
                     }
                 )
 
-        # 1. Sauvegarder en DRAFT pendant la modération
+        # 1. Sauvegarder en DRAFT (en attente de modération async)
         listing = serializer.save(seller=user, status=Listing.Status.DRAFT)
 
-        # 2. Modération IA
-        category_name = listing.category.name if listing.category else 'Non définie'
-        mod = moderate_listing(listing.title, listing.description, listing.price_gnf, category_name)
-
-        if mod['decision'] == 'reject':
-            listing.status = Listing.Status.SUSPENDED
-        elif mod['decision'] == 'review':
-            listing.status = Listing.Status.DRAFT   # Reste en attente de revue admin
-        else:
-            listing.status = Listing.Status.ACTIVE  # Approuvée → publiée immédiatement
-
-        listing.save(update_fields=['status'])
+        # 2. Lancer la modération IA en arrière-plan (Celery) — ne bloque pas la réponse
+        try:
+            from .tasks import moderate_listing_task
+            moderate_listing_task.delay(str(listing.id))
+        except Exception:
+            # Si Celery indisponible, modération synchrone de secours
+            from .moderation import moderate_listing
+            category_name = listing.category.name if listing.category else 'Non définie'
+            mod = moderate_listing(listing.title, listing.description, listing.price_gnf, category_name)
+            if mod['decision'] == 'reject':
+                listing.status = Listing.Status.SUSPENDED
+            elif mod['decision'] != 'review':
+                listing.status = Listing.Status.ACTIVE
+            listing.save(update_fields=['status'])
 
         # 3. Compteur abonnement + badge
         sub.listings_used += 1
@@ -135,6 +137,106 @@ class MyListingsView(generics.ListAPIView):
         return Listing.objects.filter(
             seller=self.request.user
         ).select_related('category').prefetch_related('media')
+
+
+class MySellerStatsView(APIView):
+    """
+    GET /listings/my/stats/
+    Stats avancées du vendeur : portée, taux d'engagement, comparaison mois.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        from django.db.models import Sum, Count, Avg, Q
+        from datetime import datetime, timedelta
+        import calendar
+
+        user = request.user
+        now  = timezone.now()
+
+        # Périodes
+        start_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        start_last_month = (start_this_month - timedelta(days=1)).replace(day=1)
+        end_last_month   = start_this_month
+
+        listings = Listing.objects.filter(seller=user)
+
+        # Stats globales
+        agg = listings.aggregate(
+            total_views=Sum('view_count'),
+            total_listings=Count('id'),
+            active_count=Count('id', filter=Q(status=Listing.Status.ACTIVE)),
+            sold_count=Count('id', filter=Q(status=Listing.Status.SOLD)),
+            avg_views=Avg('view_count'),
+        )
+        total_views    = agg['total_views']    or 0
+        total_listings = agg['total_listings'] or 0
+        active_count   = agg['active_count']   or 0
+        sold_count     = agg['sold_count']     or 0
+        avg_views      = round(agg['avg_views'] or 0, 1)
+
+        # Total favoris sur toutes les annonces
+        total_favorites = Favorite.objects.filter(listing__seller=user).count()
+
+        # Taux engagement : favoris / vues (%)
+        engagement_rate = round((total_favorites / total_views * 100) if total_views > 0 else 0, 1)
+
+        # Annonces créées ce mois / mois dernier
+        listings_this_month = listings.filter(created_at__gte=start_this_month).count()
+        listings_last_month = listings.filter(
+            created_at__gte=start_last_month, created_at__lt=end_last_month
+        ).count()
+
+        # Vues par annonce (top 5)
+        top_listings = list(
+            listings.filter(status=Listing.Status.ACTIVE)
+            .order_by('-view_count')[:5]
+            .values('id', 'title', 'view_count', 'is_boosted', 'price_gnf')
+        )
+        for l in top_listings:
+            l['id'] = str(l['id'])
+            fav_count = Favorite.objects.filter(listing_id=l['id']).count()
+            l['favorites'] = fav_count
+            l['listing_engagement'] = round(
+                (fav_count / l['view_count'] * 100) if l['view_count'] > 0 else 0, 1
+            )
+
+        # Vues par mois (6 derniers mois) pour graphique tendance
+        monthly_views = []
+        for i in range(5, -1, -1):
+            d = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+            # Reculer i mois
+            for _ in range(i):
+                d = (d - timedelta(days=1)).replace(day=1)
+            next_month = (d.replace(day=28) + timedelta(days=4)).replace(day=1)
+            views_in_month = listings.filter(
+                created_at__gte=d, created_at__lt=next_month
+            ).aggregate(v=Sum('view_count'))['v'] or 0
+            monthly_views.append({
+                'month': d.strftime('%b'),
+                'views': views_in_month,
+                'new_listings': listings.filter(created_at__gte=d, created_at__lt=next_month).count(),
+            })
+
+        return Response({
+            # Portée
+            'total_views':       total_views,
+            'avg_views_per_listing': avg_views,
+            # Engagement
+            'total_favorites':   total_favorites,
+            'engagement_rate':   engagement_rate,
+            # Annonces
+            'total_listings':    total_listings,
+            'active_count':      active_count,
+            'sold_count':        sold_count,
+            # Comparaison mois
+            'listings_this_month': listings_this_month,
+            'listings_last_month': listings_last_month,
+            # Tendance
+            'monthly_views':     monthly_views,
+            # Top annonces
+            'top_listings':      top_listings,
+        })
 
 
 class FavoriteListCreateView(generics.ListCreateAPIView):
@@ -308,6 +410,33 @@ class AdminListingDetailView(generics.RetrieveDestroyAPIView):
         instance.status = Listing.Status.SUSPENDED
         instance.save(update_fields=['status', 'updated_at'])
         return Response({'status': 'suspended'}, status=status.HTTP_200_OK)
+
+
+class AdminListingApproveView(APIView):
+    """Admin : approuver une annonce en draft (après révision manuelle)."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        listing = get_object_or_404(Listing, pk=pk)
+        if listing.status not in (Listing.Status.DRAFT, Listing.Status.SUSPENDED):
+            return Response({'error': 'Annonce déjà active ou vendue.'}, status=400)
+        listing.status = Listing.Status.ACTIVE
+        listing.save(update_fields=['status', 'updated_at'])
+
+        # Notifier le vendeur
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=listing.seller,
+                type=Notification.Type.SYSTEM,
+                title='✅ Annonce approuvée',
+                body=f'Votre annonce "{listing.title}" a été approuvée et est maintenant visible.',
+                data={'listing_id': str(listing.id)},
+            )
+        except Exception:
+            pass
+
+        return Response({'status': 'active'})
 
 
 class AdminBannerListCreateView(generics.ListCreateAPIView):

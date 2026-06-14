@@ -50,6 +50,12 @@ class ListingSerializer(serializers.ModelSerializer):
         allow_empty=True,
         default=list
     )
+    uploaded_video = serializers.FileField(
+        write_only=True,
+        required=False,
+        allow_null=True,
+        default=None
+    )
 
     class Meta:
         model  = Listing
@@ -58,7 +64,7 @@ class ListingSerializer(serializers.ModelSerializer):
             'condition', 'status', 'city', 'quartier', 'latitude', 'longitude',
             'view_count', 'is_boosted', 'expires_at', 'created_at',
             'seller', 'seller_name', 'seller_phone', 'category', 'category_name',
-            'attributes', 'media', 'uploaded_files', 'is_favorited',
+            'attributes', 'media', 'uploaded_files', 'uploaded_video', 'is_favorited',
         )
         read_only_fields = ('id', 'seller', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted', 'is_favorited')
 
@@ -71,13 +77,23 @@ class ListingSerializer(serializers.ModelSerializer):
     @transaction.atomic
     def create(self, validated_data):
         uploaded_files = validated_data.pop('uploaded_files', [])
+        uploaded_video = validated_data.pop('uploaded_video', None)
         listing = Listing.objects.create(**validated_data)
         for index, file in enumerate(uploaded_files):
             ListingMedia.objects.create(
                 listing=listing,
                 file=file,
+                media_type=ListingMedia.MediaType.IMAGE,
                 sort_order=index,
                 is_cover=(index == 0)
+            )
+        if uploaded_video:
+            ListingMedia.objects.create(
+                listing=listing,
+                file=uploaded_video,
+                media_type=ListingMedia.MediaType.VIDEO,
+                sort_order=len(uploaded_files),
+                is_cover=False
             )
         return listing
 

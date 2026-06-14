@@ -13,8 +13,9 @@ const adminAPI = {
   resolve:     (id, action) => api.post(`/orders/admin/disputes/${id}/resolve/`, { action }),
 
   // Annonces
-  getListings:    (params) => api.get('/listings/admin/listings/', { params }),
-  suspendListing: (id)     => api.delete(`/listings/admin/listings/${id}/`),
+  getListings:     (params) => api.get('/listings/admin/listings/', { params }),
+  suspendListing:  (id)     => api.delete(`/listings/admin/listings/${id}/`),
+  approveListing:  (id)     => api.post(`/listings/admin/listings/${id}/approve/`),
 
   // Publicités
   getBanners:   ()          => api.get('/listings/admin/banners/'),
@@ -187,17 +188,39 @@ function TabListings() {
     onSuccess:  () => qc.invalidateQueries(['admin-listings']),
   })
 
+  const approveMutation = useMutation({
+    mutationFn: (id) => adminAPI.approveListing(id),
+    onSuccess:  () => qc.invalidateQueries(['admin-listings']),
+  })
+
   const STATUS_LABELS = {
-    active:    { label: 'Active',    color: 'bg-green-100 text-green-700' },
-    draft:     { label: 'Brouillon', color: 'bg-gray-100 text-gray-500' },
-    sold:      { label: 'Vendue',    color: 'bg-blue-100 text-blue-700' },
-    expired:   { label: 'Expirée',   color: 'bg-orange-100 text-orange-600' },
-    suspended: { label: 'Suspendue', color: 'bg-red-100 text-red-600' },
+    active:    { label: 'Active',       color: 'bg-green-100 text-green-700' },
+    draft:     { label: '⏳ En révision', color: 'bg-amber-100 text-amber-700' },
+    sold:      { label: 'Vendue',       color: 'bg-blue-100 text-blue-700' },
+    expired:   { label: 'Expirée',      color: 'bg-orange-100 text-orange-600' },
+    suspended: { label: 'Refusée',      color: 'bg-red-100 text-red-600' },
   }
+
+  // Compter les annonces en révision pour le badge
+  const { data: draftData } = useQuery({
+    queryKey: ['admin-listings-draft-count'],
+    queryFn:  () => adminAPI.getListings({ status: 'draft' }).then(r => r.data),
+    refetchInterval: 30000,
+  })
+  const draftCount = Array.isArray(draftData) ? draftData.length : (draftData?.results?.length ?? 0)
 
   return (
     <div className="space-y-5">
-      <h2 className="text-lg font-bold text-gray-800">📦 Toutes les annonces</h2>
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-800">📦 Toutes les annonces</h2>
+        {draftCount > 0 && (
+          <button
+            onClick={() => setStatusFilter('draft')}
+            className="flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-700 px-3 py-1.5 rounded-xl text-sm font-medium hover:bg-amber-100 transition">
+            ⏳ {draftCount} en révision
+          </button>
+        )}
+      </div>
 
       <div className="flex gap-3 flex-wrap">
         <input
@@ -211,7 +234,7 @@ function TabListings() {
         >
           <option value="">Tous les statuts</option>
           {Object.entries(STATUS_LABELS).map(([v, { label }]) => (
-            <option key={v} value={v}>{label}</option>
+            <option key={v} value={v}>{label.replace('⏳ ', '')}</option>
           ))}
         </select>
       </div>
@@ -247,6 +270,13 @@ function TabListings() {
                     to={`/listings/${l.id}`}
                     className="text-xs bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg transition"
                   >Voir</Link>
+                  {l.status === 'draft' && (
+                    <button
+                      onClick={() => { if (confirm('Approuver cette annonce ?')) approveMutation.mutate(l.id) }}
+                      disabled={approveMutation.isPending}
+                      className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium"
+                    >✅ Approuver</button>
+                  )}
                   {l.status !== 'suspended' && (
                     <button
                       onClick={() => { if (confirm('Suspendre cette annonce ?')) suspendMutation.mutate(l.id) }}
