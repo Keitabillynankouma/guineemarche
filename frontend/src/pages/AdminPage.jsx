@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
@@ -1166,20 +1166,28 @@ const TABS = [
 ]
 
 export default function AdminPage() {
-  const user = useAuthStore(s => s.user)
-  const qc   = useQueryClient()
+  const user            = useAuthStore(s => s.user)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  const fetchMe         = useAuthStore(s => s.fetchMe)
+  const qc              = useQueryClient()
   const [activeTab, setActiveTab] = useState('overview')
 
-  if (!user || user.role !== 'admin') return <Navigate to="/" />
+  // Charger l'user si token présent mais user pas encore en mémoire
+  useEffect(() => {
+    if (isAuthenticated && !user) fetchMe()
+  }, [])
 
+  // Tous les hooks AVANT les returns conditionnels
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
     queryFn:  () => adminAPI.getStats().then(r => r.data),
+    enabled:  !!user && user.role === 'admin',
   })
 
   const { data: disputesData, isLoading: disputesLoading } = useQuery({
     queryKey: ['admin-disputes'],
     queryFn:  () => adminAPI.getDisputes().then(r => r.data),
+    enabled:  !!user && user.role === 'admin',
   })
 
   const disputes = Array.isArray(disputesData) ? disputesData : (disputesData?.results ?? [])
@@ -1198,9 +1206,19 @@ export default function AdminPage() {
       const d = r.data
       return Array.isArray(d) ? d.length : (d?.count ?? d?.results?.length ?? 0)
     }),
+    enabled:       !!user && user.role === 'admin',
     refetchInterval: 60000,
   })
   const pendingShopsCount = pendingShopsData ?? 0
+
+  // Returns conditionnels APRÈS tous les hooks
+  if (!isAuthenticated) return <Navigate to="/login" />
+  if (!user) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-green-600">Chargement...</div>
+    </div>
+  )
+  if (user.role !== 'admin') return <Navigate to="/" />
 
   return (
     <div className="min-h-screen bg-gray-50">
