@@ -309,8 +309,13 @@ export default function ListingDetailPage() {
         if (listing) addListing(listing)
     }, [listing?.id])
 
+    // Sync favorited depuis l'API au chargement — DOIT être avant les early returns
+    useEffect(() => {
+        if (listing?.is_favorited !== undefined) setFavorited(listing.is_favorited)
+    }, [listing?.is_favorited])
+
     const boostMutation = useMutation({
-        mutationFn: () => listingsAPI.boost(listing.id, { days: boostDays, provider: boostProvider, phone: boostPhone }),
+        mutationFn: () => listingsAPI.boost(listing?.id, { days: boostDays, provider: boostProvider, phone: boostPhone }),
         onSuccess:  () => { queryClient.invalidateQueries(['listing', id]); setBoostOpen(false) },
     })
 
@@ -347,11 +352,6 @@ export default function ListingDetailPage() {
             </div>
         </div>
     )
-
-    // Sync favorited depuis l'API au chargement
-    useEffect(() => {
-        if (listing?.is_favorited !== undefined) setFavorited(listing.is_favorited)
-    }, [listing?.is_favorited])
 
     // isSeller — comparaison robuste en string
     const isSeller = !!(user && String(user.id) === String(listing.seller))
