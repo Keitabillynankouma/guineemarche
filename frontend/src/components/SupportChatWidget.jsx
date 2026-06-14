@@ -35,11 +35,12 @@ export default function SupportChatWidget({ onClose }) {
       const { data } = await api.post('/core/support-chat/', { message: msg, history })
       const reply = data.reply || 'Désolé, une erreur est survenue. Contactez-nous sur WhatsApp.'
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
-    } catch {
-      setMessages(prev => [...prev, {
-        role: 'assistant',
-        content: 'Erreur de connexion. Réessayez ou contactez-nous sur WhatsApp au +224622411238.'
-      }])
+    } catch (err) {
+      const status = err?.response?.status
+      const errMsg = status === 429
+        ? 'Trop de messages envoyés. Attendez quelques minutes et réessayez.'
+        : 'Erreur de connexion. Contactez-nous sur WhatsApp au +224622411238.'
+      setMessages(prev => [...prev, { role: 'assistant', content: errMsg }])
     } finally {
       setLoading(false)
     }

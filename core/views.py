@@ -43,11 +43,11 @@ class SiteSettingsView(APIView):
 # ── Throttle spécifique pour le chatbot ───────────────────────────────────────
 
 class SupportChatThrottle(AnonRateThrottle):
-    rate = '30/hour'
+    rate = '200/hour'
 
 
 class SupportChatUserThrottle(UserRateThrottle):
-    rate = '100/hour'
+    rate = '500/hour'
 
 
 # ── Support chatbot powered by Claude ─────────────────────────────────────────
