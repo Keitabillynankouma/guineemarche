@@ -50,6 +50,7 @@ class ListingListCreateView(generics.ListCreateAPIView):
         from apps.accounts.models import Subscription, Badge
         from rest_framework.exceptions import PermissionDenied
         from core.site_settings import SiteSettings
+        from .moderation import moderate_listing
         user = self.request.user
         site = SiteSettings.get()
         sub, _ = Subscription.objects.get_or_create(user=user)
@@ -64,7 +65,24 @@ class ListingListCreateView(generics.ListCreateAPIView):
                                    'Passez au plan Pro pour publier des annonces illimitées.',
                     }
                 )
-        serializer.save(seller=user, status=Listing.Status.ACTIVE)
+
+        # 1. Sauvegarder en DRAFT pendant la modération
+        listing = serializer.save(seller=user, status=Listing.Status.DRAFT)
+
+        # 2. Modération IA
+        category_name = listing.category.name if listing.category else 'Non définie'
+        mod = moderate_listing(listing.title, listing.description, listing.price_gnf, category_name)
+
+        if mod['decision'] == 'reject':
+            listing.status = Listing.Status.SUSPENDED
+        elif mod['decision'] == 'review':
+            listing.status = Listing.Status.DRAFT   # Reste en attente de revue admin
+        else:
+            listing.status = Listing.Status.ACTIVE  # Approuvée → publiée immédiatement
+
+        listing.save(update_fields=['status'])
+
+        # 3. Compteur abonnement + badge
         sub.listings_used += 1
         sub.save(update_fields=['listings_used'])
         if sub.listings_used == 1:

@@ -149,8 +149,17 @@ export default function CreateListingPage() {
                 formData.append('attributes', JSON.stringify(attributes))
             }
             files.forEach(f => formData.append('uploaded_files', f))
-            await listingsAPI.create(formData)
-            navigate('/my-listings')
+            const res = await listingsAPI.create(formData)
+            const listingStatus = res.data?.status
+
+            if (listingStatus === 'suspended') {
+                setError("⛔ Votre annonce a été refusée automatiquement car elle ne respecte pas nos conditions d'utilisation. Contactez le support si vous pensez qu'il s'agit d'une erreur.")
+            } else if (listingStatus === 'draft') {
+                // Annonce en attente de révision — naviguer vers mes annonces avec un message
+                navigate('/my-listings', { state: { moderationPending: true } })
+            } else {
+                navigate('/my-listings')
+            }
         } catch (err) {
             const data = err.response?.data
             const msg  = data

@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { listingsAPI } from '../services/api'
 
 function formatPrice(price, type) {
@@ -14,8 +14,16 @@ const STATUS_LABELS = {
     expired: { label: 'Expirée', color: 'bg-red-100 text-red-600' },
 }
 
+const STATUS_LABELS_EXTRA = {
+    ...STATUS_LABELS,
+    suspended: { label: 'Refusée', color: 'bg-red-100 text-red-700' },
+    draft:     { label: 'En révision', color: 'bg-amber-100 text-amber-700' },
+}
+
 export default function MyListingsPage() {
     const queryClient = useQueryClient()
+    const location    = useLocation()
+    const moderationPending = location.state?.moderationPending
     const { data, isLoading } = useQuery({
         queryKey: ['my-listings'],
         queryFn: () => listingsAPI.myListings().then(r => r.data),
@@ -39,6 +47,18 @@ export default function MyListingsPage() {
 
             <div className="max-w-3xl mx-auto px-4 py-8">
                 <h1 className="text-xl font-bold text-gray-800 mb-6">Mes annonces</h1>
+
+                {moderationPending && (
+                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-6 flex items-start gap-3">
+                        <span className="text-2xl">⏳</span>
+                        <div>
+                            <p className="font-semibold text-amber-800 text-sm">Annonce en cours de vérification</p>
+                            <p className="text-amber-700 text-xs mt-1">
+                                Votre annonce est en attente de vérification par notre équipe. Elle sera publiée sous peu. En cas de problème, contactez le support.
+                            </p>
+                        </div>
+                    </div>
+                )}
 
                 {isLoading ? (
                     <div className="space-y-4">
