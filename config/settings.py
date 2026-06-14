@@ -4,6 +4,12 @@ import os
 from datetime import timedelta
 import cloudinary
 from decouple import config as env
+import sentry_sdk
+from sentry_sdk.integrations.django import DjangoIntegration
+from sentry_sdk.integrations.redis import RedisIntegration
+from sentry_sdk.integrations.celery import CeleryIntegration
+from sentry_sdk.integrations.logging import LoggingIntegration
+import logging
 
 
 
@@ -83,6 +89,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'corsheaders.middleware.CorsMiddleware',
+    'core.security_middleware.GuineeSecurityMiddleware',   # Sécurité active
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     #'django.middleware.csrf.CsrfViewMiddleware',
@@ -188,6 +195,41 @@ AT_SENDER_ID = env('AT_SENDER_ID', default='')
 
 # Anthropic Claude API (support chatbot + modération)
 ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
+
+# ── Sentry — monitoring erreurs + performance + sécurité ──────────────────────
+SENTRY_DSN = env('SENTRY_DSN', default='')
+
+if SENTRY_DSN:
+    sentry_sdk.init(
+        dsn=SENTRY_DSN,
+        integrations=[
+            DjangoIntegration(
+                transaction_style='url',
+                middleware_spans=True,
+                signals_spans=True,
+                cache_spans=True,
+            ),
+            RedisIntegration(),
+            CeleryIntegration(),
+            LoggingIntegration(
+                level=logging.WARNING,       # Capturer WARNING et plus
+                event_level=logging.ERROR,   # Créer un événement Sentry sur ERROR+
+            ),
+        ],
+        # Performance : tracer 10 % des requêtes en prod, 100 % en dev
+        traces_sample_rate=1.0 if DEBUG else 0.1,
+        # Profiling : analyser les requêtes lentes
+        profiles_sample_rate=1.0 if DEBUG else 0.05,
+        environment='development' if DEBUG else 'production',
+        send_default_pii=False,      # Ne pas envoyer d'infos personnelles
+        attach_stacktrace=True,
+        # Ignorer les erreurs non-critiques courantes
+        ignore_errors=[
+            'django.http.response.Http404',
+            'rest_framework.exceptions.AuthenticationFailed',
+            'rest_framework.exceptions.NotAuthenticated',
+        ],
+    )
 
 # Secrets pour validation des signatures webhook paiement
 # Définir dans les variables d'environnement Render
