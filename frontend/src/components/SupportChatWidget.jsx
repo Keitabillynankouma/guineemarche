@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect } from 'react'
+import api from '../services/api'
 
 const GREETING = 'Bonjour ! Je suis l\'assistant de GuinéeMarché. Comment puis-je vous aider ? 😊'
 
@@ -31,12 +32,7 @@ export default function SupportChatWidget({ onClose }) {
     setLoading(true)
 
     try {
-      const res = await fetch('/api/v1/core/support-chat/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: msg, history }),
-      })
-      const data = await res.json()
+      const { data } = await api.post('/core/support-chat/', { message: msg, history })
       const reply = data.reply || 'Désolé, une erreur est survenue. Contactez-nous sur WhatsApp.'
       setMessages(prev => [...prev, { role: 'assistant', content: reply }])
     } catch {
