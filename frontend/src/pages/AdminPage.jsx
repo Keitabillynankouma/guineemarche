@@ -67,6 +67,21 @@ function StatCard({ label, value, icon, color = 'green' }) {
 
 // ── Onglet 1 : Stats + Litiges ────────────────────────────────────────────────
 
+async function downloadCSV(type) {
+  const token = localStorage.getItem('access_token')
+  const res   = await fetch(`/api/v1/orders/admin/export/?type=${type}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) { alert('Erreur export CSV'); return }
+  const blob = await res.blob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url
+  a.download = `${type}_export.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
   return (
     <div className="space-y-8">
@@ -75,16 +90,14 @@ function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-bold text-gray-800">Vue d'ensemble</h2>
             <div className="flex gap-2">
-              <a href="/api/v1/orders/admin/export/?type=orders"
-                target="_blank" rel="noopener noreferrer"
+              <button onClick={() => downloadCSV('orders')}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition">
                 ⬇️ Commandes CSV
-              </a>
-              <a href="/api/v1/orders/admin/export/?type=users"
-                target="_blank" rel="noopener noreferrer"
+              </button>
+              <button onClick={() => downloadCSV('users')}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition">
                 ⬇️ Utilisateurs CSV
-              </a>
+              </button>
             </div>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
