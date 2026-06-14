@@ -232,6 +232,8 @@ if SENTRY_DSN:
             'django.http.response.Http404',
             'rest_framework.exceptions.AuthenticationFailed',
             'rest_framework.exceptions.NotAuthenticated',
+            'asyncio.exceptions.CancelledError',
+            'asyncio.CancelledError',
         ],
     )
 
