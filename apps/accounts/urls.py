@@ -13,6 +13,7 @@ urlpatterns = [
     path('resend-otp/',    views.ResendOTPView.as_view(),    name='resend-otp'),
     path('subscription/',      views.SubscriptionView.as_view(),  name='subscription'),
     path('badges/',            views.BadgeListView.as_view(),     name='badges'),
+    path('referral/',          views.ReferralStatsView.as_view(), name='referral-stats'),
     path('shop/',              views.MyShopView.as_view(),        name='my-shop'),
     path('shops/',             views.ShopListView.as_view(),      name='shop-list'),
     path('shops/<uuid:pk>/',   views.ShopDetailView.as_view(),    name='shop-detail'),

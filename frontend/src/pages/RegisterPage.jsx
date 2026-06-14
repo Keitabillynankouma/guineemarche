@@ -1,13 +1,21 @@
-import { useState } from 'react'
-import { useNavigate, Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { authAPI } from '../services/api'
 
 export default function RegisterPage() {
+    const [searchParams] = useSearchParams()
+    const refCode = searchParams.get('ref') || ''
+
     const [step, setStep] = useState(1)
     const [form, setForm] = useState({
         phone_number: '', full_name: '', password: '', password2: '',
-        city: 'Conakry', quartier: ''
+        city: 'Conakry', quartier: '', referral_code: refCode
     })
+
+    // Sync referral code if URL param changes (e.g. deep link)
+    useEffect(() => {
+        if (refCode) setForm(f => ({ ...f, referral_code: refCode }))
+    }, [refCode])
     const [otp, setOtp] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
@@ -106,6 +114,18 @@ export default function RegisterPage() {
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
                             required
                         />
+                        <div>
+                            <input
+                                type="text" placeholder="Code de parrainage (facultatif)"
+                                value={form.referral_code}
+                                onChange={(e) => setForm({ ...form, referral_code: e.target.value.toUpperCase() })}
+                                className={`w-full border rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500 font-mono tracking-wider ${form.referral_code ? 'border-green-400 bg-green-50' : 'border-gray-300'}`}
+                                maxLength={12}
+                            />
+                            {form.referral_code && (
+                                <p className="text-xs text-green-600 mt-1">🎁 Code de parrainage appliqué — tu gagneras des annonces gratuites !</p>
+                            )}
+                        </div>
                         <button
                             type="submit" disabled={loading}
                             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"

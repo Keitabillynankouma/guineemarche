@@ -46,4 +46,7 @@ urlpatterns = [
     path('admin/stats/',
         views.AdminStatsView.as_view(),
         name='admin-stats'),
+    path('admin/export/',
+        views.AdminExportCSVView.as_view(),
+        name='admin-export-csv'),
 ]

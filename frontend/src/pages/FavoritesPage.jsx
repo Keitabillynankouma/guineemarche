@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI } from '../services/api'
+import useAuthStore from '../store/authStore'
 
 function fmt(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -8,12 +9,27 @@ function fmt(price, type) {
 }
 
 export default function FavoritesPage() {
+    const { isAuthenticated } = useAuthStore()
     const qc = useQueryClient()
 
     const { data, isLoading } = useQuery({
         queryKey: ['favorites'],
         queryFn: () => listingsAPI.getFavorites().then(r => r.data),
+        enabled: isAuthenticated,
     })
+
+    if (!isAuthenticated) {
+        return (
+            <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 p-8">
+                <span className="text-6xl">❤️</span>
+                <h2 className="text-xl font-bold text-gray-800">Mes favoris</h2>
+                <p className="text-gray-500 text-center">Connectez-vous pour retrouver vos annonces sauvegardées.</p>
+                <Link to="/login" className="bg-green-600 text-white px-6 py-2 rounded-xl font-semibold hover:bg-green-700 transition">
+                    Se connecter
+                </Link>
+            </div>
+        )
+    }
 
     const removeMutation = useMutation({
         mutationFn: (id) => listingsAPI.removeFavorite(id),

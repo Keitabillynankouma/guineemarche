@@ -17,6 +17,7 @@ import FavoritesPage from './pages/FavoritesPage'
 import ShopPage from './pages/ShopPage'
 import MyShopPage from './pages/MyShopPage'
 import AdminPage from './pages/AdminPage'
+import ReviewsPage from './pages/ReviewsPage'
 
 const queryClient = new QueryClient()
 
@@ -112,6 +113,7 @@ function AppRoutes() {
         <Route path="/my-shop"   element={<PrivateRoute><MyShopPage /></PrivateRoute>} />
         <Route path="/shops/:id" element={<ShopPage />} />
         <Route path="/admin"     element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+        <Route path="/reviews/:userId" element={<ReviewsPage />} />
       </Routes>
     </>
   )

@@ -37,9 +37,12 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     city         = models.CharField(max_length=100, default='Conakry')
     quartier     = models.CharField(max_length=100, blank=True)
 
-    is_verified  = models.BooleanField(default=False)
-    is_active    = models.BooleanField(default=True)
-    is_staff     = models.BooleanField(default=False)
+    is_verified   = models.BooleanField(default=False)
+    is_active     = models.BooleanField(default=True)
+    is_staff      = models.BooleanField(default=False)
+
+    referral_code = models.CharField(max_length=12, unique=True, blank=True, db_index=True)
+    referred_by   = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals_made')
 
     objects = UserManager()
 
@@ -53,6 +56,17 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
     def __str__(self):
         return f"{self.full_name} ({self.phone_number})"
+
+    def save(self, *args, **kwargs):
+        if not self.referral_code:
+            import secrets, string
+            chars = string.ascii_uppercase + string.digits
+            while True:
+                code = ''.join(secrets.choice(chars) for _ in range(8))
+                if not User.objects.filter(referral_code=code).exists():
+                    self.referral_code = code
+                    break
+        super().save(*args, **kwargs)
 
     @property
     def is_seller(self):
@@ -176,10 +190,11 @@ class Subscription(BaseModel):
         FREE  = 'free',  'Gratuit (5 annonces)'
         PRO   = 'pro',   'Pro — illimité'
 
-    user           = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
-    plan           = models.CharField(max_length=10, choices=Plan.choices, default=Plan.FREE)
-    listings_used  = models.PositiveIntegerField(default=0)
-    valid_until    = models.DateTimeField(null=True, blank=True)
+    user            = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
+    plan            = models.CharField(max_length=10, choices=Plan.choices, default=Plan.FREE)
+    listings_used   = models.PositiveIntegerField(default=0)
+    valid_until     = models.DateTimeField(null=True, blank=True)
+    referral_bonus  = models.PositiveIntegerField(default=0, help_text='Slots gratuits supplémentaires gagnés par parrainage')
 
     FREE_LIMIT = 5
 
@@ -197,14 +212,18 @@ class Subscription(BaseModel):
         )
 
     @property
+    def effective_limit(self):
+        return self.FREE_LIMIT + self.referral_bonus
+
+    @property
     def can_post(self):
-        return self.is_pro or self.listings_used < self.FREE_LIMIT
+        return self.is_pro or self.listings_used < self.effective_limit
 
     @property
     def remaining_free(self):
         if self.is_pro:
             return None  # illimité
-        return max(0, self.FREE_LIMIT - self.listings_used)
+        return max(0, self.effective_limit - self.listings_used)
 
 
 class Badge(BaseModel):
@@ -276,3 +295,36 @@ class Badge(BaseModel):
             cls.award(user, cls.Type.PRO)
         else:
             cls.revoke(user, cls.Type.PRO)
+
+
+# ── Parrainage ────────────────────────────────────────────────────────────────
+
+class Referral(BaseModel):
+    """Parrainage : quand un filleul s'inscrit via le code d'un parrain."""
+
+    REWARD_LISTINGS = 2   # annonces gratuites supplémentaires pour le parrain
+
+    referrer       = models.ForeignKey(User, on_delete=models.CASCADE, related_name='referrals_given')
+    referred       = models.OneToOneField(User, on_delete=models.CASCADE, related_name='referral_received')
+    reward_given   = models.BooleanField(default=False)
+
+    class Meta:
+        verbose_name = 'Parrainage'
+        verbose_name_plural = 'Parrainages'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.referrer.full_name} → {self.referred.full_name}"
+
+    def give_reward(self):
+        """Crédite le parrain avec des annonces supplémentaires."""
+        if self.reward_given:
+            return
+        sub, _ = Subscription.objects.get_or_create(user=self.referrer)
+        sub.referral_bonus += self.REWARD_LISTINGS
+        sub.save(update_fields=['referral_bonus'])
+        self.reward_given = True
+        self.save(update_fields=['reward_given'])
+        # Badge "Parrain actif" si ≥ 3 filleuls
+        if Referral.objects.filter(referrer=self.referrer, reward_given=True).count() >= 3:
+            Badge.award(self.referrer, Badge.Type.TRUSTED)

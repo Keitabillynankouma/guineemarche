@@ -1,0 +1,191 @@
+import React from 'react'
+import {
+    View, Text, ScrollView, TouchableOpacity,
+    StyleSheet, ActivityIndicator, Alert,
+} from 'react-native'
+import { useQuery } from '@tanstack/react-query'
+import useAuthStore from '../store/authStore'
+import { authAPI } from '../services/api'
+import { colors, spacing, radius, font } from '../theme'
+
+export default function ProfileScreen({ navigation }) {
+    const { user, logout, isAuthenticated } = useAuthStore()
+
+    const { data: sub } = useQuery({
+        queryKey: ['subscription'],
+        queryFn:  () => authAPI.getSubscription?.().then(r => r.data),
+        enabled:  isAuthenticated,
+    })
+
+    const handleLogout = () => {
+        Alert.alert('Déconnexion', 'Voulez-vous vraiment vous déconnecter ?', [
+            { text: 'Déconnecter', style: 'destructive', onPress: logout },
+            { text: 'Annuler', style: 'cancel' },
+        ])
+    }
+
+    if (!isAuthenticated) {
+        return (
+            <View style={styles.guestContainer}>
+                <Text style={styles.guestIcon}>👤</Text>
+                <Text style={styles.guestTitle}>Connectez-vous</Text>
+                <Text style={styles.guestSub}>Pour accéder à votre profil et gérer vos annonces</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Auth')} style={styles.loginBtn}>
+                    <Text style={styles.loginBtnText}>Se connecter</Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => navigation.navigate('Auth', { screen: 'Register' })} style={styles.registerBtn}>
+                    <Text style={styles.registerBtnText}>Créer un compte</Text>
+                </TouchableOpacity>
+            </View>
+        )
+    }
+
+    if (!user) return (
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+            <ActivityIndicator color={colors.primary} size="large" />
+        </View>
+    )
+
+    const progress = Math.min(100, ((sub?.listings_used ?? 0) / 5) * 100)
+
+    return (
+        <ScrollView style={{ flex: 1, backgroundColor: colors.bg }} showsVerticalScrollIndicator={false}>
+            {/* Header profil */}
+            <View style={styles.profileHeader}>
+                <View style={styles.avatarWrap}>
+                    <Text style={{ fontSize: 36 }}>👤</Text>
+                </View>
+                <Text style={styles.userName}>{user.full_name}</Text>
+                <Text style={styles.userPhone}>{String(user.phone_number)}</Text>
+                <Text style={styles.userCity}>📍 {user.city}</Text>
+
+                {user.profile && (
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Reviews', { userId: user.id })}
+                        style={styles.ratingRow}
+                    >
+                        <Text style={styles.stars}>{'★'.repeat(Math.round(user.profile.rating_avg || 0))}</Text>
+                        <Text style={styles.ratingText}>
+                            {user.profile.rating_avg?.toFixed(1) || '0.0'} · {user.profile.total_ratings} avis
+                        </Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            {/* Abonnement */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Mon abonnement</Text>
+                {sub?.is_pro ? (
+                    <View style={styles.proCard}>
+                        <Text style={styles.proIcon}>💎</Text>
+                        <View>
+                            <Text style={styles.proLabel}>Plan Pro actif</Text>
+                            {sub.valid_until && (
+                                <Text style={styles.proSub}>Expire le {new Date(sub.valid_until).toLocaleDateString('fr-FR')}</Text>
+                            )}
+                        </View>
+                    </View>
+                ) : (
+                    <View style={styles.freeCard}>
+                        <View style={styles.freeHeader}>
+                            <Text style={styles.freeLabel}>Annonces gratuites</Text>
+                            <Text style={[styles.freeCount, sub?.remaining_free === 0 && { color: colors.danger }]}>
+                                {sub?.listings_used ?? '…'} / 5
+                            </Text>
+                        </View>
+                        <View style={styles.progressBar}>
+                            <View style={[styles.progressFill, {
+                                width: `${progress}%`,
+                                backgroundColor: sub?.remaining_free === 0 ? colors.danger : colors.primary,
+                            }]} />
+                        </View>
+                        <TouchableOpacity onPress={() => navigation.navigate('Upgrade')} style={styles.upgradeBtn}>
+                            <Text style={styles.upgradeBtnText}>💎 Passer au plan Pro</Text>
+                        </TouchableOpacity>
+                    </View>
+                )}
+            </View>
+
+            {/* Menu */}
+            <View style={styles.section}>
+                {[
+                    { icon: '📋', label: 'Mes annonces',   screen: 'MyListings' },
+                    { icon: '🛍️', label: 'Mes commandes',  screen: 'Orders' },
+                    { icon: '💬', label: 'Messages',        screen: 'Messages' },
+                    { icon: '⭐', label: 'Mes avis',         screen: 'Reviews', params: { userId: user.id } },
+                ].map(item => (
+                    <TouchableOpacity key={item.screen}
+                        onPress={() => navigation.navigate(item.screen, item.params)}
+                        style={styles.menuItem}
+                        activeOpacity={0.7}
+                    >
+                        <Text style={styles.menuIcon}>{item.icon}</Text>
+                        <Text style={styles.menuLabel}>{item.label}</Text>
+                        <Text style={styles.menuArrow}>›</Text>
+                    </TouchableOpacity>
+                ))}
+
+                {user.role === 'admin' && (
+                    <TouchableOpacity onPress={() => navigation.navigate('Admin')} style={[styles.menuItem, styles.adminItem]}>
+                        <Text style={styles.menuIcon}>🛡️</Text>
+                        <Text style={[styles.menuLabel, { color: '#dc2626' }]}>Administration</Text>
+                        <Text style={[styles.menuArrow, { color: '#dc2626' }]}>›</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+
+            <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
+                <Text style={styles.logoutText}>🚪 Se déconnecter</Text>
+            </TouchableOpacity>
+
+            <View style={{ height: spacing.xxl }} />
+        </ScrollView>
+    )
+}
+
+const styles = StyleSheet.create({
+    // Guest
+    guestContainer: { flex: 1, backgroundColor: colors.bg, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    guestIcon:      { fontSize: 64, marginBottom: spacing.lg },
+    guestTitle:     { fontSize: font.xl, fontWeight: font.bold, color: colors.text, marginBottom: spacing.sm },
+    guestSub:       { fontSize: font.base, color: colors.textMuted, textAlign: 'center', marginBottom: spacing.xl },
+    loginBtn:       { width: '100%', backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginBottom: spacing.sm },
+    loginBtnText:   { color: '#fff', fontWeight: font.bold, fontSize: font.base },
+    registerBtn:    { width: '100%', borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center' },
+    registerBtnText:{ color: colors.primary, fontWeight: font.semi, fontSize: font.base },
+    // Profile header
+    profileHeader:  { backgroundColor: colors.primary, padding: spacing.xl, alignItems: 'center' },
+    avatarWrap:     { width: 72, height: 72, borderRadius: 36, backgroundColor: 'rgba(255,255,255,0.2)', alignItems: 'center', justifyContent: 'center', marginBottom: spacing.md },
+    userName:       { fontSize: font.xl, fontWeight: font.bold, color: '#fff', marginBottom: 4 },
+    userPhone:      { fontSize: font.sm, color: 'rgba(255,255,255,0.8)', marginBottom: 4 },
+    userCity:       { fontSize: font.sm, color: 'rgba(255,255,255,0.7)', marginBottom: spacing.md },
+    ratingRow:      { flexDirection: 'row', alignItems: 'center', gap: spacing.sm, backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: radius.full, paddingHorizontal: spacing.md, paddingVertical: 6 },
+    stars:          { color: colors.accent, fontSize: font.base },
+    ratingText:     { color: '#fff', fontSize: font.sm },
+    // Sections
+    section:        { backgroundColor: colors.white, margin: spacing.lg, marginBottom: 0, borderRadius: radius.xl, overflow: 'hidden', shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
+    sectionTitle:   { fontSize: font.base, fontWeight: font.bold, color: colors.text, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+    // Pro card
+    proCard:        { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, backgroundColor: '#f0fdf4' },
+    proIcon:        { fontSize: 32 },
+    proLabel:       { fontSize: font.base, fontWeight: font.bold, color: colors.primary },
+    proSub:         { fontSize: font.sm, color: colors.textMuted },
+    // Free card
+    freeCard:       { padding: spacing.lg },
+    freeHeader:     { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.sm },
+    freeLabel:      { fontSize: font.sm, color: colors.textMuted },
+    freeCount:      { fontSize: font.sm, fontWeight: font.bold, color: colors.text },
+    progressBar:    { height: 6, backgroundColor: colors.border, borderRadius: 3, marginBottom: spacing.md },
+    progressFill:   { height: '100%', borderRadius: 3 },
+    upgradeBtn:     { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
+    upgradeBtnText: { color: '#fff', fontWeight: font.semi, fontSize: font.sm },
+    // Menu
+    menuItem:       { flexDirection: 'row', alignItems: 'center', gap: spacing.md, padding: spacing.lg, borderBottomWidth: 1, borderBottomColor: colors.border },
+    menuIcon:       { fontSize: 20, width: 28, textAlign: 'center' },
+    menuLabel:      { flex: 1, fontSize: font.base, color: colors.text },
+    menuArrow:      { fontSize: font.lg, color: colors.textMuted },
+    adminItem:      { backgroundColor: '#fff5f5' },
+    // Logout
+    logoutBtn:      { margin: spacing.lg, backgroundColor: '#fee2e2', borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.lg },
+    logoutText:     { color: colors.danger, fontWeight: font.semi, fontSize: font.base },
+})

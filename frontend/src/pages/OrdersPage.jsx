@@ -3,55 +3,275 @@ import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersAPI } from '../services/api'
 
+const STATUS_STEPS = ['pending', 'confirmed', 'completed']
 const STATUS = {
-    pending:   { label: 'En attente',  color: 'bg-yellow-100 text-yellow-700' },
-    confirmed: { label: 'Confirmée',   color: 'bg-blue-100 text-blue-700' },
-    completed: { label: 'Terminée',    color: 'bg-green-100 text-green-700' },
-    cancelled: { label: 'Annulée',     color: 'bg-gray-100 text-gray-500' },
-    disputed:  { label: 'Litige',      color: 'bg-red-100 text-red-600' },
+    pending:   { label: 'En attente',  color: 'bg-yellow-100 text-yellow-700', icon: '⏳' },
+    confirmed: { label: 'Confirmée',   color: 'bg-blue-100 text-blue-700',     icon: '✅' },
+    completed: { label: 'Terminée',    color: 'bg-green-100 text-green-700',   icon: '🎉' },
+    cancelled: { label: 'Annulée',     color: 'bg-gray-100 text-gray-500',     icon: '❌' },
+    disputed:  { label: 'Litige',      color: 'bg-red-100 text-red-600',       icon: '⚠️' },
 }
-
 const DELIVERY = {
     meeting_point: '🤝 Main propre',
     pickup_point:  '📦 Point retrait',
     home_delivery: '🚗 Livraison domicile',
 }
+function fmt(n) { return new Intl.NumberFormat('fr-GN').format(n) + ' GNF' }
 
-function fmt(n) {
-    return new Intl.NumberFormat('fr-GN').format(n) + ' GNF'
+// ── Timeline ────────────────────────────────────────────────────────────────
+function Timeline({ status }) {
+    const idx = STATUS_STEPS.indexOf(status)
+    if (idx < 0) return null   // annulé ou litige : pas de timeline
+    return (
+        <div className="flex items-center gap-0 mt-3">
+            {STATUS_STEPS.map((step, i) => {
+                const done    = i <= idx
+                const current = i === idx
+                const last    = i === STATUS_STEPS.length - 1
+                return (
+                    <div key={step} className="flex items-center flex-1 last:flex-none">
+                        <div className={`flex flex-col items-center ${!last ? 'flex-1' : ''}`}>
+                            <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 transition
+                                ${done
+                                    ? current
+                                        ? 'bg-green-600 border-green-600 text-white shadow-md'
+                                        : 'bg-green-500 border-green-500 text-white'
+                                    : 'bg-white border-gray-300 text-gray-400'
+                                }`}>
+                                {done ? (current ? STATUS[step].icon : '✓') : i + 1}
+                            </div>
+                            <p className={`text-xs mt-1 text-center leading-tight max-w-[56px]
+                                ${done ? (current ? 'text-green-700 font-semibold' : 'text-green-600') : 'text-gray-400'}`}>
+                                {STATUS[step].label}
+                            </p>
+                        </div>
+                        {!last && (
+                            <div className={`h-0.5 flex-1 mx-1 -mt-4 transition ${i < idx ? 'bg-green-500' : 'bg-gray-200'}`} />
+                        )}
+                    </div>
+                )
+            })}
+        </div>
+    )
 }
 
-export default function OrdersPage() {
+// ── Modal paiement ──────────────────────────────────────────────────────────
+function PayModal({ order, onClose, onPaid }) {
+    const [provider, setProvider] = useState('orange_money')
+    const [phone, setPhone]       = useState('')
+    const [error, setError]       = useState('')
+    const [loading, setLoading]   = useState(false)
+
+    const handlePay = async () => {
+        if (provider !== 'cash' && !phone.trim()) {
+            setError('Entrez votre numéro Mobile Money.')
+            return
+        }
+        setError('')
+        setLoading(true)
+        try {
+            await ordersAPI.pay(order.id, { provider, phone_number: phone })
+            onPaid()
+            onClose()
+        } catch (e) {
+            setError(e.response?.data?.error || e.response?.data?.detail || 'Erreur de paiement')
+        } finally { setLoading(false) }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
+            onClick={onClose}>
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4"
+                onClick={e => e.stopPropagation()}>
+                <h2 className="font-bold text-gray-800 text-lg">💳 Payer la commande</h2>
+                <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-1">
+                    <p className="font-medium text-gray-700">{order.listing_title}</p>
+                    <p className="font-bold text-green-700 text-base">{fmt(order.amount_gnf)}</p>
+                </div>
+
+                <div className="space-y-2">
+                    {[
+                        { value: 'orange_money', label: 'Orange Money', emoji: '🟠' },
+                        { value: 'mtn_momo',     label: 'MTN MoMo',     emoji: '🟡' },
+                        { value: 'cash',         label: 'Espèces (en main)',  emoji: '💵' },
+                    ].map(opt => (
+                        <button key={opt.value} onClick={() => setProvider(opt.value)}
+                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition text-sm
+                                ${provider === opt.value ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
+                            <span className="text-xl">{opt.emoji}</span>
+                            <span className={`font-medium ${provider === opt.value ? 'text-green-700' : 'text-gray-700'}`}>
+                                {opt.label}
+                            </span>
+                            {provider === opt.value && <span className="ml-auto text-green-600">✓</span>}
+                        </button>
+                    ))}
+                </div>
+
+                {provider !== 'cash' && (
+                    <input
+                        type="tel" placeholder="224 6XX XXX XXX"
+                        value={phone} onChange={e => setPhone(e.target.value)}
+                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                )}
+                {error && <p className="text-sm text-red-500">{error}</p>}
+
+                <div className="flex gap-3">
+                    <button onClick={onClose}
+                        className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">
+                        Annuler
+                    </button>
+                    <button onClick={handlePay} disabled={loading}
+                        className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50">
+                        {loading ? 'Traitement...' : `Payer ${fmt(order.amount_gnf)}`}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ── Carte commande ──────────────────────────────────────────────────────────
+function OrderCard({ order, isBuyer, onInvalidate }) {
     const qc = useQueryClient()
+    const [payOpen, setPayOpen] = useState(false)
+    const st = STATUS[order.status] || STATUS.pending
+
+    const confirmMutation = useMutation({
+        mutationFn: () => ordersAPI.confirmReceipt(order.id),
+        onSuccess:  onInvalidate,
+    })
+    const disputeMutation = useMutation({
+        mutationFn: () => ordersAPI.dispute(order.id),
+        onSuccess:  onInvalidate,
+    })
+
+    const canPay     = isBuyer && order.status === 'pending' && !order.payments?.length
+    const canConfirm = isBuyer && order.status === 'confirmed'
+    const canDispute = isBuyer && ['pending', 'confirmed'].includes(order.status)
+
+    return (
+        <>
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+
+                {/* En-tête */}
+                <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-gray-800 truncate">{order.listing_title}</p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                            {isBuyer ? `Vendeur : ${order.seller_name}` : `Acheteur : ${order.buyer_name}`}
+                        </p>
+                    </div>
+                    <span className={`text-xs px-2 py-1 rounded-full font-medium flex-shrink-0 ${st.color}`}>
+                        {st.icon} {st.label}
+                    </span>
+                </div>
+
+                {/* Timeline */}
+                <Timeline status={order.status} />
+
+                {/* Infos */}
+                <div className="flex items-center justify-between text-sm pt-1">
+                    <span className="text-gray-500">{DELIVERY[order.delivery_mode] || order.delivery_mode}</span>
+                    <span className="font-bold text-green-700">{fmt(order.amount_gnf)}</span>
+                </div>
+
+                {/* Point retrait / lieu */}
+                {(order.pickup_point_detail?.name || order.meet_location) && (
+                    <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+                        📍 {order.pickup_point_detail?.name || order.meet_location}
+                    </p>
+                )}
+
+                {/* Commission côté vendeur */}
+                {!isBuyer && order.status === 'completed' && order.seller_payout_gnf > 0 && (
+                    <div className="bg-green-50 rounded-xl p-3 text-xs text-green-700 space-y-1">
+                        <div className="flex justify-between"><span>Montant total</span><span>{fmt(order.amount_gnf)}</span></div>
+                        <div className="flex justify-between text-gray-500"><span>Commission plateforme</span><span>- {fmt(order.commission_gnf)}</span></div>
+                        <div className="flex justify-between font-bold border-t pt-1 mt-1"><span>Votre gain net</span><span>{fmt(order.seller_payout_gnf)}</span></div>
+                    </div>
+                )}
+
+                {/* Paiements existants */}
+                {order.payments?.length > 0 && (
+                    <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 space-y-1">
+                        {order.payments.map(p => (
+                            <div key={p.id} className="flex justify-between">
+                                <span>{p.provider === 'orange_money' ? '🟠 Orange Money' : p.provider === 'mtn_momo' ? '🟡 MTN MoMo' : '💵 Espèces'}</span>
+                                <span className={p.status === 'paid' ? 'text-green-600 font-medium' : 'text-yellow-600'}>
+                                    {p.status === 'paid' ? '✓ Payé' : p.status === 'pending' ? '⏳ En attente' : p.status}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-2 pt-1 flex-wrap">
+                    {canPay && (
+                        <button onClick={() => setPayOpen(true)}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-xl transition">
+                            💳 Payer maintenant
+                        </button>
+                    )}
+                    {canConfirm && (
+                        <button onClick={() => confirmMutation.mutate()} disabled={confirmMutation.isPending}
+                            className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2.5 rounded-xl transition disabled:opacity-50">
+                            ✅ Confirmer la réception
+                        </button>
+                    )}
+                    {canDispute && (
+                        <button onClick={() => disputeMutation.mutate()} disabled={disputeMutation.isPending}
+                            className="px-4 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium py-2.5 rounded-xl transition disabled:opacity-50">
+                            ⚠️ Litige
+                        </button>
+                    )}
+                    <Link to={`/listings/${order.listing}`}
+                        className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm py-2.5 rounded-xl transition text-center">
+                        Voir annonce
+                    </Link>
+                </div>
+
+                <p className="text-xs text-gray-400">
+                    {new Date(order.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </p>
+            </div>
+
+            {payOpen && (
+                <PayModal
+                    order={order}
+                    onClose={() => setPayOpen(false)}
+                    onPaid={onInvalidate}
+                />
+            )}
+        </>
+    )
+}
+
+// ── Page principale ──────────────────────────────────────────────────────────
+export default function OrdersPage() {
+    const qc     = useQueryClient()
     const [active, setActive] = useState('buyer')
 
     const { data: buyerData, isLoading: buyerLoading } = useQuery({
         queryKey: ['orders-buyer'],
-        queryFn: () => ordersAPI.getAll().then(r => r.data),
+        queryFn:  () => ordersAPI.getAll().then(r => r.data),
     })
-
     const { data: sellerData, isLoading: sellerLoading } = useQuery({
         queryKey: ['orders-seller'],
-        queryFn: () => ordersAPI.getSeller().then(r => r.data),
+        queryFn:  () => ordersAPI.getSeller().then(r => r.data),
     })
 
     const isLoading = active === 'buyer' ? buyerLoading : sellerLoading
     const rawData   = active === 'buyer' ? buyerData    : sellerData
     const orders    = Array.isArray(rawData) ? rawData : (rawData?.results ?? [])
 
-    const invalidateOrders = () => {
+    const invalidate = () => {
         qc.invalidateQueries(['orders-buyer'])
         qc.invalidateQueries(['orders-seller'])
     }
 
-    const confirmMutation = useMutation({
-        mutationFn: (id) => ordersAPI.confirmReceipt(id),
-        onSuccess: invalidateOrders,
-    })
-    const disputeMutation = useMutation({
-        mutationFn: (id) => ordersAPI.dispute(id),
-        onSuccess: invalidateOrders,
-    })
+    const pendingCount = orders.filter(o => o.status === 'pending').length
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -59,6 +279,11 @@ export default function OrdersPage() {
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
                     <Link to="/profile" className="text-green-700 font-bold text-lg">←</Link>
                     <h1 className="font-bold text-gray-800">Mes commandes</h1>
+                    {pendingCount > 0 && (
+                        <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">
+                            {pendingCount}
+                        </span>
+                    )}
                 </div>
             </nav>
 
@@ -67,7 +292,7 @@ export default function OrdersPage() {
                 <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
                     {[['buyer', '🛍️ Mes achats'], ['seller', '🏪 Mes ventes']].map(([key, label]) => (
                         <button key={key} onClick={() => setActive(key)}
-                            className={`flex-1 py-2 rounded-lg text-sm font-medium transition ${
+                            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition ${
                                 active === key ? 'bg-white shadow text-green-700' : 'text-gray-500'
                             }`}>
                             {label}
@@ -77,88 +302,28 @@ export default function OrdersPage() {
 
                 {isLoading ? (
                     <div className="space-y-3">
-                        {[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-28 animate-pulse" />)}
+                        {[...Array(3)].map((_, i) => (
+                            <div key={i} className="bg-white rounded-2xl h-44 animate-pulse" />
+                        ))}
                     </div>
                 ) : orders.length === 0 ? (
                     <div className="text-center py-20 text-gray-400">
-                        <p className="text-5xl mb-4">📭</p>
+                        <p className="text-6xl mb-4">📭</p>
                         <p>Aucune commande pour le moment</p>
+                        <Link to="/" className="mt-4 inline-block text-green-600 text-sm font-medium">
+                            Parcourir les annonces →
+                        </Link>
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {orders.map(order => {
-                            const st = STATUS[order.status] || STATUS.pending
-                            const isBuyer = active === 'buyer'
-                            const canConfirm = isBuyer && order.status === 'confirmed'
-                            const canDispute = isBuyer && ['pending', 'confirmed'].includes(order.status)
-
-                            return (
-                                <div key={order.id} className="bg-white rounded-xl shadow p-4 space-y-3">
-                                    <div className="flex items-start justify-between">
-                                        <div>
-                                            <p className="font-semibold text-gray-800">{order.listing_title}</p>
-                                            <p className="text-xs text-gray-400 mt-0.5">
-                                                {isBuyer ? `Vendeur : ${order.seller_name}` : `Acheteur : ${order.buyer_name}`}
-                                            </p>
-                                        </div>
-                                        <span className={`text-xs px-2 py-1 rounded-full font-medium ${st.color}`}>
-                                            {st.label}
-                                        </span>
-                                    </div>
-
-                                    <div className="flex items-center justify-between text-sm">
-                                        <span className="text-gray-500">{DELIVERY[order.delivery_mode]}</span>
-                                        <span className="font-bold text-green-700">{fmt(order.amount_gnf)}</span>
-                                    </div>
-
-                                    {/* Commission (visible côté vendeur si commande terminée) */}
-                                    {!isBuyer && order.status === 'completed' && order.seller_payout_gnf > 0 && (
-                                        <div className="bg-green-50 rounded-lg p-2 text-xs text-green-700 space-y-0.5">
-                                            <div className="flex justify-between">
-                                                <span>Montant total</span>
-                                                <span>{fmt(order.amount_gnf)}</span>
-                                            </div>
-                                            <div className="flex justify-between text-gray-500">
-                                                <span>Commission plateforme (5%)</span>
-                                                <span>- {fmt(order.commission_gnf)}</span>
-                                            </div>
-                                            <div className="flex justify-between font-bold border-t pt-1 mt-1">
-                                                <span>Votre gain net</span>
-                                                <span>{fmt(order.seller_payout_gnf)}</span>
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Actions acheteur */}
-                                    {(canConfirm || canDispute) && (
-                                        <div className="flex gap-2 pt-1">
-                                            {canConfirm && (
-                                                <button
-                                                    onClick={() => confirmMutation.mutate(order.id)}
-                                                    disabled={confirmMutation.isPending}
-                                                    className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-medium py-2 rounded-lg transition disabled:opacity-50">
-                                                    ✅ Confirmer la réception
-                                                </button>
-                                            )}
-                                            {canDispute && (
-                                                <button
-                                                    onClick={() => disputeMutation.mutate(order.id)}
-                                                    disabled={disputeMutation.isPending}
-                                                    className="px-3 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-medium py-2 rounded-lg transition disabled:opacity-50">
-                                                    ⚠️ Litige
-                                                </button>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <p className="text-xs text-gray-400">
-                                        {new Date(order.created_at).toLocaleDateString('fr-FR', {
-                                            day: 'numeric', month: 'long', year: 'numeric'
-                                        })}
-                                    </p>
-                                </div>
-                            )
-                        })}
+                        {orders.map(order => (
+                            <OrderCard
+                                key={order.id}
+                                order={order}
+                                isBuyer={active === 'buyer'}
+                                onInvalidate={invalidate}
+                            />
+                        ))}
                     </div>
                 )}
             </div>

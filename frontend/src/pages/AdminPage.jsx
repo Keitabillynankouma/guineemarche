@@ -72,7 +72,21 @@ function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
     <div className="space-y-8">
       {stats && (
         <div>
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Vue d'ensemble</h2>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-bold text-gray-800">Vue d'ensemble</h2>
+            <div className="flex gap-2">
+              <a href="/api/v1/orders/admin/export/?type=orders"
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition">
+                ⬇️ Commandes CSV
+              </a>
+              <a href="/api/v1/orders/admin/export/?type=users"
+                target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition">
+                ⬇️ Utilisateurs CSV
+              </a>
+            </div>
+          </div>
           <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
             <StatCard label="Utilisateurs"           value={stats.users}            icon="👥" color="blue" />
             <StatCard label="Annonces actives"        value={stats.active_listings}  icon="📦" color="green" />

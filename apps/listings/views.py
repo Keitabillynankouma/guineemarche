@@ -136,6 +136,18 @@ class FavoriteDeleteView(generics.DestroyAPIView):
         return Favorite.objects.filter(user=self.request.user)
 
 
+class FavoriteToggleView(APIView):
+    """POST /listings/{id}/favorite/ — ajoute ou retire des favoris."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        listing = get_object_or_404(Listing, pk=pk)
+        fav, created = Favorite.objects.get_or_create(user=request.user, listing=listing)
+        if not created:
+            fav.delete()
+        return Response({'is_favorited': created, 'listing_id': str(pk)})
+
+
 class ListingReportView(generics.CreateAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class   = ListingReportSerializer
@@ -184,12 +196,12 @@ class BannerClickView(APIView):
 
 # ── Boost automatique ────────────────────────────────────────────────────────
 
-BOOST_PRICES = {3: 5_000, 7: 10_000}   # jours → GNF
+BOOST_PRICES = {3: 5_000, 7: 10_000, 14: 18_000, 30: 30_000}   # jours → GNF
 
 class BoostListingView(APIView):
     """
     POST /listings/{id}/boost/
-    Body: { days: 3|7, provider: 'orange_money'|'mtn_momo'|'cash', phone: '...' }
+    Body: { days: 3|7|14|30, provider: 'orange_money'|'mtn_momo'|'cash', phone: '...' }
     → Initie le paiement, et si succès active le boost immédiatement.
     """
     permission_classes = [permissions.IsAuthenticated]

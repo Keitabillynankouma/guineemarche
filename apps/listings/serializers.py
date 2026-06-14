@@ -42,6 +42,7 @@ class ListingSerializer(serializers.ModelSerializer):
     seller_name   = serializers.CharField(source='seller.full_name', read_only=True)
     seller_phone  = serializers.CharField(source='seller.phone_number', read_only=True)
     category_name = serializers.CharField(source='category.name', read_only=True)
+    is_favorited  = serializers.SerializerMethodField()
     uploaded_files = serializers.ListField(
         child=serializers.ImageField(),
         write_only=True,
@@ -57,9 +58,15 @@ class ListingSerializer(serializers.ModelSerializer):
             'condition', 'status', 'city', 'quartier', 'latitude', 'longitude',
             'view_count', 'is_boosted', 'expires_at', 'created_at',
             'seller', 'seller_name', 'seller_phone', 'category', 'category_name',
-            'attributes', 'media', 'uploaded_files'
+            'attributes', 'media', 'uploaded_files', 'is_favorited',
         )
-        read_only_fields = ('id', 'seller', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted')
+        read_only_fields = ('id', 'seller', 'seller_name', 'seller_phone', 'view_count', 'created_at', 'status', 'is_boosted', 'is_favorited')
+
+    def get_is_favorited(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return Favorite.objects.filter(user=request.user, listing=obj).exists()
 
     @transaction.atomic
     def create(self, validated_data):

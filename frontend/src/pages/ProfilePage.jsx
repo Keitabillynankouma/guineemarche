@@ -1,8 +1,197 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import useAuthStore from '../store/authStore'
-import { authAPI } from '../services/api'
+import { authAPI, ordersAPI, listingsAPI, referralAPI } from '../services/api'
+
+// ── Graphique barres SVG pur ──────────────────────────────────────────────────
+function BarChart({ data, color = '#16a34a', label = '' }) {
+    if (!data.length) return null
+    const max = Math.max(...data.map(d => d.value), 1)
+    const W = 100 / data.length
+    return (
+        <div>
+            {label && <p className="text-xs text-gray-500 mb-2 font-medium">{label}</p>}
+            <div className="flex items-end gap-1 h-24">
+                {data.map((d, i) => (
+                    <div key={i} className="flex-1 flex flex-col items-center justify-end gap-1">
+                        <div
+                            className="w-full rounded-t-md transition-all duration-500"
+                            style={{ height: `${Math.max(4, (d.value / max) * 88)}px`, background: color, opacity: d.value ? 1 : 0.2 }}
+                            title={`${d.label}: ${d.value}`}
+                        />
+                        <p className="text-xs text-gray-400 truncate w-full text-center">{d.label}</p>
+                    </div>
+                ))}
+            </div>
+        </div>
+    )
+}
+
+// ── Dashboard vendeur ─────────────────────────────────────────────────────────
+function SellerDashboard({ userId }) {
+    const { data: ordersRaw } = useQuery({
+        queryKey: ['seller-dashboard-orders'],
+        queryFn: () => ordersAPI.getSeller().then(r => r.data),
+    })
+    const { data: listingsRaw } = useQuery({
+        queryKey: ['seller-dashboard-listings'],
+        queryFn: () => listingsAPI.myListings().then(r => r.data),
+    })
+
+    const orders   = Array.isArray(ordersRaw)   ? ordersRaw   : (ordersRaw?.results ?? [])
+    const listings = Array.isArray(listingsRaw) ? listingsRaw : (listingsRaw?.results ?? [])
+
+    // Commandes par mois (6 derniers mois)
+    const months = Array.from({ length: 6 }, (_, i) => {
+        const d = new Date()
+        d.setMonth(d.getMonth() - (5 - i))
+        return { key: `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`, label: d.toLocaleString('fr-FR', { month: 'short' }), value: 0 }
+    })
+    for (const o of orders) {
+        const k = o.created_at?.slice(0, 7)
+        const m = months.find(m => m.key === k)
+        if (m) m.value++
+    }
+
+    // Revenus par mois (commandes completed)
+    const revMonths = months.map(m => ({ ...m, value: 0 }))
+    for (const o of orders.filter(o => o.status === 'completed')) {
+        const k = o.created_at?.slice(0, 7)
+        const m = revMonths.find(m => m.key === k)
+        if (m) m.value += (o.seller_payout_gnf || o.amount_gnf || 0)
+    }
+
+    // Stats globales
+    const totalRev     = orders.filter(o => o.status === 'completed').reduce((s, o) => s + (o.seller_payout_gnf || 0), 0)
+    const completed    = orders.filter(o => o.status === 'completed').length
+    const pending      = orders.filter(o => o.status === 'pending').length
+    const convRate     = orders.length ? Math.round((completed / orders.length) * 100) : 0
+
+    // Top annonces par vues
+    const topListings  = [...listings].sort((a, b) => (b.view_count || 0) - (a.view_count || 0)).slice(0, 5)
+
+    const fmt = n => new Intl.NumberFormat('fr-GN').format(n) + ' GNF'
+
+    return (
+        <div className="bg-white rounded-2xl shadow p-5 space-y-5">
+            <h2 className="font-bold text-gray-800">📊 Tableau de bord vendeur</h2>
+
+            {/* KPIs */}
+            <div className="grid grid-cols-2 gap-3">
+                {[
+                    { label: 'Ventes terminées', value: completed, icon: '✅', color: 'text-green-600' },
+                    { label: 'En attente', value: pending, icon: '⏳', color: 'text-yellow-600' },
+                    { label: 'Taux conversion', value: convRate + '%', icon: '📈', color: 'text-blue-600' },
+                    { label: 'Revenu net total', value: fmt(totalRev), icon: '💰', color: 'text-green-700', small: true },
+                ].map(k => (
+                    <div key={k.label} className="bg-gray-50 rounded-xl p-3">
+                        <p className="text-xl mb-1">{k.icon}</p>
+                        <p className={`font-bold ${k.color} ${k.small ? 'text-sm' : 'text-xl'}`}>{k.value}</p>
+                        <p className="text-xs text-gray-500 mt-0.5">{k.label}</p>
+                    </div>
+                ))}
+            </div>
+
+            {/* Graphique commandes */}
+            <BarChart data={months} color="#16a34a" label="Commandes reçues (6 derniers mois)" />
+
+            {/* Graphique revenus */}
+            <BarChart data={revMonths.map(m => ({ ...m, label: m.label }))} color="#2563eb" label="Revenus nets (GNF)" />
+
+            {/* Top annonces */}
+            {topListings.length > 0 && (
+                <div>
+                    <p className="text-xs text-gray-500 mb-2 font-medium">Top annonces par vues</p>
+                    <div className="space-y-2">
+                        {topListings.map((l, i) => (
+                            <Link key={l.id} to={`/listings/${l.id}`}
+                                className="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 transition">
+                                <span className="text-sm font-bold text-gray-400 w-4">#{i + 1}</span>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-gray-800 truncate">{l.title}</p>
+                                    <p className="text-xs text-gray-400">👁 {l.view_count || 0} vues · {l.is_boosted ? '⚡ Boosté' : l.status}</p>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+
+            <Link to={`/reviews/${userId}`}
+                className="block text-center text-sm text-green-600 font-medium hover:underline">
+                Voir mes avis clients →
+            </Link>
+        </div>
+    )
+}
+
+// ── Section Parrainage ────────────────────────────────────────────────────────
+function ReferralSection({ referral }) {
+    const [copied, setCopied] = useState(false)
+
+    const copy = () => {
+        navigator.clipboard.writeText(referral.referral_url).then(() => {
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        })
+    }
+
+    const waText = encodeURIComponent(
+        `🛒 Rejoins-moi sur GuinéeMarché — la marketplace #1 en Guinée !\nInscris-toi avec mon code et on gagne tous les deux des annonces gratuites : ${referral.referral_url}`
+    )
+    const waUrl = `https://wa.me/?text=${waText}`
+
+    return (
+        <div className="bg-white rounded-2xl shadow p-5 space-y-4">
+            <h2 className="font-bold text-gray-800">🎁 Programme de parrainage</h2>
+
+            {/* Statistiques */}
+            <div className="grid grid-cols-3 gap-3 text-center">
+                <div className="bg-green-50 rounded-xl p-3">
+                    <p className="text-2xl font-bold text-green-700">{referral.referral_count}</p>
+                    <p className="text-xs text-gray-500 mt-1">Filleuls actifs</p>
+                </div>
+                <div className="bg-blue-50 rounded-xl p-3">
+                    <p className="text-2xl font-bold text-blue-700">+{referral.reward_per_ref}</p>
+                    <p className="text-xs text-gray-500 mt-1">Annonces / filleul</p>
+                </div>
+                <div className="bg-purple-50 rounded-xl p-3">
+                    <p className="text-2xl font-bold text-purple-700">+{referral.total_bonus}</p>
+                    <p className="text-xs text-gray-500 mt-1">Slots gagnés</p>
+                </div>
+            </div>
+
+            <p className="text-sm text-gray-600">
+                Partage ton lien. Chaque filleul qui s'inscrit et active son compte te rapporte <strong>{referral.reward_per_ref} annonces gratuites</strong> supplémentaires.
+            </p>
+
+            {/* Code */}
+            <div className="bg-gray-50 rounded-xl p-3 flex items-center justify-between gap-2">
+                <div>
+                    <p className="text-xs text-gray-400 mb-1">Ton code</p>
+                    <p className="font-mono font-bold text-lg text-green-700 tracking-widest">{referral.referral_code}</p>
+                </div>
+                <button
+                    onClick={copy}
+                    className="shrink-0 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700 transition"
+                >
+                    {copied ? '✅ Copié !' : '📋 Copier le lien'}
+                </button>
+            </div>
+
+            {/* Partage WhatsApp */}
+            <a
+                href={waUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 w-full py-3 bg-[#25D366] hover:bg-[#20bb5a] text-white font-semibold rounded-xl transition"
+            >
+                📱 Partager sur WhatsApp
+            </a>
+        </div>
+    )
+}
 
 export default function ProfilePage() {
     const { user, fetchMe, logout, isAuthenticated } = useAuthStore()
@@ -22,6 +211,12 @@ export default function ProfilePage() {
     const { data: badges = [] } = useQuery({
         queryKey: ['badges'],
         queryFn: () => authAPI.getBadges().then(r => r.data),
+        enabled: isAuthenticated,
+    })
+
+    const { data: referral } = useQuery({
+        queryKey: ['referral-stats'],
+        queryFn: () => referralAPI.getStats().then(r => r.data),
         enabled: isAuthenticated,
     })
 
@@ -56,14 +251,16 @@ export default function ProfilePage() {
                     <p className="text-sm text-gray-400 mt-1">📍 {user.city}{user.quartier && ` · ${user.quartier}`}</p>
                     {user.profile && (
                         <div className="flex justify-center gap-6 mt-4 text-sm">
-                            <div className="text-center">
-                                <p className="font-bold text-gray-800">{user.profile.rating_avg?.toFixed(1) || '0.0'}</p>
+                            <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
+                                <p className="font-bold text-gray-800">
+                                    {'★'.repeat(Math.round(user.profile.rating_avg || 0))} {user.profile.rating_avg?.toFixed(1) || '0.0'}
+                                </p>
                                 <p className="text-gray-400">Note</p>
-                            </div>
-                            <div className="text-center">
+                            </Link>
+                            <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
                                 <p className="font-bold text-gray-800">{user.profile.total_ratings}</p>
-                                <p className="text-gray-400">Avis</p>
-                            </div>
+                                <p className="text-gray-400">Avis →</p>
+                            </Link>
                             <div className="text-center">
                                 <p className="font-bold text-gray-800">{user.profile.total_sales}</p>
                                 <p className="text-gray-400">Ventes</p>
@@ -71,6 +268,9 @@ export default function ProfilePage() {
                         </div>
                     )}
                 </div>
+
+                {/* Dashboard vendeur */}
+                {user.role === 'seller' && <SellerDashboard userId={user.id} />}
 
                 {badges.length > 0 && (
                     <div className="bg-white rounded-2xl shadow p-4">
@@ -165,6 +365,11 @@ export default function ProfilePage() {
                     </Link>
                 )}
 
+                {/* ── Section Parrainage ─────────────────────────────────────── */}
+                {referral && (
+                    <ReferralSection referral={referral} />
+                )}
+
                 <div className="bg-white rounded-2xl shadow overflow-hidden">
                     <Link to="/my-listings" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
                         <span className="font-medium text-gray-700">📋 Mes annonces</span>
@@ -176,6 +381,10 @@ export default function ProfilePage() {
                     </Link>
                     <Link to="/messages" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
                         <span className="font-medium text-gray-700">💬 Mes messages</span>
+                        <span className="text-gray-400">›</span>
+                    </Link>
+                    <Link to="/favorites" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
+                        <span className="font-medium text-gray-700">❤️ Mes favoris</span>
                         <span className="text-gray-400">›</span>
                     </Link>
                     {user.role === 'admin' && (

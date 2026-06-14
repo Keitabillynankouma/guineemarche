@@ -55,6 +55,7 @@ export const listingsAPI = {
   addFavorite: (data) => api.post('/listings/favorites/', data),
   removeFavorite: (id) => api.delete(`/listings/favorites/${id}/`),
   getFavorites: () => api.get('/listings/favorites/'),
+  toggleFavorite: (listingId) => api.post(`/listings/${listingId}/favorite/`),
 }
 
 export const shopsAPI = {
@@ -82,6 +83,10 @@ export const ordersAPI = {
   dispute: (id) => api.post(`/orders/${id}/dispute/`),
   getPickupPoints: (city) => api.get('/orders/pickup-points/', { params: city ? { city } : {} }),
   getSeller: () => api.get('/orders/received/'),
+}
+
+export const referralAPI = {
+  getStats: () => api.get('/accounts/referral/'),
 }
 
 export default api

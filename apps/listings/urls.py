@@ -5,6 +5,7 @@ urlpatterns = [
     path('',                          views.ListingListCreateView.as_view(),  name='listing-list'),
     path('<uuid:pk>/',                views.ListingDetailView.as_view(),      name='listing-detail'),
     path('<uuid:pk>/boost/',          views.BoostListingView.as_view(),       name='listing-boost'),
+    path('<uuid:pk>/favorite/',       views.FavoriteToggleView.as_view(),     name='listing-favorite-toggle'),
     path('my/',                       views.MyListingsView.as_view(),         name='my-listings'),
     path('categories/',          views.CategoryListView.as_view(),         name='category-list'),
     path('categories/<uuid:pk>/attributes/', views.CategoryAttributeListView.as_view(), name='category-attributes'),

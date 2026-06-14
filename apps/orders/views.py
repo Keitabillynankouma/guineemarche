@@ -395,3 +395,43 @@ class AdminStatsView(APIView):
                                    status=Payment.Status.SUCCESS
                                ).aggregate(total=Sum('amount_gnf'))['total'] or 0,
         })
+
+
+class AdminExportCSVView(APIView):
+    """Admin : export CSV des commandes ou utilisateurs."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        import csv
+        from django.http import HttpResponse
+        from apps.accounts.models import User as AppUser
+
+        export_type = request.query_params.get('type', 'orders')
+
+        response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+        response['Content-Disposition'] = f'attachment; filename="{export_type}_export.csv"'
+
+        writer = csv.writer(response)
+
+        if export_type == 'users':
+            writer.writerow(['ID', 'Nom', 'Téléphone', 'Email', 'Rôle', 'Vérifié', 'Ville', 'Créé le'])
+            for u in AppUser.objects.all().order_by('-created_at'):
+                writer.writerow([
+                    str(u.id), u.full_name, str(u.phone_number),
+                    u.email or '', u.role, u.is_verified, u.city,
+                    u.created_at.strftime('%d/%m/%Y %H:%M'),
+                ])
+        else:
+            writer.writerow([
+                'ID', 'Annonce', 'Acheteur', 'Vendeur', 'Montant GNF',
+                'Statut', 'Mode livraison', 'Créé le',
+            ])
+            for o in Order.objects.select_related('listing', 'buyer', 'seller').order_by('-created_at'):
+                writer.writerow([
+                    str(o.id), o.listing.title,
+                    o.buyer.full_name, o.seller.full_name,
+                    o.amount_gnf, o.status, o.delivery_mode,
+                    o.created_at.strftime('%d/%m/%Y %H:%M'),
+                ])
+
+        return response

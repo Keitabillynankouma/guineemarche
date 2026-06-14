@@ -24,7 +24,7 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = 'login'
     rate  = '10/hour'
 
-from .models import User, OTPCode, Subscription, Badge, Shop
+from .models import User, OTPCode, Subscription, Badge, Shop, Referral
 from .serializers import (
     RegisterSerializer, VerifyOTPSerializer, LoginSerializer,
     UserSerializer, UserProfileSerializer, ChangePasswordSerializer,
@@ -49,6 +49,20 @@ class RegisterView(APIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
+
+        # Traitement du parrainage
+        ref_code = request.data.get('referral_code', '').strip().upper()
+        if ref_code:
+            try:
+                referrer = User.objects.get(referral_code=ref_code)
+                if referrer.id != user.id:
+                    user.referred_by = referrer
+                    user.save(update_fields=['referred_by'])
+                    referral = Referral.objects.create(referrer=referrer, referred=user)
+                    referral.give_reward()
+            except User.DoesNotExist:
+                pass  # code invalide, on ignore silencieusement
+
         return Response({
             'message': 'Compte créé. Vérifiez votre code OTP.',
             'phone_number': str(user.phone_number),
@@ -244,6 +258,24 @@ class BadgeListView(generics.ListAPIView):
     def get_queryset(self):
         Badge.check_and_award(self.request.user)
         return Badge.objects.filter(user=self.request.user)
+
+
+class ReferralStatsView(APIView):
+    """GET /accounts/referral/ — stats de parrainage de l'utilisateur connecté."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        referrals = Referral.objects.filter(referrer=user, reward_given=True)
+        sub, _ = Subscription.objects.get_or_create(user=user)
+        site_url = request.build_absolute_uri('/').rstrip('/')
+        return Response({
+            'referral_code':  user.referral_code,
+            'referral_url':   f'{site_url}/register?ref={user.referral_code}',
+            'referral_count': referrals.count(),
+            'reward_per_ref': Referral.REWARD_LISTINGS,
+            'total_bonus':    sub.referral_bonus,
+        })
 
 
 class ShopListView(generics.ListAPIView):
