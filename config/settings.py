@@ -186,6 +186,9 @@ AT_USERNAME  = env('AT_USERNAME',  default='')
 AT_API_KEY   = env('AT_API_KEY',   default='')
 AT_SENDER_ID = env('AT_SENDER_ID', default='')
 
+# Anthropic Claude API (support chatbot + modération)
+ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
+
 # Secrets pour validation des signatures webhook paiement
 # Définir dans les variables d'environnement Render
 ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
