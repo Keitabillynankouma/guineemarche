@@ -189,7 +189,7 @@ class SubscriptionView(APIView):
     """
     GET  — statut de l'abonnement.
     POST — paiement réel + activation automatique du plan Pro.
-    Body: { months: 1|3|6|12, provider: 'orange_money'|'mtn_momo'|'cash', phone: '...' }
+    Body: { months: 1|3|6|12, provider: 'orange_money'|'cash', phone: '...' }
     """
     permission_classes = [permissions.IsAuthenticated]
 
@@ -198,7 +198,7 @@ class SubscriptionView(APIView):
         return Response(SubscriptionSerializer(sub).data)
 
     def post(self, request):
-        from apps.orders.payment_service import initiate_orange_money, initiate_mtn_momo
+        from apps.orders.payment_service import initiate_orange_money
         from apps.orders.models import Payment
         from dateutil.relativedelta import relativedelta
 
@@ -214,8 +214,6 @@ class SubscriptionView(APIView):
         # Initier le paiement
         if provider == Payment.Provider.ORANGE_MONEY:
             result = initiate_orange_money(phone, amount, f'pro-{request.user.id}')
-        elif provider == Payment.Provider.MTN_MOMO:
-            result = initiate_mtn_momo(phone, amount, f'pro-{request.user.id}')
         else:
             result = type('R', (), {'success': True, 'reference': '', 'message': 'Plan Pro activé'})()
 

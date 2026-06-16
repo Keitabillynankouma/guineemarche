@@ -248,7 +248,6 @@ if SENTRY_DSN:
 # Secrets pour validation des signatures webhook paiement
 # Définir dans les variables d'environnement Render
 ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
-MTN_WEBHOOK_SECRET    = env('MTN_WEBHOOK_SECRET',    default='')
 
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False
