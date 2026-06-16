@@ -1,8 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import SupportChatWidget from './components/SupportChatWidget'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSettings } from './hooks/useSettings'
+import useAuthStore from './store/authStore'
 
 import HomePage from './pages/HomePage'
 import LoginPage from './pages/LoginPage'
@@ -113,6 +114,13 @@ function SupportButton() {
 // Routes séparées pour pouvoir utiliser useSettings (doit être dans QueryClientProvider)
 function AppRoutes() {
   const { settings } = useSettings()
+  const fetchMe = useAuthStore(s => s.fetchMe)
+  const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+
+  // Charger l'utilisateur depuis l'API au démarrage pour que isSeller/isAdmin fonctionnent
+  useEffect(() => {
+    if (isAuthenticated) fetchMe()
+  }, [isAuthenticated])
 
   return (
     <>
