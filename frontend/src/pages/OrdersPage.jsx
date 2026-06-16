@@ -89,12 +89,56 @@ function Timeline({ status }) {
     )
 }
 
+// ── Modal info escrow (affiché une seule fois avant le 1er paiement OM) ───────
+function EscrowInfoModal({ onConfirm }) {
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-2xl w-full max-w-sm p-6 space-y-4">
+                <div className="text-center text-4xl">🔒</div>
+                <h2 className="font-bold text-gray-900 text-center">Protection escrow</h2>
+                <p className="text-sm text-gray-600 text-center">
+                    Pour vous protéger des annulations Orange Money, vos fonds sont
+                    temporairement retenus et libérés automatiquement au vendeur :
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                    <div className="bg-blue-50 rounded-xl p-3 text-center">
+                        <div className="font-bold text-blue-800 text-lg">6h</div>
+                        <div className="text-xs text-blue-600">Moins de 500 000 GNF</div>
+                    </div>
+                    <div className="bg-purple-50 rounded-xl p-3 text-center">
+                        <div className="font-bold text-purple-800 text-lg">48h</div>
+                        <div className="text-xs text-purple-600">500 000 GNF et plus</div>
+                    </div>
+                </div>
+                <p className="text-xs text-gray-500 text-center">
+                    Vous pouvez aussi libérer les fonds immédiatement en confirmant
+                    la réception de l'article.
+                </p>
+                <button
+                    onClick={onConfirm}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-xl transition"
+                >
+                    J'ai compris — continuer
+                </button>
+                <a href="/terms#refund" target="_blank"
+                    className="block text-center text-xs text-green-600 hover:underline">
+                    En savoir plus sur les remboursements →
+                </a>
+            </div>
+        </div>
+    )
+}
+
 // ── Modal paiement ──────────────────────────────────────────────────────────
 function PayModal({ order, onClose, onPaid }) {
     const [provider, setProvider] = useState('orange_money')
     const [phone, setPhone]       = useState('')
     const [error, setError]       = useState('')
     const [loading, setLoading]   = useState(false)
+    const [showEscrowInfo, setShowEscrowInfo] = useState(false)
+    const [escrowAcknowledged, setEscrowAcknowledged] = useState(
+        () => localStorage.getItem('gm_escrow_acknowledged') === '1'
+    )
 
     const handlePay = async () => {
         if (provider !== 'cash' && !phone.trim()) {
@@ -112,8 +156,26 @@ function PayModal({ order, onClose, onPaid }) {
         } finally { setLoading(false) }
     }
 
+    // Montrer le modal escrow si Orange Money + jamais vu
+    const handlePayClick = () => {
+        if (provider === 'orange_money' && !escrowAcknowledged) {
+            setShowEscrowInfo(true)
+        } else {
+            handlePay()
+        }
+    }
+
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4"
+        <>
+        {showEscrowInfo && (
+            <EscrowInfoModal onConfirm={() => {
+                localStorage.setItem('gm_escrow_acknowledged', '1')
+                setEscrowAcknowledged(true)
+                setShowEscrowInfo(false)
+                handlePay()
+            }} />
+        )}
+        <div className="fixed inset-0 bg-black/50 z-40 flex items-end md:items-center justify-center p-4"
             onClick={onClose}>
             <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4"
                 onClick={e => e.stopPropagation()}>
@@ -154,13 +216,14 @@ function PayModal({ order, onClose, onPaid }) {
                         className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">
                         Annuler
                     </button>
-                    <button onClick={handlePay} disabled={loading}
+                    <button onClick={handlePayClick} disabled={loading}
                         className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50">
                         {loading ? 'Traitement...' : `Payer ${fmt(order.amount_gnf)}`}
                     </button>
                 </div>
             </div>
         </div>
+        </>
     )
 }
 

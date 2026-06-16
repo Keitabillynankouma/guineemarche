@@ -19,10 +19,15 @@ export default function RegisterPage() {
     const [otp, setOtp] = useState('')
     const [error, setError] = useState('')
     const [loading, setLoading] = useState(false)
+    const [acceptedTerms, setAcceptedTerms] = useState(false)
     const navigate = useNavigate()
 
     const handleRegister = async (e) => {
         e.preventDefault()
+        if (!acceptedTerms) {
+            setError("Vous devez accepter les conditions d'utilisation pour vous inscrire.")
+            return
+        }
         setError('')
         setLoading(true)
         try {
@@ -126,8 +131,29 @@ export default function RegisterPage() {
                                 <p className="text-xs text-green-600 mt-1">🎁 Code de parrainage appliqué — tu gagneras des annonces gratuites !</p>
                             )}
                         </div>
+                        {/* Checkbox CGU */}
+                        <label className="flex items-start gap-3 cursor-pointer select-none">
+                            <input
+                                type="checkbox"
+                                checked={acceptedTerms}
+                                onChange={e => setAcceptedTerms(e.target.checked)}
+                                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-green-600 focus:ring-green-500 flex-shrink-0"
+                            />
+                            <span className="text-xs text-gray-600 leading-relaxed">
+                                J'accepte les{' '}
+                                <a href="/terms" target="_blank" className="text-green-600 font-medium hover:underline">
+                                    Conditions d'utilisation
+                                </a>
+                                {' '}et la{' '}
+                                <a href="/terms" target="_blank" className="text-green-600 font-medium hover:underline">
+                                    Politique de confidentialité
+                                </a>
+                                {' '}de GuinéeMarché.
+                            </span>
+                        </label>
+
                         <button
-                            type="submit" disabled={loading}
+                            type="submit" disabled={loading || !acceptedTerms}
                             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50"
                         >
                             {loading ? 'Inscription...' : "S'inscrire"}

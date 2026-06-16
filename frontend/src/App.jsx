@@ -19,6 +19,7 @@ import ShopPage from './pages/ShopPage'
 import MyShopPage from './pages/MyShopPage'
 import AdminPage from './pages/AdminPage'
 import ReviewsPage from './pages/ReviewsPage'
+import TermsPage from './pages/TermsPage'
 
 const queryClient = new QueryClient()
 
@@ -138,7 +139,15 @@ function AppRoutes() {
         <Route path="/shops/:id" element={<ShopPage />} />
         <Route path="/admin"     element={<PrivateRoute><AdminPage /></PrivateRoute>} />
         <Route path="/reviews/:userId" element={<ReviewsPage />} />
+        <Route path="/terms" element={<TermsPage />} />
       </Routes>
+      {/* Footer discret */}
+      <footer className="bg-white border-t mt-8 py-4 px-4 text-center text-xs text-gray-400 space-x-4">
+        <span>© 2026 GuinéeMarché</span>
+        <a href="/terms" className="hover:text-green-600 hover:underline">Conditions d'utilisation</a>
+        <a href="/terms#privacy" className="hover:text-green-600 hover:underline">Confidentialité</a>
+        <a href="/terms#refund" className="hover:text-green-600 hover:underline">Remboursements</a>
+      </footer>
     </>
   )
 }
