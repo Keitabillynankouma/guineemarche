@@ -21,10 +21,11 @@ DEBUG = os.environ.get('DEBUG', 'False') == 'True'
 
 # En prod, définir ALLOWED_HOSTS=guineemarche.onrender.com dans les variables Render
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+_base_hosts = ['guineemarche.onrender.com', 'www.guineemarche.com']
 ALLOWED_HOSTS = (
-    _allowed_hosts_env.split(',')
+    list({*_allowed_hosts_env.split(','), *_base_hosts})
     if _allowed_hosts_env
-    else (['*'] if DEBUG else ['guineemarche.onrender.com', 'www.guineemarche.com'])
+    else (['*'] if DEBUG else _base_hosts)
 )
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
