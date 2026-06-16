@@ -7,10 +7,13 @@ from django.utils.decorators import method_decorator
 from django.conf import settings
 import hashlib
 import hmac
+import logging
+
+logger = logging.getLogger(__name__)
 
 from .models import Order, Payment, PickupPoint
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer
-from .payment_service import initiate_orange_money, initiate_mtn_momo
+from .payment_service import initiate_orange_money
 from core.permissions import IsAdmin
 
 
@@ -223,8 +226,6 @@ class InitiatePaymentView(APIView):
 
         if provider == Payment.Provider.ORANGE_MONEY:
             result = initiate_orange_money(phone_number, order.amount_gnf, str(order.id))
-        elif provider == Payment.Provider.MTN_MOMO:
-            result = initiate_mtn_momo(phone_number, order.amount_gnf, str(order.id))
         else:
             result = type('R', (), {'success': True, 'reference': '', 'message': 'Paiement en espèces enregistré'})()
 
@@ -233,10 +234,9 @@ class InitiatePaymentView(APIView):
             payment.external_ref = getattr(result, 'reference', '')
             payment.save(update_fields=['status', 'external_ref'])
             order.confirm()
-            # Bloquer les fonds pour mobile money (escrow)
-            if provider in [Payment.Provider.ORANGE_MONEY, Payment.Provider.MTN_MOMO]:
-                order.escrow_status = Order.EscrowStatus.HELD
-                order.save(update_fields=['escrow_status', 'updated_at'])
+            # Planifier la libération escrow pour Orange Money (6h petits / 48h gros montants)
+            if provider == Payment.Provider.ORANGE_MONEY:
+                order.set_escrow_schedule()
         else:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=['status'])
@@ -260,17 +260,6 @@ def _verify_orange_signature(request):
     return hmac.compare_digest(sig_header, expected)
 
 
-def _verify_mtn_signature(request):
-    """Vérifie la signature HMAC-SHA256 de MTN MoMo."""
-    secret = getattr(settings, 'MTN_WEBHOOK_SECRET', '')
-    if not secret:
-        return True  # non configuré → laisser passer
-    sig_header = request.headers.get('X-Callback-Signature', '')
-    body        = request.body
-    expected    = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(sig_header, expected)
-
-
 @method_decorator(csrf_exempt, name='dispatch')
 class PaymentWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -283,11 +272,6 @@ class PaymentWebhookView(APIView):
                 return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('pay_token', '')
             success = data.get('status', '') == 'SUCCESS'
-        elif provider == 'mtn':
-            if not _verify_mtn_signature(request):
-                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
-            ref     = data.get('externalId', '')
-            success = data.get('status', '') == 'SUCCESSFUL'
         else:
             return Response({'error': 'Fournisseur inconnu'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -300,15 +284,62 @@ class PaymentWebhookView(APIView):
                 payment.save(update_fields=['status'])
                 if success:
                     payment.order.confirm()
-                    payment.order.escrow_status = Order.EscrowStatus.HELD
-                    payment.order.save(update_fields=['escrow_status', 'updated_at'])
-        except Exception:
-            pass
+                    payment.order.set_escrow_schedule()
+            else:
+                logger.warning("[WEBHOOK] %s — paiement introuvable pour ref=%s", provider, ref)
+        except Exception as exc:
+            logger.error("[WEBHOOK] %s — erreur traitement paiement ref=%s : %s", provider, ref, exc, exc_info=True)
 
         return Response({'status': 'ok'})
 
 
 # ── Admin ──────────────────────────────────────────────────────────────────────
+
+class AdminEscrowHoldView(APIView):
+    """Admin : bloquer ou débloquer manuellement la libération automatique d'un escrow."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        order  = get_object_or_404(Order, pk=pk)
+        action = request.data.get('action')  # 'hold' ou 'release'
+
+        if action == 'hold':
+            order.escrow_admin_hold = True
+            order.save(update_fields=['escrow_admin_hold', 'updated_at'])
+            # Notifier le vendeur
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='⚠️ Fonds temporairement bloqués',
+                body=f'Les fonds de la commande « {order.listing.title} » ont été bloqués '
+                     f'par l\'administration pour vérification. Contactez le support si nécessaire.',
+                data={'order_id': str(order.id)},
+            )
+            return Response({'status': 'held', 'order_id': str(order.id)})
+
+        elif action == 'release':
+            order.escrow_admin_hold = False
+            order.save(update_fields=['escrow_admin_hold', 'updated_at'])
+            # Libérer immédiatement si la date est passée
+            from django.utils import timezone
+            if order.escrow_status == Order.EscrowStatus.HELD and (
+                order.escrow_release_at is None or order.escrow_release_at <= timezone.now()
+            ):
+                order.release_escrow()
+                from apps.notifications.models import Notification
+                Notification.send(
+                    user=order.seller,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='💰 Fonds libérés',
+                    body=f'Les fonds ({order.seller_payout_gnf:,} GNF) pour « {order.listing.title} » sont maintenant disponibles.',
+                    data={'order_id': str(order.id)},
+                )
+                return Response({'status': 'released', 'order_id': str(order.id)})
+            return Response({'status': 'unblocked', 'order_id': str(order.id)})
+
+        return Response({'error': "action doit être 'hold' ou 'release'."}, status=status.HTTP_400_BAD_REQUEST)
+
 
 class AdminDisputeListView(generics.ListAPIView):
     """Admin : liste toutes les commandes en litige."""

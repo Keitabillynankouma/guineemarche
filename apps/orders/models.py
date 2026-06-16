@@ -55,7 +55,14 @@ class Order(BaseModel):
     meet_location      = models.CharField(max_length=255, blank=True)
     escrow_status      = models.CharField(max_length=10, choices=EscrowStatus.choices, default=EscrowStatus.NONE)
     escrow_released_at = models.DateTimeField(null=True, blank=True)
+    escrow_release_at  = models.DateTimeField(null=True, blank=True)   # date planifiée de libération auto
+    escrow_admin_hold  = models.BooleanField(default=False)             # admin a bloqué manuellement
     note               = models.TextField(blank=True)
+
+    # Seuils escrow
+    LARGE_AMOUNT_GNF  = 500_000   # montants ≥ 500 000 GNF → délai étendu + alerte admin
+    ESCROW_DELAY_STD  = 6         # heures pour petits montants
+    ESCROW_DELAY_LARGE = 48       # heures pour gros montants
 
     class Meta:
         verbose_name        = 'Commande'
@@ -80,6 +87,51 @@ class Order(BaseModel):
     def cancel(self):
         self.status = self.Status.CANCELLED
         self.save(update_fields=['status', 'updated_at'])
+
+    def set_escrow_schedule(self):
+        """
+        Planifie la libération automatique des fonds selon le montant.
+        - < 500 000 GNF : libération dans 6h (fenêtre annulation OM dépassée)
+        - ≥ 500 000 GNF : libération dans 48h + alerte admin immédiate
+        """
+        from django.utils import timezone
+        from datetime import timedelta
+        is_large = self.amount_gnf >= self.LARGE_AMOUNT_GNF
+        delay    = self.ESCROW_DELAY_LARGE if is_large else self.ESCROW_DELAY_STD
+        self.escrow_release_at = timezone.now() + timedelta(hours=delay)
+        self.escrow_status     = self.EscrowStatus.HELD
+        self.save(update_fields=['escrow_status', 'escrow_release_at', 'updated_at'])
+
+        if is_large:
+            # Notifier l'admin immédiatement
+            try:
+                from apps.notifications.models import Notification
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                admins = User.objects.filter(is_staff=True)
+                for admin in admins:
+                    Notification.send(
+                        user=admin,
+                        type=Notification.Type.SYSTEM,
+                        title='⚠️ Gros paiement en escrow',
+                        body=f'Transaction de {self.amount_gnf:,} GNF pour « {self.listing.title} ». '
+                             f'Libération automatique dans 48h. Vérifiez si nécessaire.',
+                        data={'order_id': str(self.id)},
+                    )
+                # SMS admin
+                from core.sms import send_sms
+                for admin in admins:
+                    try:
+                        send_sms(
+                            str(admin.phone_number),
+                            f'GuinéeMarché: Gros paiement {self.amount_gnf:,} GNF reçu '
+                            f'(commande {str(self.id)[:8]}). Libération auto dans 48h. '
+                            f'Bloquez sur l\'admin si fraude détectée.'
+                        )
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     def release_escrow(self):
         from django.utils import timezone
@@ -108,7 +160,6 @@ class Payment(BaseModel):
 
     class Provider(models.TextChoices):
         ORANGE_MONEY = 'orange_money', 'Orange Money'
-        MTN_MOMO     = 'mtn_momo',     'MTN MoMo'
         CASH         = 'cash',         'Espèces (remise en main)'
         CARD         = 'card',         'Carte bancaire'
 

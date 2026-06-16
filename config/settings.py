@@ -18,7 +18,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
 DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-ALLOWED_HOSTS = ['*']
+
+# En prod, définir ALLOWED_HOSTS=guineemarche.onrender.com dans les variables Render
+_allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
+ALLOWED_HOSTS = (
+    _allowed_hosts_env.split(',')
+    if _allowed_hosts_env
+    else (['*'] if DEBUG else ['guineemarche.onrender.com', 'www.guineemarche.com'])
+)
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 DJANGO_APPS = [
@@ -262,5 +269,24 @@ CHANNEL_LAYERS = {
         'BACKEND': 'channels_redis.core.RedisChannelLayer',
         'CONFIG':  {'hosts': [env('REDIS_URL', default='redis://localhost:6379/1')]},
     }
+}
+
+# ── Celery + Beat (tâches périodiques) ───────────────────────────────────────
+CELERY_BROKER_URL  = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
+CELERY_TIMEZONE    = 'Africa/Conakry'
+
+from celery.schedules import crontab
+CELERY_BEAT_SCHEDULE = {
+    # Libération escrow — toutes les heures
+    'auto-release-escrow': {
+        'task':     'apps.orders.tasks.auto_release_escrow',
+        'schedule': crontab(minute=0),          # Chaque heure pile
+    },
+    # Rappel vendeurs escrow bientôt disponible — toutes les 12h
+    'notify-pending-escrow': {
+        'task':     'apps.orders.tasks.notify_pending_escrow',
+        'schedule': crontab(hour='8,20', minute=0),  # 8h et 20h
+    },
 }
 

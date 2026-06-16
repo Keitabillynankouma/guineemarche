@@ -135,7 +135,7 @@ function ProSection() {
             <div>
                 <p className="font-semibold text-gray-700 mb-3">Mode de paiement</p>
                 <div className="grid grid-cols-2 gap-3 mb-3">
-                    {[['orange_money', '🟠 Orange Money'], ['mtn_momo', '🟡 MTN MoMo']].map(([k, l]) => (
+                    {[['orange_money', '🟠 Orange Money']].map(([k, l]) => (
                         <button key={k} onClick={() => setProvider(k)}
                             className={`border-2 rounded-xl p-3 text-sm font-medium transition ${
                                 provider === k ? 'border-green-600 bg-green-50 text-green-700' : 'border-gray-200 bg-white text-gray-600 hover:border-green-300'

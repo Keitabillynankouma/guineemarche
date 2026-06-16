@@ -11,6 +11,7 @@ const adminAPI = {
   getStats:    () => api.get('/orders/admin/stats/'),
   getDisputes: () => api.get('/orders/admin/disputes/'),
   resolve:     (id, action) => api.post(`/orders/admin/disputes/${id}/resolve/`, { action }),
+  holdEscrow:  (id, action) => api.post(`/orders/admin/escrow/${id}/hold/`, { action }),
 
   // Annonces
   getListings:     (params) => api.get('/listings/admin/listings/', { params }),

@@ -49,4 +49,7 @@ urlpatterns = [
     path('admin/export/',
         views.AdminExportCSVView.as_view(),
         name='admin-export-csv'),
+    path('admin/escrow/<uuid:pk>/hold/',
+        views.AdminEscrowHoldView.as_view(),
+        name='admin-escrow-hold'),
 ]

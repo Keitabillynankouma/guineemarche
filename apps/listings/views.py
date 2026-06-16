@@ -321,13 +321,13 @@ BOOST_PRICES = {3: 5_000, 7: 10_000, 14: 18_000, 30: 30_000}   # jours → GNF
 class BoostListingView(APIView):
     """
     POST /listings/{id}/boost/
-    Body: { days: 3|7|14|30, provider: 'orange_money'|'mtn_momo'|'cash', phone: '...' }
-    → Initie le paiement, et si succès active le boost immédiatement.
+    Body: { days: 3|7|14|30, provider: 'orange_money'|'cash', phone: '...' }
+    → Initie le paiement Orange Money, et si succès active le boost immédiatement.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        from apps.orders.payment_service import initiate_orange_money, initiate_mtn_momo
+        from apps.orders.payment_service import initiate_orange_money
         from apps.orders.models import Payment
 
         listing = get_object_or_404(Listing, pk=pk, seller=request.user)
@@ -336,15 +336,13 @@ class BoostListingView(APIView):
         phone    = request.data.get('phone', '')
 
         if days not in BOOST_PRICES:
-            return Response({'error': 'Durée invalide. Choisissez 3 ou 7 jours.'}, status=400)
+            return Response({'error': 'Durée invalide. Choisissez 3, 7, 14 ou 30 jours.'}, status=400)
 
         amount = BOOST_PRICES[days]
 
         # Initier le paiement
         if provider == Payment.Provider.ORANGE_MONEY:
             result = initiate_orange_money(phone, amount, f'boost-{listing.id}')
-        elif provider == Payment.Provider.MTN_MOMO:
-            result = initiate_mtn_momo(phone, amount, f'boost-{listing.id}')
         else:
             result = type('R', (), {'success': True, 'reference': '', 'message': 'Boost activé (espèces)'})()
 

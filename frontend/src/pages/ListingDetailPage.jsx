@@ -187,8 +187,8 @@ function OrderModal({ listing, onClose, onSuccess }) {
                         )}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Paiement</label>
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                                {[{value:'orange_money',label:'Orange Money'},{value:'mtn_momo',label:'MTN MoMo'},{value:'cash',label:'Espèces'}].map(p => (
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                                {[{value:'orange_money',label:'Orange Money'},{value:'cash',label:'Espèces'}].map(p => (
                                     <button key={p.value} type="button" onClick={() => setProvider(p.value)}
                                         className={`p-2 rounded-xl border-2 text-xs font-medium transition ${provider === p.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
                                         {p.label}
@@ -567,11 +567,11 @@ export default function ListingDetailPage() {
                                     </div>
                                     <select value={boostProvider} onChange={e => setBoostProvider(e.target.value)}
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
-                                        <option value="orange_money">Orange Money</option>
-                                        <option value="mtn_momo">MTN MoMo</option>
+                                        <option value="orange_money">🟠 Orange Money</option>
+                                        <option value="cash">💵 Espèces</option>
                                     </select>
                                     <input value={boostPhone} onChange={e => setBoostPhone(e.target.value)}
-                                        placeholder="Numéro Mobile Money (ex: 224 6XX XXX XXX)"
+                                        placeholder="Numéro Orange Money (ex: 224 6XX XXX XXX)"
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
                                     {boostMutation.isError && (
                                         <p className="text-sm text-red-500">{boostMutation.error?.response?.data?.error || 'Erreur de paiement'}</p>

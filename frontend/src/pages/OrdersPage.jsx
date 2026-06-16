@@ -18,6 +18,40 @@ const DELIVERY = {
 }
 function fmt(n) { return new Intl.NumberFormat('fr-GN').format(n) + ' GNF' }
 
+// ── Countdown escrow ─────────────────────────────────────────────────────────
+function EscrowCountdown({ releaseAt, adminHold }) {
+    const [now, setNow] = useState(() => Date.now())
+    useState(() => {
+        const t = setInterval(() => setNow(Date.now()), 60_000)
+        return () => clearInterval(t)
+    }, [])
+    if (adminHold) {
+        return (
+            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-xs text-red-700 flex items-center gap-2">
+                🔒 <span>Fonds bloqués par l'administration — en cours de vérification.</span>
+            </div>
+        )
+    }
+    if (!releaseAt) return null
+    const diffMs   = new Date(releaseAt) - now
+    const released = diffMs <= 0
+    if (released) {
+        return (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-xs text-green-700 flex items-center gap-2">
+                ✅ <span>Fonds disponibles — libération en cours de traitement.</span>
+            </div>
+        )
+    }
+    const totalH = Math.ceil(diffMs / 3_600_000)
+    const h      = Math.floor(diffMs / 3_600_000)
+    const m      = Math.floor((diffMs % 3_600_000) / 60_000)
+    return (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-800 flex items-center gap-2">
+            ⏳ <span>Fonds disponibles dans <strong>{h > 0 ? `${h}h ${m}min` : `${m} min`}</strong> (protection Orange Money).</span>
+        </div>
+    )
+}
+
 // ── Timeline ────────────────────────────────────────────────────────────────
 function Timeline({ status }) {
     const idx = STATUS_STEPS.indexOf(status)
@@ -92,8 +126,7 @@ function PayModal({ order, onClose, onPaid }) {
                 <div className="space-y-2">
                     {[
                         { value: 'orange_money', label: 'Orange Money', emoji: '🟠' },
-                        { value: 'mtn_momo',     label: 'MTN MoMo',     emoji: '🟡' },
-                        { value: 'cash',         label: 'Espèces (en main)',  emoji: '💵' },
+                        { value: 'cash',         label: 'Espèces (en main)', emoji: '💵' },
                     ].map(opt => (
                         <button key={opt.value} onClick={() => setProvider(opt.value)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition text-sm
@@ -183,6 +216,14 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                     </p>
                 )}
 
+                {/* Countdown escrow côté vendeur */}
+                {!isBuyer && order.escrow_status === 'held' && (
+                    <EscrowCountdown
+                        releaseAt={order.escrow_release_at}
+                        adminHold={order.escrow_admin_hold}
+                    />
+                )}
+
                 {/* Commission côté vendeur */}
                 {!isBuyer && order.status === 'completed' && order.seller_payout_gnf > 0 && (
                     <div className="bg-green-50 rounded-xl p-3 text-xs text-green-700 space-y-1">
@@ -197,7 +238,7 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                     <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 space-y-1">
                         {order.payments.map(p => (
                             <div key={p.id} className="flex justify-between">
-                                <span>{p.provider === 'orange_money' ? '🟠 Orange Money' : p.provider === 'mtn_momo' ? '🟡 MTN MoMo' : '💵 Espèces'}</span>
+                                <span>{p.provider === 'orange_money' ? '🟠 Orange Money' : '💵 Espèces'}</span>
                                 <span className={p.status === 'paid' ? 'text-green-600 font-medium' : 'text-yellow-600'}>
                                     {p.status === 'paid' ? '✓ Payé' : p.status === 'pending' ? '⏳ En attente' : p.status}
                                 </span>
