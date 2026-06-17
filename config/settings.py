@@ -204,9 +204,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 PHONENUMBER_DEFAULT_REGION = 'GN'
 
-AT_USERNAME  = env('AT_USERNAME',  default='')
-AT_API_KEY   = env('AT_API_KEY',   default='')
-AT_SENDER_ID = env('AT_SENDER_ID', default='')
+# ── Nimba SMS (fournisseur SMS guinéen) ──────────────────────────────────────
+NIMBA_SERVICE_ID   = env('NIMBA_SERVICE_ID',   default='')
+NIMBA_SECRET_TOKEN = env('NIMBA_SECRET_TOKEN', default='')
+NIMBA_SENDER_NAME  = env('NIMBA_SENDER_NAME',  default='Guimatrix')
 
 # Anthropic Claude API (support chatbot + modération)
 ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')

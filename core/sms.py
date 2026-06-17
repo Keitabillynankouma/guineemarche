@@ -1,31 +1,60 @@
 from django.conf import settings
 import logging
+import base64
+import urllib.request
+import urllib.error
+import json
 
 logger = logging.getLogger(__name__)
 
+NIMBA_API_URL = 'https://api.nimbasms.com/v1/messages'
+
 
 def send_sms(to: str, body: str) -> bool:
-    username = getattr(settings, 'AT_USERNAME', '')
-    api_key  = getattr(settings, 'AT_API_KEY', '')
+    """Envoie un SMS via Nimba SMS (fournisseur guinéen)."""
+    service_id   = getattr(settings, 'NIMBA_SERVICE_ID', '')
+    secret_token = getattr(settings, 'NIMBA_SECRET_TOKEN', '')
+    sender_name  = getattr(settings, 'NIMBA_SENDER_NAME', 'Guimatrix')
 
-    if not all([username, api_key]):
-        logger.warning("Africa's Talking non configuré — SMS non envoyé à %s", to)
+    if not all([service_id, secret_token]):
+        logger.warning("Nimba SMS non configuré — SMS non envoyé à %s", to)
         return False
 
     try:
-        import africastalking
-        africastalking.initialize(username, api_key)
-        sms = africastalking.SMS
-        sender = getattr(settings, 'AT_SENDER_ID', None) or None
-        response = sms.send(body, [str(to)], sender)
-        recipients = response.get('SMSMessageData', {}).get('Recipients', [])
-        if recipients and recipients[0].get('statusCode') == 101:
-            logger.info("SMS envoyé à %s", to)
-            return True
-        logger.warning("Réponse AT inattendue pour %s: %s", to, response)
+        # Basic Auth : base64(service_id:secret_token)
+        credentials = base64.b64encode(f"{service_id}:{secret_token}".encode()).decode()
+
+        payload = json.dumps({
+            "sender_name": sender_name,
+            "to": [str(to)],
+            "message": body,
+            "channel": "sms",
+        }).encode('utf-8')
+
+        req = urllib.request.Request(
+            NIMBA_API_URL,
+            data=payload,
+            headers={
+                'Authorization': f'Basic {credentials}',
+                'Content-Type': 'application/json',
+            },
+            method='POST',
+        )
+
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            status = resp.getcode()
+            if status == 201:
+                logger.info("SMS Nimba envoyé à %s", to)
+                return True
+            logger.warning("Nimba SMS — statut inattendu %s pour %s", status, to)
+            return False
+
+    except urllib.error.HTTPError as exc:
+        body_err = exc.read().decode('utf-8', errors='replace')
+        logger.error("Nimba SMS HTTPError %s pour %s : %s", exc.code, to, body_err)
         return False
     except Exception as exc:
-        logger.error("Échec envoi SMS à %s: %s", to, exc)
+        logger.error("Nimba SMS — échec envoi à %s : %s", to, exc)
         return False
 
 
