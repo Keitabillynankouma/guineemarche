@@ -12,8 +12,13 @@
     <link rel="apple-touch-icon" href="/icon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <title>Guimatrix — Le marché intelligent de la Guinée</title>
+    <!-- Leaflet (carte interactive) -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- QR Code -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
   </head>
-  <body>
+  <body class="bg-white dark:bg-gray-950 transition-colors">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
     <script>

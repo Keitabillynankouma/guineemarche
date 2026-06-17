@@ -1,10 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
-import { MEETING_ZONES } from '../constants/meetingZones'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -92,11 +91,222 @@ function ImageLightbox({ images, startIndex, onClose }) {
     )
 }
 
+// ── QR Code Modal ──────────────────────────────────────────────────────────────
+function QRModal({ listing, onClose }) {
+    const qrRef    = useRef(null)
+    const canvasRef = useRef(null)
+
+    useEffect(() => {
+        if (!window.QRCode || !qrRef.current) return
+        qrRef.current.innerHTML = ''
+        new window.QRCode(qrRef.current, {
+            text: window.location.href,
+            width:  200,
+            height: 200,
+            colorDark: '#16a34a',
+            colorLight: '#ffffff',
+        })
+    }, [])
+
+    const downloadPoster = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width  = 600
+        canvas.height = 800
+        const ctx = canvas.getContext('2d')
+
+        // Fond blanc
+        ctx.fillStyle = '#ffffff'
+        ctx.fillRect(0, 0, 600, 800)
+
+        // Header vert
+        ctx.fillStyle = '#16a34a'
+        ctx.fillRect(0, 0, 600, 120)
+        ctx.fillStyle = '#ffffff'
+        ctx.font = 'bold 36px sans-serif'
+        ctx.textAlign = 'center'
+        ctx.fillText('Guimatrix', 300, 55)
+        ctx.font = '18px sans-serif'
+        ctx.fillText('Le marché intelligent de la Guinée', 300, 95)
+
+        // Titre annonce
+        ctx.fillStyle = '#1f2937'
+        ctx.font = 'bold 26px sans-serif'
+        ctx.textAlign = 'center'
+        const words  = listing.title.split(' ')
+        let line = '', lines = []
+        for (const word of words) {
+            const test = line + word + ' '
+            if (ctx.measureText(test).width > 520 && line) { lines.push(line.trim()); line = word + ' ' }
+            else line = test
+        }
+        lines.push(line.trim())
+        lines.slice(0, 2).forEach((l, i) => ctx.fillText(l, 300, 160 + i * 36))
+
+        // Prix
+        ctx.fillStyle = '#16a34a'
+        ctx.font = 'bold 32px sans-serif'
+        const priceText = listing.price_type === 'free' ? 'Gratuit'
+            : new Intl.NumberFormat('fr-GN').format(listing.price_gnf) + ' GNF'
+        ctx.fillText(priceText, 300, 255)
+
+        // Ville
+        ctx.fillStyle = '#6b7280'
+        ctx.font = '20px sans-serif'
+        ctx.fillText('📍 ' + listing.city, 300, 295)
+
+        // QR Code image
+        const qrImg = qrRef.current?.querySelector('img') || qrRef.current?.querySelector('canvas')
+        if (qrImg) {
+            const src = qrImg.src || qrImg.toDataURL()
+            const img = new Image()
+            img.onload = () => {
+                ctx.drawImage(img, 200, 320, 200, 200)
+                ctx.fillStyle = '#374151'
+                ctx.font = '16px sans-serif'
+                ctx.textAlign = 'center'
+                ctx.fillText('Scannez pour voir l\'annonce', 300, 545)
+                // URL
+                ctx.fillStyle = '#9ca3af'
+                ctx.font = '13px sans-serif'
+                ctx.fillText(window.location.href.slice(0, 60), 300, 575)
+                // Footer
+                ctx.fillStyle = '#f3f4f6'
+                ctx.fillRect(0, 750, 600, 50)
+                ctx.fillStyle = '#6b7280'
+                ctx.font = '14px sans-serif'
+                ctx.fillText('guimatrix.com — Achetez et vendez en Guinée', 300, 780)
+
+                const link = document.createElement('a')
+                link.download = `guimatrix-annonce-${listing.id}.png`
+                link.href = canvas.toDataURL('image/png')
+                link.click()
+            }
+            img.src = src
+        }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl p-6 w-full max-w-xs text-center shadow-2xl" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center justify-between mb-4">
+                    <h2 className="font-bold text-gray-800">📷 QR Code</h2>
+                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">Scannez pour accéder à cette annonce</p>
+                <div ref={qrRef} className="flex justify-center mb-4" />
+                <p className="text-xs font-medium text-gray-700 mb-4 truncate">{listing.title}</p>
+                <div className="grid grid-cols-2 gap-2">
+                    <button onClick={downloadPoster}
+                        className="col-span-2 bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg text-sm font-semibold transition">
+                        ⬇️ Télécharger l'affiche
+                    </button>
+                    <button onClick={onClose}
+                        className="bg-gray-100 text-gray-600 py-2 rounded-lg text-sm hover:bg-gray-200 transition">
+                        Fermer
+                    </button>
+                    <button onClick={() => {
+                        const url = window.location.href
+                        navigator.clipboard?.writeText(url)
+                        alert('Lien copié !')
+                    }} className="bg-blue-50 text-blue-600 py-2 rounded-lg text-sm hover:bg-blue-100 transition">
+                        🔗 Copier le lien
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
+// ── Carte de localisation de l'annonce ─────────────────────────────────────────
+function ListingLocationMap({ lat, lng, title, city }) {
+    const mapRef    = useRef(null)
+    const leafletRef = useRef(null)
+
+    useEffect(() => {
+        if (!window.L || !mapRef.current || leafletRef.current) return
+        const map = window.L.map(mapRef.current, { zoomControl: true, scrollWheelZoom: false })
+            .setView([lat, lng], 14)
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map)
+        const icon = window.L.divIcon({
+            className: '',
+            html: `<div style="background:#16a34a;color:white;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-size:18px;border:3px solid white;box-shadow:0 2px 6px rgba(0,0,0,.4)">📦</div>`,
+            iconSize: [32, 32], iconAnchor: [16, 16],
+        })
+        window.L.marker([lat, lng], { icon }).addTo(map).bindPopup(`<strong>${title}</strong><br/>📍 ${city}`).openPopup()
+        leafletRef.current = map
+        return () => { map.remove(); leafletRef.current = null }
+    }, [lat, lng])
+
+    return (
+        <div className="bg-white rounded-2xl shadow p-5">
+            <h2 className="font-semibold text-gray-700 mb-3">📍 Localisation</h2>
+            <div ref={mapRef} style={{ height: 200, borderRadius: 12, zIndex: 1 }} className="border border-gray-100" />
+            <p className="text-xs text-gray-400 mt-2 text-center">Position approximative — {city}</p>
+        </div>
+    )
+}
+
+// ── Mini carte Leaflet (zones de rencontre) ────────────────────────────────────
+function MeetingMap({ zones, selected, onSelect, city }) {
+    const mapRef    = useRef(null)
+    const leafletRef = useRef(null)
+    const markersRef = useRef([])
+
+    useEffect(() => {
+        if (!window.L || !mapRef.current || leafletRef.current) return
+        // Centre sur Conakry par défaut, coordonnées approximatives par ville
+        const CITY_COORDS = {
+            Conakry: [9.5370, -13.6773], Kindia: [10.0583, -12.8657], Mamou: [10.3742, -12.0858],
+            Labé:    [11.3181, -12.2849], Kankan: [10.3873, -9.3058],  Faranah: [10.0358, -10.7414],
+            Nzérékoré:[7.7561, -8.8153],  Boké: [10.9321, -14.2958],  Siguiri: [11.4148, -9.1668],
+        }
+        const center = CITY_COORDS[city] || [9.5370, -13.6773]
+        const map = window.L.map(mapRef.current).setView(center, zones.length ? 13 : 11)
+        window.L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap'
+        }).addTo(map)
+        leafletRef.current = map
+        return () => { map.remove(); leafletRef.current = null }
+    }, [])
+
+    useEffect(() => {
+        const map = leafletRef.current
+        if (!map || !window.L) return
+        markersRef.current.forEach(m => m.remove())
+        markersRef.current = []
+        zones.forEach(zone => {
+            if (!zone.latitude || !zone.longitude) return
+            const isSelected = selected === zone.name
+            const icon = window.L.divIcon({
+                className: '',
+                html: `<div style="background:${isSelected ? '#16a34a' : '#3b82f6'};color:white;border-radius:50% 50% 50% 0;width:28px;height:28px;display:flex;align-items:center;justify-content:center;font-size:14px;transform:rotate(-45deg);border:2px solid white;box-shadow:0 2px 4px rgba(0,0,0,.3)"><span style="transform:rotate(45deg)">📍</span></div>`,
+                iconSize: [28, 28], iconAnchor: [14, 28],
+            })
+            const marker = window.L.marker([zone.latitude, zone.longitude], { icon })
+                .addTo(map)
+                .bindPopup(`<strong>${zone.name}</strong>${zone.address ? '<br/>' + zone.address : ''}`)
+                .on('click', () => onSelect(zone.name))
+            markersRef.current.push(marker)
+        })
+    }, [zones, selected])
+
+    if (zones.filter(z => z.latitude).length === 0) return null
+
+    return (
+        <div>
+            <div ref={mapRef} style={{ height: 180, borderRadius: 12, zIndex: 1 }} className="border border-gray-200 mb-2" />
+            <p className="text-xs text-gray-400 text-center">📍 Cliquez sur un marqueur pour sélectionner le lieu</p>
+        </div>
+    )
+}
+
 // ── Order Modal ────────────────────────────────────────────────────────────────
 function OrderModal({ listing, onClose, onSuccess }) {
-    const [step, setStep]               = useState(1)
     const [deliveryMode, setDeliveryMode] = useState('meeting_point')
     const [meetLocation, setMeetLocation] = useState('')
+    const [customLocation, setCustomLocation] = useState('')
     const [pickupPoint, setPickupPoint]   = useState('')
     const [provider, setProvider]         = useState('orange_money')
     const [phone, setPhone]               = useState('')
@@ -107,6 +317,12 @@ function OrderModal({ listing, onClose, onSuccess }) {
         queryKey: ['pickup-points', listing.city],
         queryFn:  () => ordersAPI.getPickupPoints(listing.city).then(r => r.data?.results || r.data || []),
         enabled:  deliveryMode === 'pickup_point',
+    })
+
+    const { data: meetingZones = [] } = useQuery({
+        queryKey: ['meeting-zones', listing.city],
+        queryFn:  () => ordersAPI.getMeetingZones(listing.city).then(r => r.data?.results || r.data || []),
+        enabled:  deliveryMode === 'meeting_point',
     })
 
     const createOrder = useMutation({
@@ -120,17 +336,28 @@ function OrderModal({ listing, onClose, onSuccess }) {
         onError: (err) => setError(err.response?.data?.error || 'Erreur paiement.'),
     })
 
+    const finalMeetLocation = meetLocation || customLocation
+
     const handleOrder = async (e) => {
         e.preventDefault(); setError('')
+        if (deliveryMode === 'meeting_point' && !finalMeetLocation) {
+            setError('Veuillez choisir ou saisir un lieu de rencontre.'); return
+        }
         try {
             const order = await createOrder.mutateAsync({
                 listing: listing.id, delivery_mode: deliveryMode,
-                meet_location: deliveryMode === 'meeting_point' ? meetLocation : '',
+                meet_location: deliveryMode === 'meeting_point' ? finalMeetLocation : '',
                 pickup_point:  deliveryMode === 'pickup_point'  ? pickupPoint  : null,
             })
             await pay.mutateAsync({ id: order.data.id, data: { provider, phone_number: phone } })
         } catch {}
     }
+
+    const PROVIDERS = [
+        { value: 'orange_money', label: '🟠 Orange Money', color: 'border-orange-400 bg-orange-50' },
+        { value: 'mtn_momo',     label: '🟡 MTN MoMo',     color: 'border-yellow-400 bg-yellow-50' },
+        { value: 'cash',         label: '💵 Espèces',       color: 'border-gray-300 bg-gray-50' },
+    ]
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
@@ -149,11 +376,12 @@ function OrderModal({ listing, onClose, onSuccess }) {
                     </div>
                     {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
                     <form onSubmit={handleOrder} className="space-y-4">
+                        {/* Mode livraison */}
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">Mode de livraison</label>
                             <div className="grid grid-cols-2 gap-2">
                                 {[{ value:'meeting_point',label:'Remise en main propre',icon:'🤝'},{ value:'pickup_point',label:'Point de retrait',icon:'🏪'}].map(m => (
-                                    <button key={m.value} type="button" onClick={() => setDeliveryMode(m.value)}
+                                    <button key={m.value} type="button" onClick={() => { setDeliveryMode(m.value); setMeetLocation(''); setCustomLocation('') }}
                                         className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
                                         <div className="text-xl mb-1">{m.icon}</div>
                                         <div className="text-xs font-medium text-gray-700">{m.label}</div>
@@ -161,16 +389,32 @@ function OrderModal({ listing, onClose, onSuccess }) {
                                 ))}
                             </div>
                         </div>
+
+                        {/* Zone de rencontre — zones dynamiques + carte */}
                         {deliveryMode === 'meeting_point' && (
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Zone de rencontre</label>
-                                <select value={meetLocation} onChange={e => setMeetLocation(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
-                                    <option value="">Choisir un lieu</option>
-                                    {(MEETING_ZONES[listing.city] || []).map(z => <option key={z}>{z}</option>)}
-                                </select>
+                            <div className="space-y-3">
+                                <label className="block text-sm font-medium text-gray-700">📍 Lieu de rencontre</label>
+                                <MeetingMap zones={meetingZones} selected={meetLocation} onSelect={setMeetLocation} city={listing.city} />
+                                {meetingZones.length > 0 ? (
+                                    <select value={meetLocation} onChange={e => { setMeetLocation(e.target.value); setCustomLocation('') }}
+                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+                                        <option value="">— Choisir un lieu —</option>
+                                        {meetingZones.map(z => <option key={z.id} value={z.name}>{z.name}{z.address ? ` (${z.address})` : ''}</option>)}
+                                    </select>
+                                ) : null}
+                                <div className="flex items-center gap-2 text-xs text-gray-400">
+                                    <div className="flex-1 h-px bg-gray-200" />
+                                    {meetingZones.length > 0 ? 'ou saisir librement' : 'Aucun point prédéfini — saisissez le lieu'}
+                                    <div className="flex-1 h-px bg-gray-200" />
+                                </div>
+                                <input type="text" placeholder="Ex: Marché Madina, devant la pharmacie"
+                                    value={customLocation}
+                                    onChange={e => { setCustomLocation(e.target.value); if (e.target.value) setMeetLocation('') }}
+                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
                             </div>
                         )}
+
+                        {/* Point de retrait */}
                         {deliveryMode === 'pickup_point' && (
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-1">Point de retrait</label>
@@ -185,26 +429,32 @@ function OrderModal({ listing, onClose, onSuccess }) {
                                 )}
                             </div>
                         )}
+
+                        {/* Paiement — Orange + MTN + Espèces */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Paiement</label>
-                            <div className="grid grid-cols-2 gap-2 mb-3">
-                                {[{value:'orange_money',label:'Orange Money'},{value:'cash',label:'Espèces'}].map(p => (
+                            <label className="block text-sm font-medium text-gray-700 mb-2">💳 Paiement</label>
+                            <div className="grid grid-cols-3 gap-2 mb-3">
+                                {PROVIDERS.map(p => (
                                     <button key={p.value} type="button" onClick={() => setProvider(p.value)}
-                                        className={`p-2 rounded-xl border-2 text-xs font-medium transition ${provider === p.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
+                                        className={`p-2 rounded-xl border-2 text-xs font-medium transition text-center ${provider === p.value ? p.color + ' border-opacity-100' : 'border-gray-200 bg-white'}`}>
                                         {p.label}
                                     </button>
                                 ))}
                             </div>
                             {provider !== 'cash' && (
-                                <input type="tel" placeholder="+224 6XX XX XX XX" value={phone} onChange={e => setPhone(e.target.value)}
+                                <input type="tel"
+                                    placeholder={provider === 'orange_money' ? '+224 6XX XX XX XX (Orange)' : '+224 6XX XX XX XX (MTN)'}
+                                    value={phone} onChange={e => setPhone(e.target.value)}
                                     className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
                             )}
                         </div>
+
                         {provider !== 'cash' && (
                             <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
                                 🔒 <strong>Paiement sécurisé :</strong> votre argent est libéré au vendeur uniquement après votre confirmation de réception.
                             </div>
                         )}
+
                         <button type="submit" disabled={createOrder.isPending || pay.isPending}
                             className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50">
                             {(createOrder.isPending || pay.isPending) ? 'Traitement...' : `Payer ${formatPrice(listing.price_gnf, listing.price_type)}`}
@@ -289,6 +539,7 @@ export default function ListingDetailPage() {
     const [boostProvider, setBoostProvider] = useState('orange_money')
     const [boostPhone, setBoostPhone]     = useState('')
     const [favorited, setFavorited]       = useState(false)
+    const [showQR, setShowQR]             = useState(false)
 
     const { data: listing, isLoading } = useQuery({
         queryKey: ['listing', id],
@@ -375,6 +626,11 @@ export default function ListingDetailPage() {
                 <ImageLightbox images={images} startIndex={activePhoto} onClose={() => setLightboxOpen(false)} />
             )}
 
+            {/* QR Code Modal */}
+            {showQR && (
+                <QRModal listing={listing} onClose={() => setShowQR(false)} />
+            )}
+
             {/* Navbar */}
             <nav className="bg-white shadow sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -393,6 +649,11 @@ export default function ListingDetailPage() {
                             className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">
                             <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
                             Partager
+                        </button>
+                        <button onClick={() => setShowQR(true)}
+                            className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg transition"
+                            title="QR Code de cette annonce">
+                            📷 QR
                         </button>
                         <Link to="/" className="text-gray-500 text-sm hover:text-green-600">← Retour</Link>
                     </div>
@@ -509,6 +770,11 @@ export default function ListingDetailPage() {
                         )}
                         <p className="text-gray-600 leading-relaxed whitespace-pre-wrap">{listing.description}</p>
                     </div>
+
+                    {/* Mini-carte de localisation */}
+                    {listing.latitude && listing.longitude && (
+                        <ListingLocationMap lat={listing.latitude} lng={listing.longitude} title={listing.title} city={listing.city} />
+                    )}
 
                     {/* Annonces similaires */}
                     {similarListings.length > 0 && (

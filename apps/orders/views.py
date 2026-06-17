@@ -11,8 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .models import Order, Payment, PickupPoint
-from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer
+from .models import Order, Payment, PickupPoint, MeetingZone
+from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer
 from .payment_service import initiate_orange_money
 from core.permissions import IsAdmin
 
@@ -24,6 +24,19 @@ class PickupPointListView(generics.ListAPIView):
 
     def get_queryset(self):
         qs   = PickupPoint.objects.filter(is_active=True)
+        city = self.request.query_params.get('city')
+        if city:
+            qs = qs.filter(city__iexact=city)
+        return qs
+
+
+class MeetingZoneListView(generics.ListAPIView):
+    """Public : liste les zones de rencontre actives, filtrables par ville."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = MeetingZoneSerializer
+
+    def get_queryset(self):
+        qs   = MeetingZone.objects.filter(is_active=True)
         city = self.request.query_params.get('city')
         if city:
             qs = qs.filter(city__iexact=city)
@@ -58,6 +71,38 @@ class AdminPickupPointDetailView(APIView):
 
     def delete(self, request, pk):
         obj = get_object_or_404(PickupPoint, pk=pk)
+        obj.delete()
+        return Response(status=204)
+
+
+class AdminMeetingZoneView(APIView):
+    """Admin : CRUD complet sur les zones de rencontre."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        qs = MeetingZone.objects.all().order_by('city', 'name')
+        return Response(MeetingZoneSerializer(qs, many=True).data)
+
+    def post(self, request):
+        serializer = MeetingZoneSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+
+class AdminMeetingZoneDetailView(APIView):
+    """Admin : modifier ou supprimer une zone de rencontre."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        obj = get_object_or_404(MeetingZone, pk=pk)
+        serializer = MeetingZoneSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        obj = get_object_or_404(MeetingZone, pk=pk)
         obj.delete()
         return Response(status=204)
 
@@ -226,6 +271,9 @@ class InitiatePaymentView(APIView):
 
         if provider == Payment.Provider.ORANGE_MONEY:
             result = initiate_orange_money(phone_number, order.amount_gnf, str(order.id))
+        elif provider == Payment.Provider.MTN_MOMO:
+            from .payment_service import initiate_mtn_momo
+            result = initiate_mtn_momo(phone_number, order.amount_gnf, str(order.id))
         else:
             result = type('R', (), {'success': True, 'reference': '', 'message': 'Paiement en espèces enregistré'})()
 
@@ -234,8 +282,8 @@ class InitiatePaymentView(APIView):
             payment.external_ref = getattr(result, 'reference', '')
             payment.save(update_fields=['status', 'external_ref'])
             order.confirm()
-            # Planifier la libération escrow pour Orange Money (6h petits / 48h gros montants)
-            if provider == Payment.Provider.ORANGE_MONEY:
+            # Planifier la libération escrow pour paiements mobiles
+            if provider in (Payment.Provider.ORANGE_MONEY, Payment.Provider.MTN_MOMO):
                 order.set_escrow_schedule()
         else:
             payment.status = Payment.Status.FAILED

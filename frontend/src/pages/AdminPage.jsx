@@ -44,6 +44,12 @@ const adminAPI = {
   createPickupPoint:  (data) => api.post('/orders/admin/pickup-points/', data),
   updatePickupPoint:  (id, data) => api.patch(`/orders/admin/pickup-points/${id}/`, data),
   deletePickupPoint:  (id) => api.delete(`/orders/admin/pickup-points/${id}/`),
+
+  // Zones de rencontre
+  getMeetingZones:    () => api.get('/orders/admin/meeting-zones/'),
+  createMeetingZone:  (data) => api.post('/orders/admin/meeting-zones/', data),
+  updateMeetingZone:  (id, data) => api.patch(`/orders/admin/meeting-zones/${id}/`, data),
+  deleteMeetingZone:  (id) => api.delete(`/orders/admin/meeting-zones/${id}/`),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1217,16 +1223,170 @@ function TabPickupPoints() {
   )
 }
 
+// ── Onglet : Zones de rencontre ───────────────────────────────────────────────
+
+function TabMeetingZones() {
+  const qc = useQueryClient()
+  const EMPTY = { name: '', address: '', city: 'Conakry', latitude: '', longitude: '' }
+  const [form, setForm]     = useState(EMPTY)
+  const [editId, setEditId] = useState(null)
+  const [showForm, setShowForm] = useState(false)
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['admin-meeting-zones'],
+    queryFn:  () => adminAPI.getMeetingZones().then(r => r.data?.results ?? r.data ?? []),
+  })
+  const zones = Array.isArray(data) ? data : []
+
+  const saveMutation = useMutation({
+    mutationFn: (d) => editId
+      ? adminAPI.updateMeetingZone(editId, d)
+      : adminAPI.createMeetingZone(d),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-meeting-zones'])
+      setForm(EMPTY); setEditId(null); setShowForm(false)
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (id) => adminAPI.deleteMeetingZone(id),
+    onSuccess:  () => qc.invalidateQueries(['admin-meeting-zones']),
+  })
+
+  const toggleMutation = useMutation({
+    mutationFn: ({ id, is_active }) => adminAPI.updateMeetingZone(id, { is_active }),
+    onSuccess:  () => qc.invalidateQueries(['admin-meeting-zones']),
+  })
+
+  const startEdit = (z) => {
+    setForm({ name: z.name, address: z.address || '', city: z.city, latitude: z.latitude || '', longitude: z.longitude || '' })
+    setEditId(z.id); setShowForm(true)
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const payload = { ...form, latitude: form.latitude || null, longitude: form.longitude || null }
+    saveMutation.mutate(payload)
+  }
+
+  const byCity = zones.reduce((acc, z) => {
+    if (!acc[z.city]) acc[z.city] = []
+    acc[z.city].push(z)
+    return acc
+  }, {})
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">🤝 Zones de rencontre</h2>
+          <p className="text-xs text-gray-400 mt-0.5">Lieux de remise en main propre disponibles pour les acheteurs</p>
+        </div>
+        <button onClick={() => { setEditId(null); setForm(EMPTY); setShowForm(s => !s) }}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
+          {showForm ? 'Annuler' : '+ Ajouter une zone'}
+        </button>
+      </div>
+
+      {showForm && (
+        <div className="bg-white rounded-2xl shadow p-5">
+          <h3 className="font-semibold text-gray-700 mb-4">{editId ? '✏️ Modifier la zone' : '➕ Nouvelle zone de rencontre'}</h3>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Nom du lieu *</label>
+              <input value={form.name} onChange={e => setForm(f => ({...f, name: e.target.value}))}
+                placeholder="Ex: Marché Madina — Centre"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" required />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Ville *</label>
+              <select value={form.city} onChange={e => setForm(f => ({...f, city: e.target.value}))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                {VILLES_GN.map(v => <option key={v}>{v}</option>)}
+              </select>
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">Adresse / Description</label>
+              <input value={form.address} onChange={e => setForm(f => ({...f, address: e.target.value}))}
+                placeholder="Ex: Quartier Madina, en face du marché central"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Latitude (optionnel)</label>
+              <input type="number" step="any" value={form.latitude} onChange={e => setForm(f => ({...f, latitude: e.target.value}))}
+                placeholder="Ex: 9.5370"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Longitude (optionnel)</label>
+              <input type="number" step="any" value={form.longitude} onChange={e => setForm(f => ({...f, longitude: e.target.value}))}
+                placeholder="Ex: -13.6773"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            <div className="md:col-span-2 flex gap-2 justify-end">
+              <button type="button" onClick={() => setShowForm(false)}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl text-sm hover:bg-gray-200 transition">Annuler</button>
+              <button type="submit" disabled={saveMutation.isPending}
+                className="px-6 py-2 bg-green-600 hover:bg-green-700 text-white font-semibold rounded-xl text-sm transition disabled:opacity-50">
+                {saveMutation.isPending ? 'Enregistrement...' : editId ? '✓ Enregistrer' : '+ Créer'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
+
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(3)].map((_, i) => <div key={i} className="bg-white rounded-xl h-16 animate-pulse" />)}</div>
+      ) : zones.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-10 text-center text-gray-400">
+          <p className="text-4xl mb-3">🤝</p>
+          <p className="text-sm">Aucune zone de rencontre configurée</p>
+          <p className="text-xs mt-1">Les zones pré-remplies via la migration apparaissent ici</p>
+        </div>
+      ) : (
+        Object.entries(byCity).map(([city, czones]) => (
+          <div key={city} className="bg-white rounded-2xl shadow overflow-hidden">
+            <div className="px-5 py-3 bg-gray-50 border-b">
+              <h3 className="font-semibold text-gray-700 text-sm">📍 {city} <span className="text-gray-400 font-normal">({czones.length})</span></h3>
+            </div>
+            <div className="divide-y">
+              {czones.map(z => (
+                <div key={z.id} className="flex items-center gap-3 px-5 py-3">
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-medium text-sm ${z.is_active ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{z.name}</p>
+                    <p className="text-xs text-gray-400 truncate">{z.address || '—'}{z.latitude ? ` · 📌 ${z.latitude}, ${z.longitude}` : ''}</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button onClick={() => toggleMutation.mutate({ id: z.id, is_active: !z.is_active })}
+                      className={`text-xs px-2 py-1 rounded-lg font-medium transition ${z.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                      {z.is_active ? 'Actif' : 'Inactif'}
+                    </button>
+                    <button onClick={() => startEdit(z)}
+                      className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">✏️</button>
+                    <button onClick={() => { if (window.confirm(`Supprimer "${z.name}" ?`)) deleteMutation.mutate(z.id) }}
+                      className="text-xs px-2 py-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition">🗑️</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'overview',      label: '📊 Tableau de bord' },
-  { id: 'listings',      label: '📦 Annonces' },
-  { id: 'banners',       label: '📢 Publicités' },
-  { id: 'categories',    label: '🏷️ Catégories' },
-  { id: 'shops',         label: '🏪 Boutiques' },
-  { id: 'pickup-points', label: '📍 Points retrait' },
-  { id: 'settings',      label: '⚙️ Paramètres' },
+  { id: 'overview',        label: '📊 Tableau de bord' },
+  { id: 'listings',        label: '📦 Annonces' },
+  { id: 'banners',         label: '📢 Publicités' },
+  { id: 'categories',      label: '🏷️ Catégories' },
+  { id: 'shops',           label: '🏪 Boutiques' },
+  { id: 'pickup-points',   label: '📍 Points retrait' },
+  { id: 'meeting-zones',   label: '🤝 Zones rencontre' },
+  { id: 'settings',        label: '⚙️ Paramètres' },
 ]
 
 export default function AdminPage() {
@@ -1327,8 +1487,9 @@ export default function AdminPage() {
         {activeTab === 'banners'    && <TabBanners />}
         {activeTab === 'categories' && <TabCategories />}
         {activeTab === 'shops'         && <TabShops />}
-        {activeTab === 'pickup-points' && <TabPickupPoints />}
-        {activeTab === 'settings'      && <TabSettings />}
+        {activeTab === 'pickup-points'  && <TabPickupPoints />}
+        {activeTab === 'meeting-zones'  && <TabMeetingZones />}
+        {activeTab === 'settings'       && <TabSettings />}
       </div>
     </div>
   )

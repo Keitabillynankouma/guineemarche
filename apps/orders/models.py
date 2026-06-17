@@ -21,6 +21,24 @@ class PickupPoint(BaseModel):
         return f"{self.name} — {self.city}"
 
 
+class MeetingZone(BaseModel):
+    """Zone de rencontre pour remise en main propre."""
+    city      = models.CharField(max_length=100, db_index=True)
+    name      = models.CharField(max_length=200)
+    address   = models.CharField(max_length=300, blank=True)
+    latitude  = models.FloatField(null=True, blank=True)
+    longitude = models.FloatField(null=True, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name        = 'Zone de rencontre'
+        verbose_name_plural = 'Zones de rencontre'
+        ordering            = ['city', 'name']
+
+    def __str__(self):
+        return f"{self.name} — {self.city}"
+
+
 class Order(BaseModel):
 
     class Status(models.TextChoices):
@@ -160,6 +178,7 @@ class Payment(BaseModel):
 
     class Provider(models.TextChoices):
         ORANGE_MONEY = 'orange_money', 'Orange Money'
+        MTN_MOMO     = 'mtn_momo',     'MTN Mobile Money'
         CASH         = 'cash',         'Espèces (remise en main)'
         CARD         = 'card',         'Carte bancaire'
 

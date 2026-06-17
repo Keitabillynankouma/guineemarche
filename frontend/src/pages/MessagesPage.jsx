@@ -32,6 +32,8 @@ export default function MessagesPage() {
   const [message, setMessage]             = useState('')
   const [sending, setSending]             = useState(false)
   const [showQuick, setShowQuick]         = useState(false)
+  const [showOffer, setShowOffer]         = useState(false)
+  const [offerAmount, setOfferAmount]     = useState('')
   const bottomRef                         = useRef(null)
 
   const { data: conversations, isLoading } = useQuery({
@@ -73,6 +75,24 @@ export default function MessagesPage() {
     try {
       await messagingAPI.sendMessage(activeConv.id, { content })
       setMessage('')
+      refetchMsgs()
+      qc.invalidateQueries(['conversations'])
+    } catch {}
+    finally { setSending(false) }
+  }
+
+  const handleSendOffer = async () => {
+    const amount = parseInt(offerAmount.replace(/\s/g, ''), 10)
+    if (!amount || amount <= 0 || !activeConv) return
+    setSending(true)
+    try {
+      await messagingAPI.sendMessage(activeConv.id, {
+        content: `💰 Je propose ${new Intl.NumberFormat('fr-GN').format(amount)} GNF`,
+        msg_type: 'offer',
+        offer_amount_gnf: amount,
+      })
+      setOfferAmount('')
+      setShowOffer(false)
       refetchMsgs()
       qc.invalidateQueries(['conversations'])
     } catch {}
@@ -196,24 +216,37 @@ export default function MessagesPage() {
               // Détermination côté: buyer = gauche, vendeur = droite côté acheteur
               const isFromOther = msg.sender === activeConv.other_user?.id
 
+              const isOffer = msg.msg_type === 'offer' && msg.offer_amount_gnf
               return (
                 <div key={msg.id} className={`flex ${isFromOther ? 'justify-start' : 'justify-end'}`}>
-                  <div className={`
-                    max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm
-                    ${isFromOther
-                      ? 'bg-white text-gray-800 rounded-tl-none'
-                      : 'bg-green-600 text-white rounded-tr-none'}
-                  `}>
-                    {msg.content}
-                    {msg.offer_amount_gnf && (
-                      <p className="font-bold mt-1 text-xs opacity-90">
-                        💰 {new Intl.NumberFormat('fr-GN').format(msg.offer_amount_gnf)} GNF
+                  {isOffer ? (
+                    /* Bulle spéciale pour les offres de prix */
+                    <div className={`max-w-[80%] rounded-2xl shadow-sm overflow-hidden border-2 ${isFromOther ? 'border-amber-200 rounded-tl-none' : 'border-green-300 rounded-tr-none'}`}>
+                      <div className={`px-4 py-2 text-xs font-bold ${isFromOther ? 'bg-amber-50 text-amber-700' : 'bg-green-600 text-white'}`}>
+                        💰 OFFRE DE PRIX
+                      </div>
+                      <div className={`px-4 py-3 ${isFromOther ? 'bg-white' : 'bg-green-50'}`}>
+                        <p className={`text-xl font-bold ${isFromOther ? 'text-gray-800' : 'text-green-700'}`}>
+                          {new Intl.NumberFormat('fr-GN').format(msg.offer_amount_gnf)} GNF
+                        </p>
+                        <p className={`text-xs mt-1 ${isFromOther ? 'text-gray-400' : 'text-gray-500'}`}>
+                          {timeLabel(msg.created_at)}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={`
+                      max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm
+                      ${isFromOther
+                        ? 'bg-white text-gray-800 rounded-tl-none'
+                        : 'bg-green-600 text-white rounded-tr-none'}
+                    `}>
+                      {msg.content}
+                      <p className={`text-xs mt-1 ${isFromOther ? 'text-gray-400' : 'text-green-100'}`}>
+                        {timeLabel(msg.created_at)}
                       </p>
-                    )}
-                    <p className={`text-xs mt-1 ${isFromOther ? 'text-gray-400' : 'text-green-100'}`}>
-                      {timeLabel(msg.created_at)}
-                    </p>
-                  </div>
+                    </div>
+                  )}
                 </div>
               )
             })}
@@ -238,6 +271,33 @@ export default function MessagesPage() {
             </div>
           )}
 
+          {/* Panneau offre de prix */}
+          {showOffer && (
+            <div className="bg-amber-50 border-t border-amber-200 px-4 py-3">
+              <p className="text-xs font-semibold text-amber-700 mb-2">💰 Proposer un prix</p>
+              <div className="flex gap-2">
+                <input
+                  type="number"
+                  placeholder="Montant en GNF"
+                  value={offerAmount}
+                  onChange={e => setOfferAmount(e.target.value)}
+                  className="flex-1 border border-amber-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white"
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleSendOffer() } }}
+                />
+                <button onClick={handleSendOffer} disabled={sending || !offerAmount}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white font-semibold rounded-xl text-sm transition disabled:opacity-50">
+                  Envoyer
+                </button>
+                <button onClick={() => { setShowOffer(false); setOfferAmount('') }}
+                  className="px-3 py-2 bg-gray-100 text-gray-500 rounded-xl text-sm hover:bg-gray-200 transition">
+                  ✕
+                </button>
+              </div>
+              <p className="text-xs text-amber-500 mt-1">Le destinataire verra votre offre et pourra l'accepter ou contre-proposer.</p>
+            </div>
+          )}
+
           {/* Input */}
           <form
             onSubmit={(e) => { e.preventDefault(); handleSend() }}
@@ -245,11 +305,18 @@ export default function MessagesPage() {
           >
             <button
               type="button"
-              onClick={() => setShowQuick(v => !v)}
+              onClick={() => { setShowQuick(v => !v); setShowOffer(false) }}
               className={`w-9 h-9 flex-shrink-0 rounded-full flex items-center justify-center text-lg transition
                 ${showQuick ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
               title="Messages rapides"
             >⚡</button>
+            <button
+              type="button"
+              onClick={() => { setShowOffer(v => !v); setShowQuick(false) }}
+              className={`w-9 h-9 flex-shrink-0 rounded-full flex items-center justify-center text-lg transition
+                ${showOffer ? 'bg-amber-500 text-white' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}
+              title="Proposer un prix"
+            >💰</button>
             <textarea
               rows={1}
               placeholder="Écrire un message..."

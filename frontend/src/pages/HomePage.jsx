@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tansta
 import { Link, useNavigate } from 'react-router-dom'
 import { listingsAPI, shopsAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
+import { useDarkMode } from '../hooks/useDarkMode'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -180,24 +181,30 @@ function FeaturedShops({ shops }) {
 
 // ── Navbar ─────────────────────────────────────────────────────────────────────
 function Navbar({ isAuthenticated }) {
+    const [dark, toggleDark] = useDarkMode()
     return (
-        <nav className="bg-white shadow sticky top-0 z-20">
+        <nav className="bg-white dark:bg-gray-900 shadow sticky top-0 z-20">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                <Link to="/" className="text-xl font-bold text-green-700 tracking-tight">🛒 Guimatrix</Link>
+                <Link to="/" className="text-xl font-bold text-green-700 dark:text-green-400 tracking-tight">🛒 Guimatrix</Link>
                 <div className="flex items-center gap-2">
                     {isAuthenticated ? (
                         <>
                             <Link to="/create" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">+ Publier</Link>
-                            <Link to="/messages" className="text-gray-600 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition" title="Messages">💬</Link>
-                            <Link to="/favorites" className="text-gray-600 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition" title="Favoris">❤️</Link>
-                            <Link to="/profile" className="text-gray-600 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 transition" title="Profil">👤</Link>
+                            <Link to="/messages" className="text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Messages">💬</Link>
+                            <Link to="/favorites" className="text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Favoris">❤️</Link>
+                            <Link to="/profile" className="text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Profil">👤</Link>
                         </>
                     ) : (
                         <>
-                            <Link to="/login" className="text-gray-600 px-4 py-2 rounded-lg text-sm hover:bg-gray-100 transition">Connexion</Link>
+                            <Link to="/login" className="text-gray-600 dark:text-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition">Connexion</Link>
                             <Link to="/register" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">S'inscrire</Link>
                         </>
                     )}
+                    <button onClick={toggleDark}
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-base bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                        title={dark ? 'Mode clair' : 'Mode sombre'}>
+                        {dark ? '☀️' : '🌙'}
+                    </button>
                 </div>
             </div>
         </nav>
@@ -222,6 +229,10 @@ export default function HomePage() {
     const [priceMin, setPriceMin]               = useState('')
     const [priceMax, setPriceMax]               = useState('')
     const [showFilters, setShowFilters]         = useState(false)
+    const [nearLat, setNearLat]                 = useState(null)
+    const [nearLng, setNearLng]                 = useState(null)
+    const [radiusKm, setRadiusKm]               = useState(20)
+    const [geoLoading, setGeoLoading]           = useState(false)
     const isAuthenticated = useAuthStore(s => s.isAuthenticated)
     const navigate = useNavigate()
     const loadMoreRef = useRef(null)
@@ -231,6 +242,16 @@ export default function HomePage() {
         try { return JSON.parse(localStorage.getItem('gm_recently_viewed') || '[]') }
         catch { return [] }
     })
+
+    const handleGeolocate = () => {
+        if (!navigator.geolocation) return
+        setGeoLoading(true)
+        navigator.geolocation.getCurrentPosition(
+            (pos) => { setNearLat(pos.coords.latitude); setNearLng(pos.coords.longitude); setGeoLoading(false) },
+            ()    => { setGeoLoading(false); alert('Géolocalisation refusée ou indisponible.') },
+            { timeout: 8000 }
+        )
+    }
 
     const handleSearchChange = (e) => {
         const val = e.target.value
@@ -261,11 +282,12 @@ export default function HomePage() {
     const featuredShops = Array.isArray(shopsData) ? shopsData : (shopsData?.results || [])
 
     const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-        queryKey: ['listings', debouncedSearch, city, categoryId, ordering, priceMin, priceMax],
+        queryKey: ['listings', debouncedSearch, city, categoryId, ordering, priceMin, priceMax, nearLat, nearLng, radiusKm],
         queryFn: ({ pageParam = 1 }) =>
             listingsAPI.getAll({
                 search: debouncedSearch, city, category: categoryId, page: pageParam,
                 ordering, min_price: priceMin || undefined, max_price: priceMax || undefined,
+                ...(nearLat && nearLng ? { near_lat: nearLat, near_lng: nearLng, radius_km: radiusKm } : {}),
             }).then(r => r.data),
         getNextPageParam: (lastPage) => {
             if (!lastPage.next) return undefined
@@ -342,8 +364,35 @@ export default function HomePage() {
                                     ))}
                                 </div>
                             </div>
-                            {(priceMin || priceMax || ordering !== '-is_boosted,-created_at') && (
-                                <button onClick={() => { setPriceMin(''); setPriceMax(''); setOrdering('-is_boosted,-created_at') }}
+                            {/* Filtre par distance */}
+                            <div>
+                                <div className="flex items-center justify-between mb-2">
+                                    <label className="text-xs font-medium text-gray-500">📍 Près de moi</label>
+                                    {nearLat && (
+                                        <button onClick={() => { setNearLat(null); setNearLng(null) }}
+                                            className="text-xs text-red-400 hover:underline">Désactiver</button>
+                                    )}
+                                </div>
+                                {nearLat ? (
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-xs text-green-600 font-medium">✓ Position activée</span>
+                                            <span className="text-xs text-gray-400">{radiusKm} km</span>
+                                        </div>
+                                        <input type="range" min="5" max="200" step="5" value={radiusKm}
+                                            onChange={e => setRadiusKm(Number(e.target.value))}
+                                            className="w-full accent-green-600" />
+                                        <div className="flex justify-between text-xs text-gray-400"><span>5 km</span><span>200 km</span></div>
+                                    </div>
+                                ) : (
+                                    <button onClick={handleGeolocate} disabled={geoLoading}
+                                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition disabled:opacity-50">
+                                        {geoLoading ? '⏳ Détection...' : '📍 Détecter ma position'}
+                                    </button>
+                                )}
+                            </div>
+                            {(priceMin || priceMax || ordering !== '-is_boosted,-created_at' || nearLat) && (
+                                <button onClick={() => { setPriceMin(''); setPriceMax(''); setOrdering('-is_boosted,-created_at'); setNearLat(null); setNearLng(null) }}
                                     className="text-xs text-red-500 hover:underline">
                                     Réinitialiser les filtres
                                 </button>

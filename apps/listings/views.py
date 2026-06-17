@@ -46,6 +46,28 @@ class ListingListCreateView(generics.ListCreateAPIView):
             expires_at__isnull=False, expires_at__lt=timezone.now()
         ).select_related('seller', 'category').prefetch_related('media')
 
+    def filter_queryset(self, queryset):
+        queryset = super().filter_queryset(queryset)
+        # Filtre géographique optionnel — Haversine en Python
+        try:
+            lat  = float(self.request.query_params.get('near_lat', ''))
+            lng  = float(self.request.query_params.get('near_lng', ''))
+            r    = float(self.request.query_params.get('radius_km', '50'))
+        except (TypeError, ValueError):
+            return queryset
+        # Ne filtre que les annonces avec lat/lng renseignés
+        import math
+        R = 6371.0
+        def _in_radius(listing):
+            if listing.latitude is None or listing.longitude is None:
+                return False
+            dlat = math.radians(listing.latitude - lat)
+            dlng = math.radians(listing.longitude - lng)
+            a = math.sin(dlat/2)**2 + math.cos(math.radians(lat)) * math.cos(math.radians(listing.latitude)) * math.sin(dlng/2)**2
+            return R * 2 * math.asin(math.sqrt(a)) <= r
+        ids = [l.id for l in queryset if _in_radius(l)]
+        return queryset.filter(id__in=ids)
+
     def perform_create(self, serializer):
         from apps.accounts.models import Subscription, Badge
         from rest_framework.exceptions import PermissionDenied

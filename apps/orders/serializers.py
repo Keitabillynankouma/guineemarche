@@ -1,11 +1,17 @@
 from rest_framework import serializers
-from .models import Order, Payment, PickupPoint
+from .models import Order, Payment, PickupPoint, MeetingZone
 
 
 class PickupPointSerializer(serializers.ModelSerializer):
     class Meta:
         model  = PickupPoint
         fields = ('id', 'name', 'address', 'city', 'commune', 'phone', 'is_active')
+
+
+class MeetingZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = MeetingZone
+        fields = ('id', 'city', 'name', 'address', 'latitude', 'longitude', 'is_active')
 
 
 class PaymentSerializer(serializers.ModelSerializer):
