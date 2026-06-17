@@ -30,5 +30,5 @@ def send_sms(to: str, body: str) -> bool:
 
 
 def send_otp_sms(phone_number: str, code: str) -> bool:
-    body = f"[GuinéeMarché] Votre code de vérification est : {code}\nValide 10 minutes."
+    body = f"[Guimatrix] Votre code de vérification est : {code}\nValide 10 minutes."
     return send_sms(to=phone_number, body=body)

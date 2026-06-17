@@ -8,7 +8,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-MODERATION_SYSTEM = """Tu es un modérateur de contenu pour GuinéeMarché, une marketplace en ligne en Guinée.
+MODERATION_SYSTEM = """Tu es un modérateur de contenu pour Guimatrix, une marketplace en ligne en Guinée.
 Analyse l'annonce et retourne UNIQUEMENT un objet JSON valide, rien d'autre.
 
 REJETER automatiquement si :

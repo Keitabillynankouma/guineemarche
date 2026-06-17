@@ -1,0 +1,9 @@
+@echo off
+cd /d C:\Users\DNTCP\guineemarche
+echo Installation de docx si necessaire...
+call npm install docx --save-dev 2>nul
+echo Generation du business plan...
+node generate_business_plan.js
+echo.
+echo Appuyer sur une touche pour fermer...
+pause

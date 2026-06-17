@@ -9,9 +9,9 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['icon.svg', 'favicon.ico'],
       manifest: {
-        name: 'GuinéeMarché',
-        short_name: 'GuinéeMarché',
-        description: 'La marketplace de la Guinée — Achetez et vendez facilement',
+        name: 'Guimatrix',
+        short_name: 'Guimatrix',
+        description: 'Le marché intelligent de la Guinée — Achetez et vendez facilement',
         start_url: '/',
         scope: '/',
         display: 'standalone',

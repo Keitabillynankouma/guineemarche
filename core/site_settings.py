@@ -1,5 +1,5 @@
 """
-SiteSettings — modèle singleton pour les paramètres globaux de GuinéeMarché.
+SiteSettings — modèle singleton pour les paramètres globaux de Guimatrix.
 Un seul enregistrement (pk=1) créé automatiquement au premier accès.
 """
 from django.db import models
@@ -52,7 +52,7 @@ class SiteSettings(models.Model):
         verbose_name="Email support",
         help_text="Adresse email de support visible sur le site.",
     )
-    site_name = models.CharField(max_length=100, default='GuinéeMarché')
+    site_name = models.CharField(max_length=100, default='Guimatrix')
     tagline    = models.CharField(max_length=200, blank=True, default='Le marché en ligne de la Guinée')
 
     # ── Maintenance ──────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ class SiteSettings(models.Model):
         verbose_name = 'Paramètres du site'
 
     def __str__(self):
-        return 'Paramètres GuinéeMarché'
+        return 'Paramètres Guimatrix'
 
     def save(self, *args, **kwargs):
         # Forcer pk=1 (singleton)

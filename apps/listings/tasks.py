@@ -55,7 +55,7 @@ def moderate_listing_task(self, listing_id):
                 phone = str(listing.seller.phone_number)
                 send_sms(
                     phone,
-                    f'GuinéeMarché : Votre annonce "{listing.title[:30]}" a été refusée. '
+                    f'Guimatrix : Votre annonce "{listing.title[:30]}" a été refusée. '
                     f'Raison : {reason}. Contactez le support au +224622411238.'
                 )
             except Exception as sms_err:

@@ -97,7 +97,7 @@ def initiate_mtn_momo(phone: str, amount: int, order_id: str) -> PaymentResult:
                 'currency': 'GNF',
                 'externalId': str(order_id),
                 'payer': {'partyIdType': 'MSISDN', 'partyId': phone},
-                'payerMessage': 'Paiement GuinéeMarché',
+                'payerMessage': 'Paiement Guimatrix',
                 'payeeNote': str(order_id),
             },
             timeout=15

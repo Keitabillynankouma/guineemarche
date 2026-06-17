@@ -14,8 +14,8 @@ const DEFAULTS = {
   shop_approval_required: true,
   whatsapp_contact:       '',
   support_email:          '',
-  site_name:              'GuinéeMarché',
-  tagline:                'Le marché en ligne de la Guinée',
+  site_name:              'Guimatrix',
+  tagline:                'Le marché intelligent de la Guinée',
   maintenance_mode:       false,
   maintenance_message:    '',
 }

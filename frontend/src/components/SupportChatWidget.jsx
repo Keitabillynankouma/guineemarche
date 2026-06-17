@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import api from '../services/api'
 
-const GREETING = 'Bonjour ! Je suis l\'assistant de GuinéeMarché. Comment puis-je vous aider ? 😊'
+const GREETING = 'Bonjour ! Je suis l\'assistant de Guimatrix. Comment puis-je vous aider ? 😊'
 
 export default function SupportChatWidget({ onClose }) {
   const [messages, setMessages] = useState([
@@ -63,7 +63,7 @@ export default function SupportChatWidget({ onClose }) {
         <div className="flex items-center gap-2">
           <div className="w-9 h-9 rounded-full bg-white/20 flex items-center justify-center text-lg">🤖</div>
           <div>
-            <p className="text-sm font-semibold leading-tight">Assistant GuinéeMarché</p>
+            <p className="text-sm font-semibold leading-tight">Assistant Guimatrix</p>
             <p className="text-xs opacity-75">Disponible 24h/24</p>
           </div>
         </div>

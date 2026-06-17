@@ -276,7 +276,7 @@ export default function MessagesPage() {
       {/* Nav desktop uniquement (mobile : bouton retour dans la liste/header) */}
       <nav className="bg-white shadow sticky top-0 z-10 hidden md:block">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="text-green-700 font-bold text-lg">GuinéeMarché</Link>
+          <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
           <Link to="/profile" className="text-gray-500 text-sm hover:text-green-600">👤 Profil</Link>
         </div>
       </nav>

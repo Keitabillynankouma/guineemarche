@@ -337,7 +337,7 @@ export default function ListingDetailPage() {
     const shareOnWhatsApp = () => {
         if (!listing) return
         const url  = encodeURIComponent(window.location.href)
-        const text = encodeURIComponent(`🛒 *${listing.title}* — ${formatPrice(listing.price_gnf, listing.price_type)}\n📍 ${listing.city}\nVoir sur GuinéeMarché :`)
+        const text = encodeURIComponent(`🛒 *${listing.title}* — ${formatPrice(listing.price_gnf, listing.price_type)}\n📍 ${listing.city}\nVoir sur Guimatrix :`)
         window.open(`https://wa.me/?text=${text}%20${url}`, '_blank')
     }
 
@@ -378,7 +378,7 @@ export default function ListingDetailPage() {
             {/* Navbar */}
             <nav className="bg-white shadow sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link to="/" className="text-green-700 font-bold text-lg">GuinéeMarché</Link>
+                    <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
                     <div className="flex items-center gap-2">
                         {isAuthenticated && !isSeller && (
                             <button

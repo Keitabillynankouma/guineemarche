@@ -21,6 +21,7 @@ import MyShopPage from './pages/MyShopPage'
 import AdminPage from './pages/AdminPage'
 import ReviewsPage from './pages/ReviewsPage'
 import TermsPage from './pages/TermsPage'
+import ForgotPasswordPage from './pages/ForgotPasswordPage'
 
 const queryClient = new QueryClient()
 
@@ -47,7 +48,7 @@ function SupportButton() {
   const [chatOpen, setChatOpen] = useState(false)
 
   const waUrl = settings.whatsapp_contact
-    ? `https://wa.me/${settings.whatsapp_contact.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour, j\'ai besoin d\'aide sur GuinéeMarché.')}`
+    ? `https://wa.me/${settings.whatsapp_contact.replace(/\D/g, '')}?text=${encodeURIComponent('Bonjour, j\'ai besoin d\'aide sur Guimatrix.')}`
     : null
 
   function openChat() {
@@ -88,7 +89,7 @@ function SupportButton() {
             )}
 
             {settings.support_email && (
-              <a href={`mailto:${settings.support_email}?subject=Support GuinéeMarché`}
+              <a href={`mailto:${settings.support_email}?subject=Support Guimatrix`}
                 className="flex items-center gap-3 p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition">
                 <span className="text-2xl">✉️</span>
                 <div>
@@ -130,6 +131,7 @@ function AppRoutes() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/listings/:id" element={<ListingDetailPage />} />
         <Route path="/create" element={<PrivateRoute><CreateListingPage /></PrivateRoute>} />
         <Route path="/my-listings" element={<PrivateRoute><MyListingsPage /></PrivateRoute>} />
@@ -151,7 +153,7 @@ function AppRoutes() {
       </Routes>
       {/* Footer discret */}
       <footer className="bg-white border-t mt-8 py-4 px-4 text-center text-xs text-gray-400 space-x-4">
-        <span>© 2026 GuinéeMarché</span>
+        <span>© 2026 Guimatrix</span>
         <a href="/terms" className="hover:text-green-600 hover:underline">Conditions d'utilisation</a>
         <a href="/terms#privacy" className="hover:text-green-600 hover:underline">Confidentialité</a>
         <a href="/terms#refund" className="hover:text-green-600 hover:underline">Remboursements</a>

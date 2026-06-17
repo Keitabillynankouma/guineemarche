@@ -185,7 +185,7 @@ function ShopSection() {
         <div className="space-y-6">
             <div className="bg-white rounded-2xl border border-amber-200 p-4 text-sm text-amber-800">
                 <p className="font-bold mb-1">💡 Comment ça marche ?</p>
-                <p>Choisissez votre plan ci-dessous, puis créez votre boutique depuis votre profil. L'équipe GuinéeMarché validera votre boutique sous <strong>24–48h</strong> et vous recevrez une notification.</p>
+                <p>Choisissez votre plan ci-dessous, puis créez votre boutique depuis votre profil. L'équipe Guimatrix validera votre boutique sous <strong>24–48h</strong> et vous recevrez une notification.</p>
             </div>
 
             {/* Sélection plan */}
@@ -261,7 +261,7 @@ function ShopSection() {
                     Créer ma boutique → Profil
                 </Link>
                 <p className="text-xs text-center text-gray-400">
-                    La boutique sera activée après validation par l'équipe GuinéeMarché. Paiement demandé à l'approbation.
+                    La boutique sera activée après validation par l'équipe Guimatrix. Paiement demandé à l'approbation.
                 </p>
             </div>
         </div>

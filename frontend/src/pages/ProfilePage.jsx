@@ -198,7 +198,7 @@ function ReferralSection({ referral }) {
     }
 
     const waText = encodeURIComponent(
-        `🛒 Rejoins-moi sur GuinéeMarché — la marketplace #1 en Guinée !\nInscris-toi avec mon code et on gagne tous les deux des annonces gratuites : ${referral.referral_url}`
+        `🛒 Rejoins-moi sur Guimatrix — la marketplace #1 en Guinée !\nInscris-toi avec mon code et on gagne tous les deux des annonces gratuites : ${referral.referral_url}`
     )
     const waUrl = `https://wa.me/?text=${waText}`
 
@@ -295,7 +295,7 @@ export default function ProfilePage() {
         <div className="min-h-screen bg-gray-50">
             <nav className="bg-white shadow sticky top-0 z-10">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link to="/" className="text-green-700 font-bold text-lg">GuinéeMarché</Link>
+                    <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
                 </div>
             </nav>
 

@@ -469,7 +469,7 @@ class AdminListingRejectView(APIView):
             from core.sms import send_sms
             send_sms(
                 str(listing.seller.phone_number),
-                f'GuinéeMarché : Votre annonce "{listing.title[:30]}" a été refusée. '
+                f'Guimatrix : Votre annonce "{listing.title[:30]}" a été refusée. '
                 f'Raison : {reason[:80]}. Contactez le support.'
             )
         except Exception:

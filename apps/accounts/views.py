@@ -181,6 +181,79 @@ class ResendOTPView(APIView):
         return Response({'message': 'Nouveau code envoyé.'})
 
 
+class ForgotPasswordView(APIView):
+    """POST /auth/forgot-password/ — envoie un OTP de réinitialisation au numéro."""
+    permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
+
+    def post(self, request):
+        from core.utils import generate_otp, otp_expiry
+        from core.sms import send_otp_sms
+        from .models import User, OTPCode
+
+        phone_number = request.data.get('phone_number', '').strip()
+        if not phone_number:
+            return Response({'error': 'Numéro de téléphone requis.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(phone_number=phone_number)
+        except User.DoesNotExist:
+            # Sécurité : ne pas révéler si le numéro existe
+            return Response({'message': 'Si ce numéro est enregistré, vous recevrez un code par SMS.'})
+
+        code = generate_otp()
+        OTPCode.objects.create(
+            user=user,
+            code=code,
+            purpose=OTPCode.Purpose.RESET_PASSWORD,
+            expires_at=otp_expiry(minutes=10),
+        )
+        send_otp_sms(str(user.phone_number), code)
+        return Response({'message': 'Code de vérification envoyé par SMS.'})
+
+
+class ResetPasswordView(APIView):
+    """POST /auth/reset-password/ — vérifie l'OTP et définit le nouveau mot de passe."""
+    permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
+
+    def post(self, request):
+        from .models import User, OTPCode
+
+        phone_number = request.data.get('phone_number', '').strip()
+        code         = request.data.get('code', '').strip()
+        new_password = request.data.get('new_password', '').strip()
+
+        if not all([phone_number, code, new_password]):
+            return Response({'error': 'Tous les champs sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
+        if len(new_password) < 6:
+            return Response({'error': 'Le mot de passe doit contenir au moins 6 caractères.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(phone_number=phone_number)
+        except User.DoesNotExist:
+            return Response({'error': 'Utilisateur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
+
+        otp = OTPCode.objects.filter(
+            user=user,
+            code=code,
+            purpose=OTPCode.Purpose.RESET_PASSWORD,
+            is_used=False,
+            expires_at__gt=timezone.now(),
+        ).last()
+
+        if not otp:
+            return Response({'error': 'Code invalide ou expiré.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        otp.is_used = True
+        otp.save(update_fields=['is_used'])
+
+        user.set_password(new_password)
+        user.save()
+
+        return Response({'message': 'Mot de passe réinitialisé avec succès. Vous pouvez maintenant vous connecter.'})
+
+
 # Prix Pro par durée (GNF)
 PRO_PRICES = {1: 40_000, 3: 105_000, 6: 190_000, 12: 350_000}
 
@@ -397,7 +470,7 @@ class AdminShopApproveView(APIView):
                     user=shop.owner,
                     type=Notification.Type.ORDER_UPDATE,
                     title='✅ Boutique approuvée !',
-                    body=f'Votre boutique « {shop.name} » a été approuvée. Elle est maintenant visible sur GuinéeMarché.',
+                    body=f'Votre boutique « {shop.name} » a été approuvée. Elle est maintenant visible sur Guimatrix.',
                     data={'shop_id': str(shop.id)},
                 )
             except Exception:

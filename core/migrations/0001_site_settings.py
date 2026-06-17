@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
                 ('escrow_enabled', models.BooleanField(default=True, verbose_name='Paiement escrow activé')),
                 ('shop_approval_required', models.BooleanField(default=True, verbose_name='Validation boutique par admin')),
                 ('whatsapp_contact', models.CharField(blank=True, default='', max_length=30, verbose_name='WhatsApp contact admin')),
-                ('site_name', models.CharField(default='GuinéeMarché', max_length=100)),
+                ('site_name', models.CharField(default='Guimatrix', max_length=100)),
                 ('tagline', models.CharField(blank=True, default='Le marché en ligne de la Guinée', max_length=200)),
                 ('maintenance_mode', models.BooleanField(default=False, verbose_name='Mode maintenance')),
                 ('maintenance_message', models.TextField(blank=True, default='', verbose_name='Message de maintenance')),

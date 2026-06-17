@@ -124,7 +124,7 @@ class Order(BaseModel):
                     try:
                         send_sms(
                             str(admin.phone_number),
-                            f'GuinéeMarché: Gros paiement {self.amount_gnf:,} GNF reçu '
+                            f'Guimatrix: Gros paiement {self.amount_gnf:,} GNF reçu '
                             f'(commande {str(self.id)[:8]}). Libération auto dans 48h. '
                             f'Bloquez sur l\'admin si fraude détectée.'
                         )

@@ -48,7 +48,7 @@ export default function TermsPage() {
             </div>
 
             <div className="text-center text-xs text-gray-400 pb-8">
-                GuinéeMarché — Conakry, Guinée · contact@guineemarche.com
+                Guimatrix — Conakry, Guinée · contact@guineemarche.com
             </div>
         </div>
     )
@@ -59,7 +59,7 @@ function CGU() {
     return (
         <div className="space-y-6">
             <Section title="1. Présentation de la plateforme">
-                GuinéeMarché est une place de marché en ligne permettant aux particuliers et
+                Guimatrix est une place de marché en ligne permettant aux particuliers et
                 professionnels basés en Guinée d'acheter et vendre des biens et services.
                 La plateforme est éditée et exploitée en Guinée Conakry. En vous inscrivant,
                 vous acceptez les présentes conditions dans leur intégralité.
@@ -74,7 +74,7 @@ function CGU() {
             </Section>
 
             <Section title="3. Publication d'annonces">
-                <p>Toute annonce publiée sur GuinéeMarché doit :</p>
+                <p>Toute annonce publiée sur Guimatrix doit :</p>
                 <ul className="list-disc pl-5 mt-2 space-y-1">
                     <li>Décrire fidèlement l'article ou le service proposé</li>
                     <li>Utiliser des photos réelles du produit mis en vente</li>
@@ -83,13 +83,13 @@ function CGU() {
                 </ul>
                 <p className="mt-2">
                     Les annonces sont soumises à une modération automatique (IA) et manuelle.
-                    GuinéeMarché se réserve le droit de rejeter ou supprimer toute annonce
+                    Guimatrix se réserve le droit de rejeter ou supprimer toute annonce
                     non conforme, sans obligation de justification.
                 </p>
             </Section>
 
             <Section title="4. Transactions et paiements">
-                GuinéeMarché propose le paiement via Orange Money ou en espèces lors de la
+                Guimatrix propose le paiement via Orange Money ou en espèces lors de la
                 remise en main propre. Les paiements via Orange Money sont sécurisés par un
                 système d'escrow (rétention temporaire des fonds) décrit dans l'onglet
                 "Remboursements & Litiges". La plateforme prélève une commission de 4 % sur
@@ -122,15 +122,15 @@ function CGU() {
                 définitive du compte et, le cas échéant, des poursuites judiciaires.
             </Section>
 
-            <Section title="8. Responsabilité de GuinéeMarché">
-                GuinéeMarché est une plateforme d'intermédiation. Nous ne sommes pas parties
+            <Section title="8. Responsabilité de Guimatrix">
+                Guimatrix est une plateforme d'intermédiation. Nous ne sommes pas parties
                 aux transactions entre acheteurs et vendeurs et ne pouvons garantir la qualité
                 ou la conformité des articles vendus. Notre responsabilité est limitée au bon
                 fonctionnement des outils de mise en relation et du système de paiement.
             </Section>
 
             <Section title="9. Modification des conditions">
-                GuinéeMarché se réserve le droit de modifier les présentes conditions à tout
+                Guimatrix se réserve le droit de modifier les présentes conditions à tout
                 moment. Les utilisateurs seront informés des changements importants par
                 notification in-app. La poursuite de l'utilisation de la plateforme vaut
                 acceptation des nouvelles conditions.
@@ -144,7 +144,7 @@ function Privacy() {
     return (
         <div className="space-y-6">
             <Section title="1. Données collectées">
-                <p>Lors de votre inscription et utilisation de GuinéeMarché, nous collectons :</p>
+                <p>Lors de votre inscription et utilisation de Guimatrix, nous collectons :</p>
                 <ul className="list-disc pl-5 mt-2 space-y-1">
                     <li><strong>Données d'identité :</strong> nom complet, numéro de téléphone, ville et quartier</li>
                     <li><strong>Données de transaction :</strong> montants, historique des commandes, statuts de paiement</li>
@@ -201,7 +201,7 @@ function Privacy() {
             </Section>
 
             <Section title="7. Cookies et traceurs">
-                GuinéeMarché utilise uniquement des cookies techniques strictement nécessaires
+                Guimatrix utilise uniquement des cookies techniques strictement nécessaires
                 au fonctionnement (session, authentification JWT). Aucun cookie publicitaire
                 ou de tracking tiers n'est utilisé.
             </Section>
@@ -215,7 +215,7 @@ function Refund() {
         <div className="space-y-6">
             {/* Escrow highlight box */}
             <div className="bg-orange-50 border border-orange-200 rounded-2xl p-5">
-                <h2 className="font-bold text-orange-800 mb-2">🔒 Protection escrow GuinéeMarché</h2>
+                <h2 className="font-bold text-orange-800 mb-2">🔒 Protection escrow Guimatrix</h2>
                 <p className="text-orange-700 text-sm">
                     Pour vous protéger des annulations de paiement Orange Money, tous les
                     paiements en ligne transitent par notre système d'escrow : les fonds sont
@@ -260,7 +260,7 @@ function Refund() {
             <Section title="3. Paiement en espèces">
                 Pour les paiements en espèces lors d'une remise en main propre, aucun
                 escrow n'est appliqué. L'échange se fait directement entre acheteur et
-                vendeur. GuinéeMarché ne peut pas intervenir en cas de litige sur un
+                vendeur. Guimatrix ne peut pas intervenir en cas de litige sur un
                 paiement en espèces non passé par la plateforme.
             </Section>
 
@@ -285,7 +285,7 @@ function Refund() {
                     <li><strong>Rembourser l'acheteur</strong> si le produit n'est pas conforme ou non livré</li>
                 </ul>
                 <p className="mt-2">
-                    La décision de l'administrateur est définitive. GuinéeMarché s'engage à
+                    La décision de l'administrateur est définitive. Guimatrix s'engage à
                     traiter les litiges de manière équitable, en examinant toutes les preuves
                     disponibles (photos, messages, témoignages).
                 </p>

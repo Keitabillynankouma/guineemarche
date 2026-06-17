@@ -189,7 +189,7 @@ export default function CreateListingPage() {
         <div className="min-h-screen bg-gray-50">
             <nav className="bg-white shadow sticky top-0 z-10">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-                    <Link to="/" className="text-green-700 font-bold text-lg">GuinéeMarché</Link>
+                    <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
                     <span className="text-gray-400">/</span>
                     <span className="text-gray-600">Publier une annonce</span>
                 </div>

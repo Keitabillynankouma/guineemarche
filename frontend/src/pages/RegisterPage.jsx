@@ -67,7 +67,7 @@ export default function RegisterPage() {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow p-8 w-full max-w-md">
-                <h1 className="text-2xl font-bold text-center text-green-700 mb-2">GuinéeMarché</h1>
+                <h1 className="text-2xl font-bold text-center text-green-700 mb-2">Guimatrix</h1>
                 <p className="text-center text-gray-500 mb-6">
                     {step === 1 ? 'Créer votre compte' : 'Vérifiez votre numéro'}
                 </p>
@@ -148,7 +148,7 @@ export default function RegisterPage() {
                                 <a href="/terms" target="_blank" className="text-green-600 font-medium hover:underline">
                                     Politique de confidentialité
                                 </a>
-                                {' '}de GuinéeMarché.
+                                {' '}de Guimatrix.
                             </span>
                         </label>
 

@@ -183,7 +183,7 @@ function Navbar({ isAuthenticated }) {
     return (
         <nav className="bg-white shadow sticky top-0 z-20">
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                <Link to="/" className="text-xl font-bold text-green-700 tracking-tight">🛒 GuinéeMarché</Link>
+                <Link to="/" className="text-xl font-bold text-green-700 tracking-tight">🛒 Guimatrix</Link>
                 <div className="flex items-center gap-2">
                     {isAuthenticated ? (
                         <>

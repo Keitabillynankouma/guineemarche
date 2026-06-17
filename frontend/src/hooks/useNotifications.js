@@ -16,7 +16,7 @@ async function requestPushPermission() {
 
 function showPushNotification(data) {
     if (!('Notification' in window) || Notification.permission !== 'granted') return
-    const title = data.title || 'GuinéeMarché'
+    const title = data.title || 'Guimatrix'
     const body  = data.body  || ''
     const icon  = '/icon-192.png'
 

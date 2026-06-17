@@ -56,7 +56,7 @@ def auto_release_escrow():
                 from core.sms import send_sms
                 send_sms(
                     str(order.seller.phone_number),
-                    f'GuinéeMarché: Fonds libérés! Votre gain de {order.seller_payout_gnf:,} GNF '
+                    f'Guimatrix: Fonds libérés! Votre gain de {order.seller_payout_gnf:,} GNF '
                     f'pour « {order.listing.title[:30]} » est disponible.'
                 )
             except Exception:

@@ -26,8 +26,9 @@ export default function LoginPage() {
     return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-2xl shadow p-8 w-full max-w-md">
-                <h1 className="text-2xl font-bold text-center text-green-700 mb-2">GuinéeMarché</h1>
-                <p className="text-center text-gray-500 mb-6">Connectez-vous à votre compte</p>
+                <h1 className="text-2xl font-bold text-center text-green-700 mb-1">Guimatrix</h1>
+                <p className="text-center text-xs text-green-600 font-medium mb-1">Le marché intelligent de la Guinée</p>
+                <p className="text-center text-gray-500 mb-6 text-sm">Connectez-vous à votre compte</p>
 
                 {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
 
@@ -53,6 +54,11 @@ export default function LoginPage() {
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
                             required
                         />
+                    </div>
+                    <div className="flex justify-end">
+                        <Link to="/forgot-password" className="text-xs text-green-600 hover:underline">
+                            Mot de passe oublié ?
+                        </Link>
                     </div>
                     <button
                         type="submit"

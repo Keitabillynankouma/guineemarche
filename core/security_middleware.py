@@ -1,5 +1,5 @@
 """
-Middleware de sécurité GuinéeMarché.
+Middleware de sécurité Guimatrix.
 Détecte les attaques courantes, bloque les requêtes malveillantes et alerte via Sentry.
 """
 import re
@@ -153,7 +153,7 @@ class GuineeSecurityMiddleware(MiddlewareMixin):
                 scope.set_extra('details', extra)
                 scope.set_level('warning')
                 sentry_sdk.capture_message(
-                    f"[GuinéeMarché Security] {event_type} from {ip}",
+                    f"[Guimatrix Security] {event_type} from {ip}",
                     level='warning',
                 )
         except Exception:
