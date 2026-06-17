@@ -178,6 +178,9 @@ CSRF_TRUSTED_ORIGINS = [
 CORS_ALLOW_ALL_ORIGINS = DEBUG  # True en dev, False en prod
 CORS_ALLOWED_ORIGINS = [
     "https://guineemarche-frontend.onrender.com",
+    "https://guimatrix.onrender.com",
+    "https://guimatrix.com",
+    "https://www.guimatrix.com",
     "https://guineemarche.com",
     "https://www.guineemarche.com",
     "http://localhost:5173",   # Dev local
