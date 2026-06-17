@@ -437,6 +437,47 @@ class AdminListingApproveView(APIView):
         return Response({'status': 'active'})
 
 
+class AdminListingRejectView(APIView):
+    """Admin : refuser une annonce avec une raison (notifie le vendeur)."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        listing = get_object_or_404(Listing, pk=pk)
+        reason = request.data.get('reason', '').strip()
+        if not reason:
+            return Response({'error': 'Une raison de refus est requise.'}, status=400)
+
+        listing.status = Listing.Status.SUSPENDED
+        listing.save(update_fields=['status', 'updated_at'])
+
+        # Notifier le vendeur avec la raison
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=listing.seller,
+                type=Notification.Type.SYSTEM,
+                title='❌ Annonce refusée',
+                body=f'Votre annonce "{listing.title}" a été refusée par notre équipe. '
+                     f'Raison : {reason}. Contactez le support si vous pensez qu\'il s\'agit d\'une erreur.',
+                data={'listing_id': str(listing.id)},
+            )
+        except Exception:
+            pass
+
+        # SMS au vendeur
+        try:
+            from core.sms import send_sms
+            send_sms(
+                str(listing.seller.phone_number),
+                f'GuinéeMarché : Votre annonce "{listing.title[:30]}" a été refusée. '
+                f'Raison : {reason[:80]}. Contactez le support.'
+            )
+        except Exception:
+            pass
+
+        return Response({'status': 'suspended', 'reason': reason})
+
+
 class AdminBannerListCreateView(generics.ListCreateAPIView):
     """Admin : liste et création de publicités."""
     permission_classes = [IsAdmin]

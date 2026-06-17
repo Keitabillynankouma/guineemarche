@@ -20,6 +20,7 @@ urlpatterns = [
     path('admin/listings/',                      views.AdminListingListView.as_view(),    name='admin-listing-list'),
     path('admin/listings/<uuid:pk>/',            views.AdminListingDetailView.as_view(),  name='admin-listing-detail'),
     path('admin/listings/<uuid:pk>/approve/',    views.AdminListingApproveView.as_view(), name='admin-listing-approve'),
+    path('admin/listings/<uuid:pk>/reject/',     views.AdminListingRejectView.as_view(),  name='admin-listing-reject'),
     path('admin/banners/',            views.AdminBannerListCreateView.as_view(), name='admin-banner-list'),
     path('admin/banners/<uuid:pk>/',  views.AdminBannerDetailView.as_view(),   name='admin-banner-detail'),
     path('admin/categories/',         views.AdminCategoryListCreateView.as_view(), name='admin-category-list'),

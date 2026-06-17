@@ -15,8 +15,9 @@ const adminAPI = {
 
   // Annonces
   getListings:     (params) => api.get('/listings/admin/listings/', { params }),
-  suspendListing:  (id)     => api.delete(`/listings/admin/listings/${id}/`),
-  approveListing:  (id)     => api.post(`/listings/admin/listings/${id}/approve/`),
+  suspendListing:  (id)          => api.delete(`/listings/admin/listings/${id}/`),
+  approveListing:  (id)          => api.post(`/listings/admin/listings/${id}/approve/`),
+  rejectListing:   (id, reason)  => api.post(`/listings/admin/listings/${id}/reject/`, { reason }),
 
   // Publicités
   getBanners:   ()          => api.get('/listings/admin/banners/'),
@@ -174,8 +175,10 @@ function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
 
 function TabListings() {
   const qc = useQueryClient()
-  const [search, setSearch]           = useState('')
+  const [search, setSearch]             = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [rejectId, setRejectId]         = useState(null)
+  const [rejectReason, setRejectReason] = useState('')
 
   const { data, isLoading } = useQuery({
     queryKey: ['admin-listings', search, statusFilter],
@@ -192,6 +195,11 @@ function TabListings() {
   const approveMutation = useMutation({
     mutationFn: (id) => adminAPI.approveListing(id),
     onSuccess:  () => qc.invalidateQueries(['admin-listings']),
+  })
+
+  const rejectMutation = useMutation({
+    mutationFn: ({ id, reason }) => adminAPI.rejectListing(id, reason),
+    onSuccess:  () => { qc.invalidateQueries(['admin-listings']); setRejectId(null); setRejectReason('') },
   })
 
   const STATUS_LABELS = {
@@ -252,40 +260,65 @@ function TabListings() {
           {listings.map(l => {
             const s = STATUS_LABELS[l.status] || { label: l.status, color: 'bg-gray-100 text-gray-500' }
             return (
-              <div key={l.id} className="bg-white rounded-2xl shadow p-4 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
-                  {l.media?.[0]?.file
-                    ? <img src={l.media[0].file} alt="" className="w-full h-full object-cover" />
-                    : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
-                  }
+              <div key={l.id} className="bg-white rounded-2xl shadow p-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-xl bg-gray-100 overflow-hidden flex-shrink-0">
+                    {l.media?.[0]?.file
+                      ? <img src={l.media[0].file} alt="" className="w-full h-full object-cover" />
+                      : <div className="w-full h-full flex items-center justify-center text-2xl">📦</div>
+                    }
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 truncate">{l.title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {l.seller_name} · {l.city} · {new Intl.NumberFormat('fr-GN').format(l.price_gnf)} GNF
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
+                    <Link
+                      to={`/listings/${l.id}`}
+                      className="text-xs bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg transition"
+                    >Voir</Link>
+                    {l.status === 'draft' && (
+                      <button
+                        onClick={() => { if (confirm('Approuver cette annonce ?')) approveMutation.mutate(l.id) }}
+                        disabled={approveMutation.isPending}
+                        className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium"
+                      >✅ Approuver</button>
+                    )}
+                    {l.status !== 'suspended' && (
+                      rejectId === l.id ? null : (
+                        <button
+                          onClick={() => { setRejectId(l.id); setRejectReason('') }}
+                          className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition"
+                        >❌ Refuser</button>
+                      )
+                    )}
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 truncate">{l.title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {l.seller_name} · {l.city} · {new Intl.NumberFormat('fr-GN').format(l.price_gnf)} GNF
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${s.color}`}>{s.label}</span>
-                  <Link
-                    to={`/listings/${l.id}`}
-                    className="text-xs bg-gray-50 hover:bg-gray-100 text-gray-600 px-3 py-1.5 rounded-lg transition"
-                  >Voir</Link>
-                  {l.status === 'draft' && (
+                {/* Formulaire refus inline */}
+                {rejectId === l.id && (
+                  <div className="mt-3 flex gap-2 items-center">
+                    <input
+                      type="text"
+                      placeholder="Raison du refus (obligatoire)…"
+                      value={rejectReason}
+                      onChange={e => setRejectReason(e.target.value)}
+                      className="flex-1 border border-red-300 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                      autoFocus
+                    />
                     <button
-                      onClick={() => { if (confirm('Approuver cette annonce ?')) approveMutation.mutate(l.id) }}
-                      disabled={approveMutation.isPending}
-                      className="text-xs bg-green-50 hover:bg-green-100 text-green-700 px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium"
-                    >✅ Approuver</button>
-                  )}
-                  {l.status !== 'suspended' && (
+                      onClick={() => rejectReason.trim() && rejectMutation.mutate({ id: l.id, reason: rejectReason.trim() })}
+                      disabled={!rejectReason.trim() || rejectMutation.isPending}
+                      className="text-xs bg-red-600 hover:bg-red-700 text-white px-3 py-1.5 rounded-lg transition disabled:opacity-50 font-medium"
+                    >Confirmer</button>
                     <button
-                      onClick={() => { if (confirm('Suspendre cette annonce ?')) suspendMutation.mutate(l.id) }}
-                      disabled={suspendMutation.isPending}
-                      className="text-xs bg-red-50 hover:bg-red-100 text-red-600 px-3 py-1.5 rounded-lg transition disabled:opacity-50"
-                    >Suspendre</button>
-                  )}
-                </div>
+                      onClick={() => { setRejectId(null); setRejectReason('') }}
+                      className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1.5"
+                    >Annuler</button>
+                  </div>
+                )}
               </div>
             )
           })}

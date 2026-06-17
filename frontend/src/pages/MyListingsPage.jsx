@@ -78,7 +78,7 @@ export default function MyListingsPage() {
                     <div className="space-y-4">
                         {data?.results?.map(listing => {
                             const cover = listing.media?.find(m => m.is_cover) || listing.media?.[0]
-                            const status = STATUS_LABELS[listing.status] || STATUS_LABELS.draft
+                            const status = STATUS_LABELS_EXTRA[listing.status] || STATUS_LABELS_EXTRA.draft
                             return (
                                 <div key={listing.id} className="bg-white rounded-xl shadow p-4 flex gap-4">
                                     <div className="w-20 h-20 bg-gray-100 rounded-lg overflow-hidden flex-shrink-0">
