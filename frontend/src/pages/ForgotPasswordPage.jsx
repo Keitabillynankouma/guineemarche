@@ -19,7 +19,7 @@ export default function ForgotPasswordPage() {
         setError('')
         setLoading(true)
         try {
-            await api.post('/auth/forgot-password/', { phone_number: phone })
+            await api.post('/accounts/forgot-password/', { phone_number: phone })
             setStep(STEPS.OTP)
         } catch (err) {
             setError(err.response?.data?.error || 'Erreur lors de l\'envoi du code.')
@@ -51,7 +51,7 @@ export default function ForgotPasswordPage() {
         }
         setLoading(true)
         try {
-            await api.post('/auth/reset-password/', {
+            await api.post('/accounts/reset-password/', {
                 phone_number: phone,
                 code: otp.trim(),
                 new_password: newPassword,
