@@ -93,8 +93,21 @@ def initiate_pawapay(phone: str, amount: int, order_id: str, correspondent: str)
             return PaymentResult(success=True, reference=deposit_id,
                                  message='Demande PawaPay envoyée — confirmez sur votre téléphone.')
         rejection = data.get('rejectionReason', {})
-        return PaymentResult(success=False,
-                             message=rejection.get('rejectionMessage', 'Erreur PawaPay'))
+        rejection_code = rejection.get('rejectionCode', '')
+        rejection_msg  = rejection.get('rejectionMessage', '')
+        # En sandbox, si le correspondant n'est pas configuré sur ce compte, simuler le paiement
+        sandbox_correspondent_errors = (
+            'INVALID_CORRESPONDENT', 'CORRESPONDENT_NOT_SUPPORTED', 'CONFIGURATION_ERROR'
+        )
+        if is_sandbox and (
+            rejection_code in sandbox_correspondent_errors
+            or 'correspondent' in rejection_msg.lower()
+            or 'correspondent' in data.get('failureReason', {}).get('failureMessage', '').lower()
+        ):
+            logger.warning("[SANDBOX] Correspondent %s not configured → simulation fallback", correspondent)
+            return _simulate_payment('pawapay', phone, amount)
+        err_msg = rejection_msg or data.get('failureReason', {}).get('failureMessage', 'Erreur PawaPay')
+        return PaymentResult(success=False, message=err_msg)
     except Exception as exc:
         logger.error("PawaPay API error: %s", exc)
         return _simulate_payment('pawapay', phone, amount)
