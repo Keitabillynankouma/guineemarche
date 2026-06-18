@@ -255,7 +255,7 @@ ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
 
 # ── PawaPay — agrégateur Mobile Money (Orange GN + MTN GN) ───────────────────
 PAWAPAY_API_TOKEN = env('PAWAPAY_API_TOKEN', default='')
-PAWAPAY_SANDBOX   = env.bool('PAWAPAY_SANDBOX', default=DEBUG)
+PAWAPAY_SANDBOX   = env('PAWAPAY_SANDBOX', default=str(DEBUG)).lower() in ('true', '1', 'yes')
 
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False
