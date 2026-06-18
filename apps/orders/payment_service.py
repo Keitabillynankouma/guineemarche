@@ -80,7 +80,7 @@ def initiate_pawapay(phone: str, amount: int, order_id: str, correspondent: str)
                 'correspondent':       correspondent,
                 'payer':               {'type': 'MSISDN', 'address': {'value': phone}},
                 'customerTimestamp':   datetime.now(tz.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                'statementDescription': f'Guimatrix #{order_id[:8].upper()}',
+                'statementDescription': f'Guimatrix {order_id[:8].upper()}',
             },
             headers={
                 'Authorization': f'Bearer {api_token}',
