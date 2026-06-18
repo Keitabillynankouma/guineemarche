@@ -834,10 +834,10 @@ export default function ListingDetailPage() {
                                     <select value={boostProvider} onChange={e => setBoostProvider(e.target.value)}
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
                                         <option value="orange_money">🟠 Orange Money</option>
-                                        <option value="cash">💵 Espèces</option>
+                                        <option value="mtn_momo">🟡 MTN MoMo</option>
                                     </select>
                                     <input value={boostPhone} onChange={e => setBoostPhone(e.target.value)}
-                                        placeholder="Numéro Orange Money (ex: 224 6XX XXX XXX)"
+                                        placeholder={boostProvider === 'mtn_momo' ? 'Numéro MTN (ex: 224 6XX XXX XXX)' : 'Numéro Orange Money (ex: 224 6XX XXX XXX)'}
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
                                     {boostMutation.isError && (
                                         <p className="text-sm text-red-500">{boostMutation.error?.response?.data?.error || 'Erreur de paiement'}</p>
