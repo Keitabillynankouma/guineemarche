@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from .models import Order, Payment, PickupPoint, MeetingZone
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer
-from .payment_service import initiate_orange_money
+from .payment_service import initiate_orange_money, initiate_pawapay
 from core.permissions import IsAdmin
 
 
@@ -270,10 +270,18 @@ class InitiatePaymentView(APIView):
         )
 
         if provider == Payment.Provider.ORANGE_MONEY:
-            result = initiate_orange_money(phone_number, order.amount_gnf, str(order.id))
+            # Utiliser PawaPay si configuré, sinon fallback direct Orange
+            if getattr(settings, 'PAWAPAY_API_TOKEN', ''):
+                result = initiate_pawapay(phone_number, order.amount_gnf, str(order.id), 'ORANGE_GN')
+            else:
+                result = initiate_orange_money(phone_number, order.amount_gnf, str(order.id))
         elif provider == Payment.Provider.MTN_MOMO:
-            from .payment_service import initiate_mtn_momo
-            result = initiate_mtn_momo(phone_number, order.amount_gnf, str(order.id))
+            # Utiliser PawaPay si configuré, sinon fallback direct MTN
+            if getattr(settings, 'PAWAPAY_API_TOKEN', ''):
+                result = initiate_pawapay(phone_number, order.amount_gnf, str(order.id), 'MTN_MOMO_GN')
+            else:
+                from .payment_service import initiate_mtn_momo
+                result = initiate_mtn_momo(phone_number, order.amount_gnf, str(order.id))
         else:
             result = type('R', (), {'success': True, 'reference': '', 'message': 'Paiement en espèces enregistré'})()
 
@@ -320,6 +328,27 @@ class PaymentWebhookView(APIView):
                 return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('pay_token', '')
             success = data.get('status', '') == 'SUCCESS'
+        elif provider in ('pawapay_deposit', 'pawapay'):
+            # PawaPay Deposit callback
+            ref     = data.get('depositId', '')
+            success = data.get('status', '') == 'COMPLETED'
+        elif provider == 'pawapay_payout':
+            # PawaPay Payout callback (versement vendeur) — log uniquement pour l'instant
+            logger.info("[PAWAPAY PAYOUT] %s", data)
+            return Response({'status': 'ok'})
+        elif provider == 'pawapay_refund':
+            # PawaPay Refund callback
+            ref     = data.get('refundId', '')
+            success = data.get('status', '') == 'COMPLETED'
+            try:
+                payment = Payment.objects.filter(external_ref=ref).first()
+                if payment and success:
+                    payment.order.escrow_status = Order.EscrowStatus.REFUNDED
+                    payment.order.save(update_fields=['escrow_status', 'updated_at'])
+                    logger.info("[PAWAPAY REFUND] Commande %s remboursée.", payment.order.id)
+            except Exception as exc:
+                logger.error("[PAWAPAY REFUND] Erreur: %s", exc)
+            return Response({'status': 'ok'})
         else:
             return Response({'error': 'Fournisseur inconnu'}, status=status.HTTP_400_BAD_REQUEST)
 

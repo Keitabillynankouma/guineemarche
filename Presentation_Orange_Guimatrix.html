@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <title>Guimatrix — Proposition de Partenariat Orange Guinée</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', Arial, sans-serif;
+      background: #f5f5f5;
+      color: #1a1a2e;
+      font-size: 11pt;
+      line-height: 1.6;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      background: #fff;
+      margin: 20px auto;
+      padding: 0;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.12);
+    }
+
+    /* ── COVER PAGE ─────────────────────────────────────── */
+    .cover {
+      background: linear-gradient(145deg, #FF6600 0%, #FF8C00 40%, #FF6600 100%);
+      color: white;
+      padding: 60px 50px 50px;
+      position: relative;
+      overflow: hidden;
+      min-height: 220px;
+    }
+    .cover::after {
+      content: '';
+      position: absolute;
+      top: -60px; right: -60px;
+      width: 280px; height: 280px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.08);
+    }
+    .cover::before {
+      content: '';
+      position: absolute;
+      bottom: -40px; left: 40%;
+      width: 180px; height: 180px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+    }
+    .cover-logo {
+      font-size: 13pt;
+      font-weight: 700;
+      letter-spacing: 3px;
+      text-transform: uppercase;
+      opacity: 0.9;
+      margin-bottom: 30px;
+    }
+    .cover-title {
+      font-size: 28pt;
+      font-weight: 800;
+      line-height: 1.15;
+      margin-bottom: 12px;
+    }
+    .cover-subtitle {
+      font-size: 14pt;
+      font-weight: 400;
+      opacity: 0.88;
+      margin-bottom: 30px;
+    }
+    .cover-meta {
+      font-size: 10pt;
+      opacity: 0.75;
+      margin-top: 20px;
+    }
+    .cover-badge {
+      display: inline-block;
+      background: rgba(255,255,255,0.2);
+      border: 1px solid rgba(255,255,255,0.35);
+      border-radius: 20px;
+      padding: 5px 16px;
+      font-size: 10pt;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    /* ── BODY ───────────────────────────────────────────── */
+    .content {
+      padding: 40px 50px 50px;
+    }
+
+    h2 {
+      font-size: 14pt;
+      font-weight: 700;
+      color: #FF6600;
+      margin: 32px 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #FFE0CC;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    h3 {
+      font-size: 11pt;
+      font-weight: 600;
+      color: #1a1a2e;
+      margin: 18px 0 6px;
+    }
+    p {
+      margin-bottom: 10px;
+      color: #333;
+    }
+
+    /* ── INTRO BOX ──────────────────────────────────────── */
+    .intro-box {
+      background: #FFF5EE;
+      border-left: 4px solid #FF6600;
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 24px 0 28px;
+    }
+    .intro-box p {
+      margin: 0;
+      font-size: 11.5pt;
+      color: #444;
+      font-style: italic;
+    }
+
+    /* ── STAT CARDS ─────────────────────────────────────── */
+    .stat-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 20px 0 28px;
+    }
+    .stat-card {
+      background: linear-gradient(135deg, #FF6600 0%, #FF8C00 100%);
+      color: white;
+      border-radius: 10px;
+      padding: 18px 16px;
+      text-align: center;
+    }
+    .stat-number {
+      font-size: 22pt;
+      font-weight: 800;
+      line-height: 1;
+      margin-bottom: 4px;
+    }
+    .stat-label {
+      font-size: 9pt;
+      opacity: 0.88;
+      font-weight: 500;
+    }
+    .stat-card.light {
+      background: #FFF5EE;
+      color: #FF6600;
+      border: 1.5px solid #FFD5B5;
+    }
+    .stat-card.light .stat-label { color: #888; opacity: 1; }
+
+    /* ── FEATURE LIST ───────────────────────────────────── */
+    .feature-list {
+      list-style: none;
+      margin: 10px 0 18px;
+    }
+    .feature-list li {
+      padding: 7px 0 7px 28px;
+      border-bottom: 1px solid #f0f0f0;
+      position: relative;
+      color: #333;
+      font-size: 10.5pt;
+    }
+    .feature-list li::before {
+      content: '✓';
+      position: absolute;
+      left: 0;
+      color: #FF6600;
+      font-weight: 700;
+      font-size: 12pt;
+    }
+    .feature-list li:last-child { border-bottom: none; }
+
+    /* ── PARTNER TABLE ──────────────────────────────────── */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 16px 0 24px;
+      font-size: 10.5pt;
+    }
+    th {
+      background: #FF6600;
+      color: white;
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      font-size: 10pt;
+    }
+    th:first-child { border-radius: 6px 0 0 0; }
+    th:last-child  { border-radius: 0 6px 0 0; }
+    td {
+      padding: 10px 14px;
+      border-bottom: 1px solid #eee;
+      vertical-align: top;
+      color: #333;
+    }
+    tr:nth-child(even) td { background: #FFF8F4; }
+    .check { color: #16a34a; font-weight: 700; font-size: 12pt; }
+    .orange { color: #FF6600; font-weight: 600; }
+
+    /* ── PROPOSAL CARDS ─────────────────────────────────── */
+    .proposal-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+      margin: 16px 0 24px;
+    }
+    .proposal-card {
+      border: 1.5px solid #FFD5B5;
+      border-radius: 10px;
+      padding: 16px;
+      background: #FFFAF7;
+    }
+    .proposal-card h4 {
+      font-size: 10.5pt;
+      font-weight: 700;
+      color: #FF6600;
+      margin-bottom: 8px;
+    }
+    .proposal-card p {
+      font-size: 10pt;
+      color: #555;
+      margin: 0;
+    }
+    .proposal-number {
+      display: inline-block;
+      background: #FF6600;
+      color: white;
+      border-radius: 50%;
+      width: 22px;
+      height: 22px;
+      text-align: center;
+      line-height: 22px;
+      font-size: 10pt;
+      font-weight: 700;
+      margin-right: 8px;
+      vertical-align: middle;
+    }
+
+    /* ── ESCROW BOX ─────────────────────────────────────── */
+    .highlight-box {
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      color: white;
+      border-radius: 10px;
+      padding: 20px 24px;
+      margin: 18px 0 24px;
+    }
+    .highlight-box h3 { color: #FFB347; margin-top: 0; }
+    .highlight-box p  { color: #ddd; font-size: 10.5pt; }
+
+    /* ── FOOTER ─────────────────────────────────────────── */
+    .footer {
+      background: #1a1a2e;
+      color: #aaa;
+      padding: 20px 50px;
+      text-align: center;
+      font-size: 9.5pt;
+    }
+    .footer strong { color: #FF8C00; }
+
+    /* ── PRINT STYLES ───────────────────────────────────── */
+    @media print {
+      body { background: white; }
+      .page { box-shadow: none; margin: 0; width: 100%; }
+      @page { margin: 0; size: A4; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="cover-logo">Guimatrix &nbsp;×&nbsp; Orange Guinée</div>
+    <div class="cover-badge">Proposition de Partenariat Stratégique</div>
+    <div class="cover-title">Le Commerce Digital<br>au Service des Guinéens</div>
+    <div class="cover-subtitle">Comment Orange Money peut devenir le moteur<br>du premier marché en ligne de Guinée</div>
+    <div class="cover-meta">Préparé par Billy Keita · Fondateur Guimatrix · Juin 2026</div>
+  </div>
+
+  <!-- CONTENT -->
+  <div class="content">
+
+    <!-- INTRO -->
+    <div class="intro-box">
+      <p>Guimatrix est la première marketplace guinéenne sécurisée par Mobile Money. Nous ne cherchons pas un prestataire de paiement — nous cherchons un partenaire fondateur pour construire ensemble l'économie digitale de la Guinée.</p>
+    </div>
+
+    <!-- SECTION 1 : QUI SOMMES NOUS -->
+    <h2>1. Qui sommes-nous ?</h2>
+    <p>
+      <strong>Guimatrix</strong> est une plateforme de petites annonces en ligne, conçue exclusivement pour la Guinée. Elle permet à n'importe quel Guinéen de vendre et d'acheter en toute sécurité, depuis son téléphone, en francs guinéens.
+    </p>
+    <p>
+      La plateforme est <strong>déjà en ligne</strong> sur <strong>guimatrix.com</strong>, avec une application mobile disponible sur iOS et Android.
+    </p>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-number">100%</div>
+        <div class="stat-label">Made in Guinea</div>
+      </div>
+      <div class="stat-card light">
+        <div class="stat-number">GNF</div>
+        <div class="stat-label">Tout en Francs Guinéens</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">iOS & Android</div>
+        <div class="stat-label">Application mobile</div>
+      </div>
+    </div>
+
+    <p><strong>Nos fonctionnalités clés :</strong></p>
+    <ul class="feature-list">
+      <li>Publication d'annonces en 2 minutes (photos, description, prix en GNF)</li>
+      <li>Messagerie en temps réel avec négociation de prix intégrée</li>
+      <li>Carte interactive pour choisir le lieu de rencontre / remise en main propre</li>
+      <li>Annonces géolocalisées avec filtre de distance</li>
+      <li>QR Code par annonce — affiche téléchargeable pour partager hors ligne</li>
+      <li>Paiement sécurisé via Orange Money et MTN MoMo</li>
+      <li>Modération automatique des annonces par intelligence artificielle</li>
+      <li>Notifications push, mode sombre, interface 100% mobile-first</li>
+    </ul>
+
+    <!-- SECTION 2 : L'INNOVATION ESCROW -->
+    <h2>2. Notre innovation : l'escrow Mobile Money</h2>
+
+    <div class="highlight-box">
+      <h3>Le problème que nous résolvons</h3>
+      <p>
+        Dans le commerce en ligne informel en Guinée, l'acheteur a peur de payer avant de recevoir le produit.
+        Le vendeur a peur de livrer avant d'être payé. Résultat : la méfiance bloque des millions de transactions potentielles chaque jour.
+      </p>
+    </div>
+
+    <p><strong>Notre solution :</strong> un système d'escrow intelligent via Orange Money.</p>
+    <ol class="feature-list">
+      <li>L'acheteur paye via Orange Money → l'argent est <strong>sécurisé</strong> (ni chez l'acheteur, ni encore chez le vendeur)</li>
+      <li>La remise du produit a lieu en main propre (lieu géolocalisé sur la carte)</li>
+      <li>L'acheteur <strong>confirme la réception</strong> → l'argent est libéré au vendeur automatiquement</li>
+      <li>En cas de litige : notre équipe arbitre et l'argent est remboursé à l'acheteur</li>
+    </ol>
+    <p>
+      Ce système <strong>élimine la méfiance</strong>, la principale barrière au commerce en ligne en Afrique de l'Ouest.
+      Et il repose entièrement sur <strong>l'infrastructure Orange Money</strong>.
+    </p>
+
+    <!-- SECTION 3 : OPPORTUNITE MARCHE -->
+    <h2>3. L'opportunité de marché</h2>
+
+    <div class="stat-grid">
+      <div class="stat-card">
+        <div class="stat-number">3M+</div>
+        <div class="stat-label">Abonnés Orange Money en Guinée</div>
+      </div>
+      <div class="stat-card light">
+        <div class="stat-number">+20%</div>
+        <div class="stat-label">Croissance annuelle e-commerce Afrique de l'Ouest</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-number">#1</div>
+        <div class="stat-label">Pas encore de marketplace nationale dominante en Guinée</div>
+      </div>
+    </div>
+
+    <p>
+      Le marché de l'occasion en Guinée est immense : téléphones, motos, électroménager, vêtements, véhicules. Ces transactions se font aujourd'hui <strong>de façon informelle, sans sécurité, sans traçabilité</strong>. Guimatrix digitalise ce marché — et Orange Money en devient la colonne vertébrale financière.
+    </p>
+
+    <!-- SECTION 4 : CE QUE NOUS PROPOSONS -->
+    <h2>4. Notre proposition à Orange Guinée</h2>
+    <p>Nous proposons 4 axes de collaboration concrète :</p>
+
+    <div class="proposal-grid">
+      <div class="proposal-card">
+        <h4><span class="proposal-number">A</span>Accès API Production</h4>
+        <p>Accès à l'API Orange Money Merchant en environnement de production (Merchant ID, clé API) pour traiter des paiements réels immédiatement. Nous sommes déjà intégrés en sandbox.</p>
+      </div>
+      <div class="proposal-card">
+        <h4><span class="proposal-number">B</span>Co-marketing</h4>
+        <p>Guimatrix positionné comme "la marketplace sécurisée par Orange Money" dans nos communications. Orange mis en avant comme partenaire de confiance auprès de nos utilisateurs.</p>
+      </div>
+      <div class="proposal-card">
+        <h4><span class="proposal-number">C</span>Bundle Data</h4>
+        <p>Un forfait data spécial pour accéder à Guimatrix (zero-rating ou tarif réduit) augmente l'usage Internet des abonnés Orange tout en boostant notre trafic.</p>
+      </div>
+      <div class="proposal-card">
+        <h4><span class="proposal-number">D</span>Programme de Fidélité</h4>
+        <p>Les paiements Orange Money sur Guimatrix génèrent des points, du cashback ou des bonus d'airtime pour les utilisateurs. Double bénéfice pour Orange et pour nos acheteurs.</p>
+      </div>
+    </div>
+
+    <!-- SECTION 5 : CE QUE ORANGE GAGNE -->
+    <h2>5. Ce qu'Orange Guinée y gagne</h2>
+
+    <table>
+      <thead>
+        <tr>
+          <th>Bénéfice</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><span class="check">✓</span> Volume de transactions</td>
+          <td>Chaque vente sur Guimatrix génère une transaction Orange Money. Plus de commerce = plus de volumes.</td>
+        </tr>
+        <tr>
+          <td><span class="check">✓</span> Nouveaux cas d'usage</td>
+          <td>L'escrow et le paiement marchand enrichissent l'écosystème Orange Money au-delà des transferts classiques.</td>
+        </tr>
+        <tr>
+          <td><span class="check">✓</span> Fidélisation abonnés</td>
+          <td>Un abonné qui paye sur Guimatrix reste sur Orange Money. Réduction du churn vers MTN.</td>
+        </tr>
+        <tr>
+          <td><span class="check">✓</span> Image digitale</td>
+          <td>Orange co-construit la première marketplace de Guinée. Positionnement unique dans l'économie numérique nationale.</td>
+        </tr>
+        <tr>
+          <td><span class="check">✓</span> Données de marché</td>
+          <td>Tendances d'achats, zones géographiques actives, catégories populaires — données anonymisées partagées.</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <!-- SECTION 6 : NOS DEMANDES -->
+    <h2>6. Nos demandes concrètes</h2>
+    <p>Nous ne cherchons pas de financement. Nous demandons :</p>
+    <ul class="feature-list">
+      <li><strong>Un Merchant ID Orange Money en production</strong> — pour traiter des paiements réels dès maintenant</li>
+      <li><strong>Un point de contact commercial Orange</strong> — pour structurer et signer un accord de partenariat</li>
+      <li><strong>Un référencement dans l'app Orange Money</strong> — comme partenaire e-commerce de confiance</li>
+    </ul>
+
+    <div class="highlight-box" style="background: linear-gradient(135deg, #FF6600, #FF8C00);">
+      <h3 style="color: white;">Notre engagement</h3>
+      <p style="color: rgba(255,255,255,0.9);">
+        Guimatrix s'engage à faire d'Orange Money le mode de paiement mis en avant sur toute la plateforme,
+        à mentionner Orange dans toutes nos communications, et à partager nos données de croissance trimestriellement.
+      </p>
+    </div>
+
+    <!-- CONCLUSION -->
+    <h2>Conclusion</h2>
+    <p>
+      Guimatrix et Orange Money partagent la même mission : <strong>rendre l'économie guinéenne plus fluide, plus sûre et plus accessible.</strong>
+    </p>
+    <p>
+      Notre plateforme est prête. Notre intégration Orange Money est opérationnelle. Nos premiers utilisateurs attendent. Il ne manque qu'un partenaire de confiance pour franchir la prochaine étape.
+    </p>
+    <p style="font-size: 12pt; font-weight: 600; color: #FF6600; margin-top: 14px;">
+      Ce partenaire naturel, c'est Orange Guinée.
+    </p>
+
+  </div><!-- /content -->
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <strong>Billy Keita</strong> — Fondateur &amp; CEO, Guimatrix &nbsp;|&nbsp;
+    bnkeita020@gmail.com &nbsp;|&nbsp;
+    <strong>guimatrix.com</strong>
+    <br><br>
+    <span style="font-size:8.5pt;">Document confidentiel — Réservé aux dirigeants d'Orange Guinée — Juin 2026</span>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>

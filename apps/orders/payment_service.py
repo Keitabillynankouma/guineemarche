@@ -55,6 +55,51 @@ def initiate_orange_money(phone: str, amount: int, order_id: str) -> PaymentResu
         return _simulate_payment('orange_money', phone, amount)
 
 
+def initiate_pawapay(phone: str, amount: int, order_id: str, correspondent: str) -> PaymentResult:
+    """
+    PawaPay — agrégateur couvrant Orange Money GN et MTN MoMo GN.
+    correspondent : 'ORANGE_GN' ou 'MTN_MOMO_GN'
+    """
+    from datetime import datetime, timezone as tz
+    api_token = getattr(settings, 'PAWAPAY_API_TOKEN', '')
+    if not api_token:
+        return _simulate_payment('pawapay', phone, amount)
+
+    is_sandbox = getattr(settings, 'PAWAPAY_SANDBOX', getattr(settings, 'DEBUG', True))
+    base_url   = 'https://api.sandbox.pawapay.io' if is_sandbox else 'https://api.pawapay.io'
+    deposit_id = str(uuid.uuid4())
+
+    try:
+        import requests
+        resp = requests.post(
+            f'{base_url}/deposits',
+            json={
+                'depositId':           deposit_id,
+                'amount':              str(amount),
+                'currency':            'GNF',
+                'correspondent':       correspondent,
+                'payer':               {'type': 'MSISDN', 'address': {'value': phone}},
+                'customerTimestamp':   datetime.now(tz.utc).strftime('%Y-%m-%dT%H:%M:%SZ'),
+                'statementDescription': f'Guimatrix #{order_id[:8].upper()}',
+            },
+            headers={
+                'Authorization': f'Bearer {api_token}',
+                'Content-Type':  'application/json',
+            },
+            timeout=20,
+        )
+        data = resp.json()
+        if resp.status_code == 200 and data.get('status') == 'ACCEPTED':
+            return PaymentResult(success=True, reference=deposit_id,
+                                 message='Demande PawaPay envoyée — confirmez sur votre téléphone.')
+        rejection = data.get('rejectionReason', {})
+        return PaymentResult(success=False,
+                             message=rejection.get('rejectionMessage', 'Erreur PawaPay'))
+    except Exception as exc:
+        logger.error("PawaPay API error: %s", exc)
+        return _simulate_payment('pawapay', phone, amount)
+
+
 def initiate_mtn_momo(phone: str, amount: int, order_id: str) -> PaymentResult:
     """
     MTN Mobile Money Guinea.
