@@ -18,12 +18,12 @@ function isNew(dateStr) {
 // ── Skeleton card ──────────────────────────────────────────────────────────────
 function SkeletonCard() {
     return (
-        <div className="bg-white rounded-xl shadow overflow-hidden animate-pulse">
-            <div className="h-44 bg-gray-200" />
+        <div className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{boxShadow:'0 2px 8px rgba(0,0,0,0.06)'}}>
+            <div className="h-44 bg-gradient-to-br from-gray-100 to-gray-200" />
             <div className="p-3 space-y-2">
-                <div className="h-4 bg-gray-200 rounded w-3/4" />
-                <div className="h-4 bg-gray-200 rounded w-1/2" />
-                <div className="h-3 bg-gray-100 rounded w-2/3" />
+                <div className="h-3.5 bg-gray-100 rounded-full w-3/4" />
+                <div className="h-4 bg-gray-200 rounded-full w-1/2" />
+                <div className="h-3 bg-gray-100 rounded-full w-2/3" />
             </div>
         </div>
     )
@@ -55,34 +55,34 @@ function ListingCard({ listing }) {
     }
 
     return (
-        <div className="bg-white rounded-xl shadow hover:shadow-md transition overflow-hidden group relative">
+        <div className="listing-card group relative animate-fade-in">
             <Link to={`/listings/${listing.id}`}>
-                <div className="h-44 bg-gray-100 overflow-hidden relative">
+                <div className="h-44 bg-gray-50 overflow-hidden relative">
                     {cover
                         ? <img src={cover.file} alt={listing.title}
                             loading="lazy"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
-                        : <div className="w-full h-full flex items-center justify-center text-gray-300 text-5xl">📦</div>
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                        : <div className="w-full h-full flex items-center justify-center text-gray-200 text-5xl bg-gradient-to-br from-gray-50 to-gray-100">📦</div>
                     }
+                    {/* Dégradé bas */}
+                    <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                     {/* Badges */}
-                    <div className="absolute top-2 left-2 flex flex-col gap-1">
-                        {fresh && (
-                            <span className="bg-green-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">🆕 Nouveau</span>
-                        )}
-                    </div>
+                    {fresh && (
+                        <span className="absolute top-2 left-2 bg-green-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm tracking-wide">Nouveau</span>
+                    )}
                     {/* Vue count */}
                     {listing.view_count > 0 && (
-                        <span className="absolute bottom-2 right-2 bg-black/40 text-white text-xs px-1.5 py-0.5 rounded-full">
+                        <span className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded-full font-medium">
                             👁 {listing.view_count}
                         </span>
                     )}
                 </div>
                 <div className="p-3">
-                    <h3 className="font-semibold text-gray-800 truncate text-sm">{listing.title}</h3>
-                    <p className="text-green-600 font-bold mt-1 text-sm">{formatPrice(listing.price_gnf, listing.price_type)}</p>
+                    <h3 className="font-semibold text-gray-800 truncate text-sm leading-snug">{listing.title}</h3>
+                    <p className="price-tag mt-1 text-sm">{formatPrice(listing.price_gnf, listing.price_type)}</p>
                     <p className="text-xs text-gray-400 mt-1 truncate">📍 {listing.city}{listing.quartier ? ` · ${listing.quartier}` : ''}</p>
                     {listing.category_name && (
-                        <span className="inline-block mt-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">{listing.category_name}</span>
+                        <span className="inline-block mt-2 text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded-full font-medium">{listing.category_name}</span>
                     )}
                 </div>
             </Link>
@@ -90,7 +90,7 @@ function ListingCard({ listing }) {
             {isAuthenticated && (
                 <button
                     onClick={handleFav}
-                    className={`absolute top-2 right-2 w-8 h-8 bg-white/90 rounded-full shadow flex items-center justify-center text-sm hover:scale-110 transition ${favorited ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}
+                    className={`absolute top-2 right-2 w-8 h-8 bg-white/95 backdrop-blur-sm rounded-full shadow-md flex items-center justify-center text-sm transition-all duration-200 hover:scale-110 ${favorited ? 'text-red-500' : 'text-gray-300 hover:text-red-400'}`}
                     title={favorited ? 'Retirer des favoris' : 'Ajouter aux favoris'}
                 >
                     {favorited ? '❤️' : '🤍'}
@@ -183,25 +183,28 @@ function FeaturedShops({ shops }) {
 function Navbar({ isAuthenticated }) {
     const [dark, toggleDark] = useDarkMode()
     return (
-        <nav className="bg-white dark:bg-gray-900 shadow sticky top-0 z-20">
+        <nav className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 sticky top-0 z-20" style={{boxShadow:'0 1px 0 rgba(0,0,0,0.05)'}}>
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                <Link to="/" className="text-xl font-bold text-green-700 dark:text-green-400 tracking-tight">🛒 Guimatrix</Link>
-                <div className="flex items-center gap-2">
+                <Link to="/" className="flex items-center gap-2 group">
+                    <span className="text-2xl">🛒</span>
+                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight group-hover:text-green-700 transition-colors">Guimatrix</span>
+                </Link>
+                <div className="flex items-center gap-1.5">
                     {isAuthenticated ? (
                         <>
-                            <Link to="/create" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">+ Publier</Link>
-                            <Link to="/messages" className="text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Messages">💬</Link>
-                            <Link to="/favorites" className="text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Favoris">❤️</Link>
-                            <Link to="/profile" className="text-gray-600 dark:text-gray-300 px-3 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition" title="Profil">👤</Link>
+                            <Link to="/create" className="btn-primary text-sm px-4 py-2 rounded-xl">+ Publier</Link>
+                            <Link to="/messages" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Messages">💬</Link>
+                            <Link to="/favorites" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Favoris">❤️</Link>
+                            <Link to="/profile" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Profil">👤</Link>
                         </>
                     ) : (
                         <>
-                            <Link to="/login" className="text-gray-600 dark:text-gray-300 px-4 py-2 rounded-lg text-sm hover:bg-gray-100 dark:hover:bg-gray-800 transition">Connexion</Link>
-                            <Link to="/register" className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition">S'inscrire</Link>
+                            <Link to="/login" className="text-gray-600 dark:text-gray-300 px-4 py-2 rounded-xl text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition">Connexion</Link>
+                            <Link to="/register" className="btn-primary text-sm">S'inscrire</Link>
                         </>
                     )}
                     <button onClick={toggleDark}
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-base bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition"
+                        className="w-9 h-9 rounded-xl flex items-center justify-center text-base bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 transition ml-1"
                         title={dark ? 'Mode clair' : 'Mode sombre'}>
                         {dark ? '☀️' : '🌙'}
                     </button>
@@ -311,17 +314,20 @@ export default function HomePage() {
     }, [hasNextPage, isFetchingNextPage, fetchNextPage])
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen" style={{background:'#f8fafc'}}>
             <Navbar isAuthenticated={isAuthenticated} />
 
             {/* Hero + Recherche */}
-            <div className="bg-gradient-to-br from-green-700 to-green-600 text-white py-10 px-4">
-                <div className="max-w-2xl mx-auto text-center">
-                    <h1 className="text-3xl font-bold mb-1">Achetez et vendez en Guinée</h1>
-                    <p className="text-green-200 mb-6 text-sm">Des milliers d'annonces près de chez vous</p>
+            <div className="hero-section text-white py-12 px-4">
+                <div className="max-w-2xl mx-auto text-center relative z-10">
+                    <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs font-medium text-green-100 mb-4">
+                        🇬🇳 La plateforme N°1 en Guinée
+                    </div>
+                    <h1 className="text-4xl font-extrabold mb-2 leading-tight tracking-tight">Achetez et vendez<br />en Guinée</h1>
+                    <p className="text-green-200 mb-8 text-sm">Des milliers d'annonces près de chez vous</p>
 
                     {/* Barre principale */}
-                    <div className="flex gap-2 bg-white rounded-xl p-2 shadow-lg">
+                    <div className="search-bar flex gap-2">
                         <input type="text" placeholder="Rechercher une annonce..."
                             value={search} onChange={handleSearchChange}
                             className="flex-1 px-3 py-2 text-gray-800 outline-none rounded-lg text-sm" />
@@ -420,15 +426,15 @@ export default function HomePage() {
 
             {/* Filtres catégories */}
             {categories.length > 0 && (
-                <div className="bg-white border-b shadow-sm sticky top-14 z-10">
-                    <div className="max-w-5xl mx-auto px-4 py-2 flex gap-2 overflow-x-auto">
+                <div className="bg-white/95 backdrop-blur-sm border-b border-gray-100 sticky top-14 z-10">
+                    <div className="max-w-5xl mx-auto px-4 py-2.5 flex gap-2 overflow-x-auto" style={{scrollbarWidth:'none'}}>
                         <button onClick={() => setCategoryId('')}
-                            className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition ${categoryId === '' ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                            className={`cat-pill flex-shrink-0 ${categoryId === '' ? 'cat-pill-active' : 'cat-pill-inactive'}`}>
                             Tout
                         </button>
                         {categories.map(cat => (
                             <button key={cat.id} onClick={() => setCategoryId(cat.id === categoryId ? '' : cat.id)}
-                                className={`flex-shrink-0 px-4 py-1.5 rounded-full text-sm font-medium transition whitespace-nowrap ${categoryId === cat.id ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                className={`cat-pill flex-shrink-0 ${categoryId === cat.id ? 'cat-pill-active' : 'cat-pill-inactive'}`}>
                                 {cat.icon_url && <span className="mr-1">{cat.icon_url}</span>}
                                 {cat.name}
                             </button>
