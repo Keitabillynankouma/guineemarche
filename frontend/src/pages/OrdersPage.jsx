@@ -248,7 +248,7 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
 
     return (
         <>
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 space-y-3">
+            <div className="bg-white rounded-2xl shadow-card border border-gray-50 p-4 space-y-3">
 
                 {/* En-tête */}
                 <div className="flex items-start justify-between gap-2">
@@ -378,8 +378,8 @@ export default function OrdersPage() {
     const pendingCount = orders.filter(o => o.status === 'pending').length
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white shadow sticky top-0 z-10">
+        <div className="min-h-screen bg-[#f8fafc]">
+            <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
                     <Link to="/profile" className="text-green-700 font-bold text-lg">←</Link>
                     <h1 className="font-bold text-gray-800">Mes commandes</h1>
@@ -396,8 +396,8 @@ export default function OrdersPage() {
                 <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
                     {[['buyer', '🛍️ Mes achats'], ['seller', '🏪 Mes ventes']].map(([key, label]) => (
                         <button key={key} onClick={() => setActive(key)}
-                            className={`flex-1 py-2.5 rounded-lg text-sm font-medium transition ${
-                                active === key ? 'bg-white shadow text-green-700' : 'text-gray-500'
+                            className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition ${
+                                active === key ? 'bg-white shadow text-green-700' : 'text-gray-400 hover:text-gray-600'
                             }`}>
                             {label}
                         </button>

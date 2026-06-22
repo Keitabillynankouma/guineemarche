@@ -620,7 +620,7 @@ export default function ListingDetailPage() {
     })()
 
     return (
-        <div className="min-h-screen bg-gray-50">
+        <div className="min-h-screen bg-[#f8fafc]">
             {/* Lightbox */}
             {lightboxOpen && images.length > 0 && (
                 <ImageLightbox images={images} startIndex={activePhoto} onClose={() => setLightboxOpen(false)} />
@@ -632,9 +632,9 @@ export default function ListingDetailPage() {
             )}
 
             {/* Navbar */}
-            <nav className="bg-white shadow sticky top-0 z-10">
+            <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
+                    <Link to="/" className="text-green-700 font-bold text-lg tracking-tight">← Guimatrix</Link>
                     <div className="flex items-center gap-2">
                         {isAuthenticated && !isSeller && (
                             <button
@@ -665,8 +665,8 @@ export default function ListingDetailPage() {
                 <div className="md:col-span-2 space-y-4">
 
                     {/* Galerie photos */}
-                    <div className="bg-white rounded-2xl shadow overflow-hidden">
-                        <div className="relative h-72 bg-gray-100 cursor-zoom-in"
+                    <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+                        <div className="relative h-80 bg-gray-100 cursor-zoom-in"
                             onClick={() => images.length > 0 && setLightboxOpen(true)}>
                             {images.length > 0 ? (
                                 <img src={images[activePhoto]?.file} alt={listing.title}
@@ -751,7 +751,7 @@ export default function ListingDetailPage() {
                                 {CONDITION_LABELS[listing.condition] || listing.condition}
                             </span>
                         </div>
-                        <p className="text-2xl font-bold text-green-600 mb-1">
+                        <p className="text-3xl font-extrabold price-tag mb-1">
                             {formatPrice(listing.price_gnf, listing.price_type)}
                             {listing.price_type === 'negotiable' && (
                                 <span className="text-sm font-normal text-gray-400 ml-2">· Prix négociable</span>
@@ -788,15 +788,17 @@ export default function ListingDetailPage() {
                 </div>
 
                 {/* ── Sidebar ── */}
-                <div className="space-y-4">
+                <div className="space-y-4 md:sticky md:top-20">
                     {/* Vendeur */}
-                    <div className="bg-white rounded-2xl shadow p-5">
-                        <h2 className="font-semibold text-gray-700 mb-3">Vendeur</h2>
+                    <div className="bg-white rounded-2xl shadow-card p-5">
+                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Vendeur</p>
                         <div className="flex items-center gap-3">
-                            <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center text-xl">👤</div>
+                            <div className="w-12 h-12 bg-gradient-to-br from-green-100 to-green-200 rounded-full flex items-center justify-center text-xl font-bold text-green-700">
+                                {listing.seller_name?.[0]?.toUpperCase() ?? '👤'}
+                            </div>
                             <div>
-                                <p className="font-medium text-gray-800">{listing.seller_name}</p>
-                                <p className="text-xs text-gray-400">{listing.seller_phone}</p>
+                                <p className="font-semibold text-gray-800">{listing.seller_name}</p>
+                                <p className="text-xs text-gray-400 mt-0.5">{listing.seller_phone}</p>
                             </div>
                         </div>
                     </div>
@@ -859,14 +861,14 @@ export default function ListingDetailPage() {
 
                     {/* Bouton acheter */}
                     {!isSeller && listing.status === 'active' && (
-                        <div className="bg-white rounded-2xl shadow p-5 space-y-3">
+                        <div className="bg-white rounded-2xl shadow-card p-5 space-y-3">
                             {orderDone ? (
-                                <div className="bg-green-50 text-green-700 p-4 rounded-xl text-sm text-center">
+                                <div className="bg-green-50 text-green-700 p-4 rounded-xl text-sm text-center font-medium">
                                     ✅ Commande passée ! Le vendeur va confirmer sous peu.
                                 </div>
                             ) : (
                                 <button onClick={() => isAuthenticated ? setShowBuyModal(true) : navigate('/login')}
-                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition text-base">
+                                    className="btn-primary w-full py-3.5 rounded-xl text-base font-bold text-center block">
                                     🛒 Acheter maintenant
                                 </button>
                             )}
@@ -875,18 +877,18 @@ export default function ListingDetailPage() {
 
                     {/* Contact vendeur */}
                     {!isSeller && (
-                        <div className="bg-white rounded-2xl shadow p-5">
-                            <h2 className="font-semibold text-gray-700 mb-3">💬 Contacter le vendeur</h2>
+                        <div className="bg-white rounded-2xl shadow-card p-5">
+                            <h2 className="font-semibold text-gray-800 mb-3">💬 Contacter le vendeur</h2>
                             {sent ? (
-                                <div className="bg-green-50 text-green-700 p-3 rounded-lg text-sm text-center">✅ Message envoyé !</div>
+                                <div className="bg-green-50 text-green-700 p-3 rounded-xl text-sm text-center font-medium">✅ Message envoyé !</div>
                             ) : (
                                 <form onSubmit={handleContact} className="space-y-3">
                                     <textarea rows={3} placeholder="Bonjour, est-ce encore disponible ?"
                                         value={message} onChange={e => setMessage(e.target.value)}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 resize-none" required />
                                     <button type="submit" disabled={sending}
-                                        className="w-full bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-2 rounded-lg text-sm transition disabled:opacity-50">
-                                        {sending ? 'Envoi...' : 'Envoyer un message'}
+                                        className="w-full bg-gray-800 hover:bg-gray-900 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50">
+                                        {sending ? 'Envoi...' : '📨 Envoyer un message'}
                                     </button>
                                     {!isAuthenticated && (
                                         <p className="text-xs text-center text-gray-400">

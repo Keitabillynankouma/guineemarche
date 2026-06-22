@@ -236,10 +236,10 @@ export default function MessagesPage() {
                     </div>
                   ) : (
                     <div className={`
-                      max-w-[75%] px-4 py-2.5 rounded-2xl text-sm shadow-sm
+                      max-w-[75%] px-4 py-2.5 rounded-2xl text-sm
                       ${isFromOther
-                        ? 'bg-white text-gray-800 rounded-tl-none'
-                        : 'bg-green-600 text-white rounded-tr-none'}
+                        ? 'bg-white text-gray-800 rounded-tl-none shadow-sm border border-gray-100'
+                        : 'bg-gradient-to-br from-green-600 to-green-700 text-white rounded-tr-none shadow-md'}
                     `}>
                       {msg.content}
                       <p className={`text-xs mt-1 ${isFromOther ? 'text-gray-400' : 'text-green-100'}`}>
@@ -301,7 +301,7 @@ export default function MessagesPage() {
           {/* Input */}
           <form
             onSubmit={(e) => { e.preventDefault(); handleSend() }}
-            className="bg-white border-t p-3 flex items-end gap-2"
+            className="bg-white border-t border-gray-100 p-3 flex items-end gap-2"
           >
             <button
               type="button"
@@ -339,18 +339,18 @@ export default function MessagesPage() {
   )
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
+    <div className="min-h-screen bg-[#f8fafc] flex flex-col">
       {/* Nav desktop uniquement (mobile : bouton retour dans la liste/header) */}
-      <nav className="bg-white shadow sticky top-0 z-10 hidden md:block">
+      <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10 hidden md:block">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-          <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
-          <Link to="/profile" className="text-gray-500 text-sm hover:text-green-600">👤 Profil</Link>
+          <Link to="/" className="text-green-700 font-bold text-lg tracking-tight">← Guimatrix</Link>
+          <Link to="/profile" className="text-gray-500 text-sm hover:text-green-600 transition">👤 Profil</Link>
         </div>
       </nav>
 
       {/* Container principal — plein écran mobile */}
       <div className="flex-1 flex md:max-w-5xl md:mx-auto md:w-full md:px-4 md:py-6">
-        <div className="flex flex-1 md:rounded-2xl md:shadow overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
+        <div className="flex flex-1 md:rounded-2xl md:shadow-card overflow-hidden" style={{ height: 'calc(100vh - 56px)' }}>
           {ConvList}
           {ChatArea}
         </div>

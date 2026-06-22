@@ -292,41 +292,45 @@ export default function ProfilePage() {
     )
 
     return (
-        <div className="min-h-screen bg-gray-50">
-            <nav className="bg-white shadow sticky top-0 z-10">
+        <div className="min-h-screen bg-[#f8fafc]">
+            <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link to="/" className="text-green-700 font-bold text-lg">Guimatrix</Link>
+                    <Link to="/" className="text-green-700 font-bold text-lg tracking-tight">← Guimatrix</Link>
+                    <span className="text-sm font-semibold text-gray-700">Mon profil</span>
                 </div>
             </nav>
 
-            <div className="max-w-2xl mx-auto px-4 py-8 space-y-4">
-                <div className="bg-white rounded-2xl shadow p-6 text-center">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-4xl mx-auto mb-4 overflow-hidden">
-                        {user.profile?.avatar_url
-                            ? <img src={user.profile.avatar_url} alt="" className="w-full h-full object-cover" />
-                            : '👤'}
-                    </div>
-                    <h1 className="text-xl font-bold text-gray-800">{user.full_name}</h1>
-                    <p className="text-gray-500">{String(user.phone_number)}</p>
-                    <p className="text-sm text-gray-400 mt-1">📍 {user.city}{user.quartier && ` · ${user.quartier}`}</p>
-                    {user.profile && (
-                        <div className="flex justify-center gap-6 mt-4 text-sm">
-                            <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
-                                <p className="font-bold text-gray-800">
-                                    {'★'.repeat(Math.round(user.profile.rating_avg || 0))} {user.profile.rating_avg?.toFixed(1) || '0.0'}
-                                </p>
-                                <p className="text-gray-400">Note</p>
-                            </Link>
-                            <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
-                                <p className="font-bold text-gray-800">{user.profile.total_ratings}</p>
-                                <p className="text-gray-400">Avis →</p>
-                            </Link>
-                            <div className="text-center">
-                                <p className="font-bold text-gray-800">{user.profile.total_sales}</p>
-                                <p className="text-gray-400">Ventes</p>
-                            </div>
+            <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+                {/* Carte profil avec bannière */}
+                <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+                    {/* Bannière verte */}
+                    <div className="h-20 bg-hero-gradient" />
+                    <div className="px-6 pb-6 -mt-10 text-center">
+                        <div className="w-20 h-20 bg-white border-4 border-white rounded-full flex items-center justify-center text-3xl mx-auto shadow-md overflow-hidden">
+                            {user.profile?.avatar_url
+                                ? <img src={user.profile.avatar_url} alt="" className="w-full h-full object-cover" />
+                                : <span className="bg-gradient-to-br from-green-100 to-green-200 w-full h-full flex items-center justify-center font-bold text-green-700 text-2xl">{user.full_name?.[0]?.toUpperCase() ?? '?'}</span>}
                         </div>
-                    )}
+                        <h1 className="text-xl font-bold text-gray-900 mt-3">{user.full_name}</h1>
+                        <p className="text-gray-500 text-sm mt-0.5">{String(user.phone_number)}</p>
+                        <p className="text-xs text-gray-400 mt-1">📍 {user.city}{user.quartier && ` · ${user.quartier}`}</p>
+                        {user.profile && (
+                            <div className="flex justify-center gap-8 mt-5 text-sm border-t pt-4">
+                                <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
+                                    <p className="font-bold text-gray-900 text-base">{user.profile.rating_avg?.toFixed(1) || '0.0'} <span className="text-amber-400">★</span></p>
+                                    <p className="text-gray-400 text-xs mt-0.5">Note</p>
+                                </Link>
+                                <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
+                                    <p className="font-bold text-gray-900 text-base">{user.profile.total_ratings}</p>
+                                    <p className="text-gray-400 text-xs mt-0.5">Avis</p>
+                                </Link>
+                                <div className="text-center">
+                                    <p className="font-bold text-gray-900 text-base">{user.profile.total_sales}</p>
+                                    <p className="text-gray-400 text-xs mt-0.5">Ventes</p>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 </div>
 
                 {/* Dashboard vendeur */}
@@ -430,33 +434,29 @@ export default function ProfilePage() {
                     <ReferralSection referral={referral} />
                 )}
 
-                <div className="bg-white rounded-2xl shadow overflow-hidden">
-                    <Link to="/my-listings" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
-                        <span className="font-medium text-gray-700">📋 Mes annonces</span>
-                        <span className="text-gray-400">›</span>
-                    </Link>
-                    <Link to="/orders" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
-                        <span className="font-medium text-gray-700">🛍️ Mes commandes</span>
-                        <span className="text-gray-400">›</span>
-                    </Link>
-                    <Link to="/messages" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
-                        <span className="font-medium text-gray-700">💬 Mes messages</span>
-                        <span className="text-gray-400">›</span>
-                    </Link>
-                    <Link to="/favorites" className="flex items-center justify-between p-4 hover:bg-gray-50 border-b">
-                        <span className="font-medium text-gray-700">❤️ Mes favoris</span>
-                        <span className="text-gray-400">›</span>
-                    </Link>
+                <div className="bg-white rounded-2xl shadow-card overflow-hidden">
+                    {[
+                        { to: '/my-listings', label: '📋 Mes annonces' },
+                        { to: '/orders',      label: '🛍️ Mes commandes' },
+                        { to: '/messages',    label: '💬 Mes messages' },
+                        { to: '/favorites',   label: '❤️ Mes favoris' },
+                    ].map(item => (
+                        <Link key={item.to} to={item.to}
+                            className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 border-b border-gray-50 transition-colors">
+                            <span className="font-medium text-gray-700">{item.label}</span>
+                            <span className="text-gray-300 text-lg">›</span>
+                        </Link>
+                    ))}
                     {user.role === 'admin' && (
-                        <Link to="/admin" className="flex items-center justify-between p-4 hover:bg-red-50 border-b">
+                        <Link to="/admin" className="flex items-center justify-between px-5 py-4 hover:bg-red-50 border-b transition-colors">
                             <span className="font-medium text-red-600">🛡️ Administration</span>
-                            <span className="text-red-400">›</span>
+                            <span className="text-red-300 text-lg">›</span>
                         </Link>
                     )}
                     <button onClick={handleLogout}
-                        className="w-full flex items-center justify-between p-4 hover:bg-red-50 text-red-500">
+                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-red-50 text-red-500 transition-colors">
                         <span className="font-medium">🚪 Se déconnecter</span>
-                        <span>›</span>
+                        <span className="text-lg">›</span>
                     </button>
                 </div>
             </div>
