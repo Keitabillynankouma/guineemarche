@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersAPI } from '../services/api'
+import Logo from '../components/Logo'
 
 const STATUS_STEPS = ['pending', 'confirmed', 'completed']
 const STATUS = {
@@ -381,7 +382,7 @@ export default function OrdersPage() {
         <div className="min-h-screen bg-[#f8fafc]">
             <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
-                    <Link to="/profile" className="text-green-700 font-bold text-lg">←</Link>
+                    <Logo back />
                     <h1 className="font-bold text-gray-800">Mes commandes</h1>
                     {pendingCount > 0 && (
                         <span className="bg-red-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center font-bold">

@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
+import Logo from '../components/Logo'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -634,7 +635,7 @@ export default function ListingDetailPage() {
             {/* Navbar */}
             <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10">
                 <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link to="/" className="text-green-700 font-bold text-lg tracking-tight">← Guimatrix</Link>
+                    <Logo back />
                     <div className="flex items-center gap-2">
                         {isAuthenticated && !isSeller && (
                             <button

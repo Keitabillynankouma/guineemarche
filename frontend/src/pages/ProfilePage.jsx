@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import useAuthStore from '../store/authStore'
 import { authAPI, ordersAPI, listingsAPI, referralAPI } from '../services/api'
+import Logo from '../components/Logo'
 
 // ── Graphique barres SVG pur ──────────────────────────────────────────────────
 function BarChart({ data, color = '#16a34a', label = '' }) {
@@ -295,7 +296,7 @@ export default function ProfilePage() {
         <div className="min-h-screen bg-[#f8fafc]">
             <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-10">
                 <div className="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
-                    <Link to="/" className="text-green-700 font-bold text-lg tracking-tight">← Guimatrix</Link>
+                    <Logo back />
                     <span className="text-sm font-semibold text-gray-700">Mon profil</span>
                 </div>
             </nav>

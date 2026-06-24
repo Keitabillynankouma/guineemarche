@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { listingsAPI, shopsAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useDarkMode } from '../hooks/useDarkMode'
+import Logo from '../components/Logo'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -185,10 +186,7 @@ function Navbar({ isAuthenticated }) {
     return (
         <nav className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 sticky top-0 z-20" style={{boxShadow:'0 1px 0 rgba(0,0,0,0.05)'}}>
             <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
-                <Link to="/" className="flex items-center gap-2 group">
-                    <span className="text-2xl">🛒</span>
-                    <span className="text-lg font-bold text-gray-900 dark:text-white tracking-tight group-hover:text-green-700 transition-colors">Guimatrix</span>
-                </Link>
+                <Logo />
                 <div className="flex items-center gap-1.5">
                     {isAuthenticated ? (
                         <>

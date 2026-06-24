@@ -1,4 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="80" fill="#16a34a"/>
-  <text x="256" y="310" font-family="Arial,sans-serif" font-size="200" font-weight="bold" text-anchor="middle" fill="white">GM</text>
+  <rect width="512" height="512" rx="102" fill="#111827"/>
+  <text x="256" y="310" font-family="Arial,sans-serif" font-size="200" font-weight="bold" text-anchor="middle" fill="white" letter-spacing="-6">Gui</text>
+  <rect x="72" y="330" width="368" height="14" rx="7" fill="#22c55e"/>
+  <text x="256" y="410" font-family="Arial,sans-serif" font-size="72" font-weight="bold" text-anchor="middle" fill="#22c55e" letter-spacing="20">MATRIX</text>
 </svg>
