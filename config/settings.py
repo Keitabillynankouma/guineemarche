@@ -174,6 +174,7 @@ CSRF_TRUSTED_ORIGINS = [
     'https://guineemarche-frontend.onrender.com',
     'https://guineemarche.onrender.com',
     'https://guineemarche-production.up.railway.app',
+    'https://guineemarche-frontend-production.up.railway.app',
     'https://*.railway.app',
     'https://*.up.railway.app',
 ]
@@ -187,6 +188,7 @@ CORS_ALLOWED_ORIGINS = [
     "https://guineemarche.com",
     "https://www.guineemarche.com",
     "https://guineemarche-production.up.railway.app",
+    "https://guineemarche-frontend-production.up.railway.app",
     "http://localhost:5173",   # Dev local
     "http://127.0.0.1:5173",
 ]
