@@ -534,9 +534,18 @@ class AdminExportCSVView(APIView):
                 'ID', 'Annonce', 'Acheteur', 'Vendeur', 'Montant GNF',
                 'Statut', 'Mode livraison', 'Créé le',
             ])
-            for o in Order.objects.select_related('listing', 'buyer', 'seller').order_by('-created_at'):
+            # Pre-fetch existing listings to avoid INNER JOIN filtering out
+            # orders whose listing was deleted (orphaned FK)
+            from apps.listings.models import Listing
+            listing_ids = Order.objects.values_list('listing_id', flat=True)
+            listings_map = {
+                str(l.id): l.title
+                for l in Listing.objects.filter(id__in=listing_ids)
+            }
+            for o in Order.objects.select_related('buyer', 'seller').order_by('-created_at'):
+                listing_title = listings_map.get(str(o.listing_id), 'Annonce supprimée')
                 writer.writerow([
-                    str(o.id), o.listing.title,
+                    str(o.id), listing_title,
                     o.buyer.full_name, o.seller.full_name,
                     o.amount_gnf, o.status, o.delivery_mode,
                     o.created_at.strftime('%d/%m/%Y %H:%M'),
