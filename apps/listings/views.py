@@ -69,15 +69,21 @@ class ListingListCreateView(generics.ListCreateAPIView):
         return queryset.filter(id__in=ids)
 
     def perform_create(self, serializer):
+        import logging
+        logger = logging.getLogger(__name__)
         from apps.accounts.models import Subscription, Badge
-        from rest_framework.exceptions import PermissionDenied
+        from rest_framework.exceptions import PermissionDenied, ValidationError
         from core.site_settings import SiteSettings
-        from .moderation import moderate_listing
         user = self.request.user
-        site = SiteSettings.get()
+        try:
+            site = SiteSettings.get()
+        except Exception as e:
+            logger.error("SiteSettings.get() failed: %s", e, exc_info=True)
+            site = None
+
         sub, _ = Subscription.objects.get_or_create(user=user)
         # Vérifier quotas seulement si abonnements actifs ET gratuites désactivées
-        if not site.free_listings_enabled and site.subscriptions_enabled:
+        if site and not site.free_listings_enabled and site.subscriptions_enabled:
             limit = site.max_free_listings
             if not sub.can_post:
                 raise PermissionDenied(
@@ -89,28 +95,41 @@ class ListingListCreateView(generics.ListCreateAPIView):
                 )
 
         # 1. Sauvegarder en DRAFT (en attente de modération async)
-        listing = serializer.save(seller=user, status=Listing.Status.DRAFT)
+        try:
+            listing = serializer.save(seller=user, status=Listing.Status.DRAFT)
+        except Exception as e:
+            logger.error("serializer.save() failed: %s", e, exc_info=True)
+            raise ValidationError({'detail': f'Erreur lors de la création de l\'annonce: {str(e)}'})
 
         # 2. Lancer la modération IA en arrière-plan (Celery) — ne bloque pas la réponse
         try:
             from .tasks import moderate_listing_task
             moderate_listing_task.delay(str(listing.id))
-        except Exception:
+        except Exception as celery_err:
+            logger.warning("Celery indisponible (%s), modération synchrone", celery_err)
             # Si Celery indisponible, modération synchrone de secours
-            from .moderation import moderate_listing
-            category_name = listing.category.name if listing.category else 'Non définie'
-            mod = moderate_listing(listing.title, listing.description, listing.price_gnf, category_name)
-            if mod['decision'] == 'reject':
-                listing.status = Listing.Status.SUSPENDED
-            elif mod['decision'] != 'review':
+            try:
+                from .moderation import moderate_listing
+                category_name = listing.category.name if listing.category else 'Non définie'
+                mod = moderate_listing(listing.title, listing.description, listing.price_gnf, category_name)
+                if mod['decision'] == 'reject':
+                    listing.status = Listing.Status.SUSPENDED
+                elif mod['decision'] != 'review':
+                    listing.status = Listing.Status.ACTIVE
+                listing.save(update_fields=['status'])
+            except Exception as mod_err:
+                logger.error("Modération synchrone échouée: %s", mod_err, exc_info=True)
                 listing.status = Listing.Status.ACTIVE
-            listing.save(update_fields=['status'])
+                listing.save(update_fields=['status'])
 
         # 3. Compteur abonnement + badge
-        sub.listings_used += 1
-        sub.save(update_fields=['listings_used'])
-        if sub.listings_used == 1:
-            Badge.award(user, Badge.Type.FIRST_LISTING)
+        try:
+            sub.listings_used += 1
+            sub.save(update_fields=['listings_used'])
+            if sub.listings_used == 1:
+                Badge.award(user, Badge.Type.FIRST_LISTING)
+        except Exception as e:
+            logger.error("Badge/subscription update failed: %s", e, exc_info=True)
 
 
 class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):

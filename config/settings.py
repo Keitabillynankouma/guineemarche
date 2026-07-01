@@ -290,6 +290,21 @@ CELERY_BROKER_URL  = env('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_RESULT_BACKEND = env('REDIS_URL', default='redis://localhost:6379/0')
 CELERY_TIMEZONE    = 'Africa/Conakry'
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {'class': 'logging.StreamHandler'},
+    },
+    'root': {'handlers': ['console'], 'level': 'INFO'},
+    'loggers': {
+        'django': {'handlers': ['console'], 'level': 'WARNING', 'propagate': False},
+        'django.request': {'handlers': ['console'], 'level': 'ERROR', 'propagate': False},
+        'apps': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+        'core': {'handlers': ['console'], 'level': 'DEBUG', 'propagate': False},
+    },
+}
+
 from celery.schedules import crontab
 CELERY_BEAT_SCHEDULE = {
     # Libération escrow — toutes les heures
