@@ -272,16 +272,20 @@ PAYCARD_WEBHOOK_URL = env('PAYCARD_WEBHOOK_URL', default='https://api.guimatrix.
 # ── Brevo (ex-Sendinblue) — Email transactionnel ──────────────────────────────
 # Créer un compte sur brevo.com → Settings → SMTP & API → SMTP
 # Copier SMTP Login et SMTP Password dans Railway :
+# ── Email — Gmail (immédiat) ou Brevo (production) ────────────────────────────
+# Gmail  : BREVO_SMTP_USER=bnkeita020@gmail.com  EMAIL_HOST=smtp.gmail.com
+# Brevo  : BREVO_SMTP_USER=xxx@smtp-brevo.com    EMAIL_HOST=smtp-relay.brevo.com
+# Les deux utilisent port 587 + TLS
 EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
-EMAIL_HOST          = 'smtp-relay.brevo.com'
+EMAIL_HOST          = env('EMAIL_HOST', default='smtp.gmail.com')  # smtp.gmail.com ou smtp-relay.brevo.com
 EMAIL_PORT          = 587
 EMAIL_USE_TLS       = True
-EMAIL_HOST_USER     = env('BREVO_SMTP_USER', default='')      # ex: 123456@smtp-brevo.com
-EMAIL_HOST_PASSWORD = env('BREVO_SMTP_PASSWORD', default='')  # clé SMTP Brevo
+EMAIL_HOST_USER     = env('BREVO_SMTP_USER', default='')      # ton email Gmail ou login Brevo
+EMAIL_HOST_PASSWORD = env('BREVO_SMTP_PASSWORD', default='')  # mot de passe d'application Google ou clé Brevo
 DEFAULT_FROM_EMAIL  = env('DEFAULT_FROM_EMAIL', default='Guimatrix <noreply@guimatrix.com>')
 ADMIN_EMAIL         = env('ADMIN_EMAIL', default='bnkeita020@gmail.com')
 
-# Si pas de config Brevo → console (logs Railway) pour le développement
+# Si pas de config email → console (logs Railway) — rien ne plante
 if not EMAIL_HOST_USER:
     EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 

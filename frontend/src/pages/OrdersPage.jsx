@@ -131,25 +131,47 @@ function EscrowInfoModal({ onConfirm }) {
 }
 
 // ── Modal paiement ──────────────────────────────────────────────────────────
+const PROVIDERS = [
+    { value: 'orange_money', label: 'Orange Money',         emoji: '🟠', desc: 'Mobile Money Guinea' },
+    { value: 'mtn_momo',     label: 'MTN Mobile Money',     emoji: '🟡', desc: 'Mobile Money Guinea' },
+    { value: 'card',         label: 'Carte Visa / Mastercard', emoji: '💳', desc: 'Diaspora & international', badge: 'Paycard' },
+    { value: 'cash',         label: 'Espèces (remise en main)', emoji: '💵', desc: 'Paiement à la livraison' },
+]
+
 function PayModal({ order, onClose, onPaid }) {
     const [provider, setProvider] = useState('orange_money')
     const [phone, setPhone]       = useState('')
     const [error, setError]       = useState('')
     const [loading, setLoading]   = useState(false)
+    const [cardPending, setCardPending] = useState(false)   // attente confirmation Visa
     const [showEscrowInfo, setShowEscrowInfo] = useState(false)
     const [escrowAcknowledged, setEscrowAcknowledged] = useState(
         () => localStorage.getItem('gm_escrow_acknowledged') === '1'
     )
 
+    const needsPhone = !['cash', 'card'].includes(provider)
+
     const handlePay = async () => {
-        if (provider !== 'cash' && !phone.trim()) {
+        if (needsPhone && !phone.trim()) {
             setError('Entrez votre numéro Mobile Money.')
             return
         }
         setError('')
         setLoading(true)
         try {
-            await ordersAPI.pay(order.id, { provider, phone_number: phone })
+            const res = await ordersAPI.pay(order.id, {
+                provider,
+                phone_number: needsPhone ? phone : '',
+            })
+
+            // Paiement carte Visa → redirection vers page Paycard
+            if (res.data?.card && res.data?.payment_url) {
+                setCardPending(true)
+                setLoading(false)
+                window.open(res.data.payment_url, '_blank', 'noopener,noreferrer')
+                return
+            }
+
             onPaid()
             onClose()
         } catch (e) {
@@ -157,13 +179,41 @@ function PayModal({ order, onClose, onPaid }) {
         } finally { setLoading(false) }
     }
 
-    // Montrer le modal escrow si Orange Money + jamais vu
     const handlePayClick = () => {
-        if (provider === 'orange_money' && !escrowAcknowledged) {
+        if (['orange_money', 'mtn_momo'].includes(provider) && !escrowAcknowledged) {
             setShowEscrowInfo(true)
         } else {
             handlePay()
         }
+    }
+
+    // Écran d'attente après redirection carte Visa
+    if (cardPending) {
+        return (
+            <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl w-full max-w-md p-6 text-center space-y-4">
+                    <div className="text-4xl">💳</div>
+                    <h2 className="font-bold text-gray-800 text-lg">Paiement Visa en cours</h2>
+                    <p className="text-sm text-gray-600">
+                        La page de paiement Paycard s'est ouverte dans un nouvel onglet.<br />
+                        Entrez vos données de carte et validez. Votre commande sera confirmée automatiquement.
+                    </p>
+                    <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
+                        ℹ️ Vous pouvez fermer ce dialogue. Votre commande s'actualisera une fois le paiement reçu.
+                    </div>
+                    <div className="flex gap-3">
+                        <button onClick={onClose}
+                            className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">
+                            Fermer
+                        </button>
+                        <button onClick={() => { onPaid(); onClose(); }}
+                            className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold">
+                            J'ai payé ✓
+                        </button>
+                    </div>
+                </div>
+            </div>
+        )
     }
 
     return (
@@ -180,36 +230,49 @@ function PayModal({ order, onClose, onPaid }) {
             onClick={onClose}>
             <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4"
                 onClick={e => e.stopPropagation()}>
-                <h2 className="font-bold text-gray-800 text-lg">💳 Payer la commande</h2>
+                <h2 className="font-bold text-gray-800 text-lg">Choisir le mode de paiement</h2>
                 <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-1">
                     <p className="font-medium text-gray-700">{order.listing_title}</p>
                     <p className="font-bold text-green-700 text-base">{fmt(order.amount_gnf)}</p>
                 </div>
 
                 <div className="space-y-2">
-                    {[
-                        { value: 'orange_money', label: 'Orange Money', emoji: '🟠' },
-                        { value: 'cash',         label: 'Espèces (en main)', emoji: '💵' },
-                    ].map(opt => (
+                    {PROVIDERS.map(opt => (
                         <button key={opt.value} onClick={() => setProvider(opt.value)}
                             className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border-2 transition text-sm
                                 ${provider === opt.value ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
                             <span className="text-xl">{opt.emoji}</span>
-                            <span className={`font-medium ${provider === opt.value ? 'text-green-700' : 'text-gray-700'}`}>
-                                {opt.label}
-                            </span>
-                            {provider === opt.value && <span className="ml-auto text-green-600">✓</span>}
+                            <div className="text-left flex-1">
+                                <div className={`font-medium ${provider === opt.value ? 'text-green-700' : 'text-gray-700'}`}>
+                                    {opt.label}
+                                    {opt.badge && (
+                                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                                            {opt.badge}
+                                        </span>
+                                    )}
+                                </div>
+                                <div className="text-xs text-gray-400">{opt.desc}</div>
+                            </div>
+                            {provider === opt.value && <span className="text-green-600">✓</span>}
                         </button>
                     ))}
                 </div>
 
-                {provider !== 'cash' && (
+                {needsPhone && (
                     <input
                         type="tel" placeholder="224 6XX XXX XXX"
                         value={phone} onChange={e => setPhone(e.target.value)}
                         className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
                     />
                 )}
+
+                {provider === 'card' && (
+                    <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 space-y-1">
+                        <p className="font-medium">💳 Paiement sécurisé Visa / Mastercard</p>
+                        <p>Vous serez redirigé vers la page sécurisée Paycard. Accepté depuis la Guinée et l'étranger (diaspora).</p>
+                    </div>
+                )}
+
                 {error && <p className="text-sm text-red-500">{error}</p>}
 
                 <div className="flex gap-3">
@@ -219,7 +282,7 @@ function PayModal({ order, onClose, onPaid }) {
                     </button>
                     <button onClick={handlePayClick} disabled={loading}
                         className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50">
-                        {loading ? 'Traitement...' : `Payer ${fmt(order.amount_gnf)}`}
+                        {loading ? 'Traitement...' : provider === 'card' ? '💳 Payer par carte' : `Payer ${fmt(order.amount_gnf)}`}
                     </button>
                 </div>
             </div>
@@ -302,7 +365,12 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                     <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 space-y-1">
                         {order.payments.map(p => (
                             <div key={p.id} className="flex justify-between">
-                                <span>{p.provider === 'orange_money' ? '🟠 Orange Money' : '💵 Espèces'}</span>
+                                <span>{
+                                    p.provider === 'orange_money' ? '🟠 Orange Money' :
+                                    p.provider === 'mtn_momo'     ? '🟡 MTN MoMo' :
+                                    p.provider === 'card'         ? '💳 Carte Visa (Paycard)' :
+                                    '💵 Espèces'
+                                }</span>
                                 <span className={p.status === 'paid' ? 'text-green-600 font-medium' : 'text-yellow-600'}>
                                     {p.status === 'paid' ? '✓ Payé' : p.status === 'pending' ? '⏳ En attente' : p.status}
                                 </span>
