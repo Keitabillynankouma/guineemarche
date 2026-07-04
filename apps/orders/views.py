@@ -316,6 +316,40 @@ def _verify_orange_signature(request):
     return hmac.compare_digest(sig_header, expected)
 
 
+def _verify_pawapay_signature(request):
+    """
+    Vérifie la signature HMAC-SHA256 des webhooks PawaPay.
+    PawaPay signe avec : HMAC-SHA256(timestamp + '.' + body, API_TOKEN)
+    Headers: X-PawaPay-Timestamp, X-PawaPay-Signature
+    """
+    token = getattr(settings, 'PAWAPAY_API_TOKEN', '')
+    if not token:
+        logger.warning("[PAWAPAY] PAWAPAY_API_TOKEN non configuré — webhook non vérifié")
+        return True  # En sandbox, on laisse passer mais on log
+
+    timestamp = request.headers.get('X-PawaPay-Timestamp', '')
+    sig_header = request.headers.get('X-PawaPay-Signature', '')
+
+    if not timestamp or not sig_header:
+        logger.warning("[PAWAPAY] Webhook sans headers de signature — potentielle attaque")
+        return False
+
+    # Vérifier que le timestamp n'est pas trop vieux (protection replay attack)
+    try:
+        import time
+        ts = int(timestamp)
+        if abs(time.time() - ts) > 300:  # 5 minutes max
+            logger.warning("[PAWAPAY] Webhook trop ancien (replay attack?) ts=%s", timestamp)
+            return False
+    except (ValueError, TypeError):
+        return False
+
+    body = request.body
+    message = f"{timestamp}.{body.decode('utf-8', errors='replace')}".encode()
+    expected = hmac.new(token.encode(), message, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig_header, expected)
+
+
 @method_decorator(csrf_exempt, name='dispatch')
 class PaymentWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -329,7 +363,10 @@ class PaymentWebhookView(APIView):
             ref     = data.get('pay_token', '')
             success = data.get('status', '') == 'SUCCESS'
         elif provider in ('pawapay_deposit', 'pawapay'):
-            # PawaPay Deposit callback
+            # Vérification signature PawaPay
+            if not _verify_pawapay_signature(request):
+                logger.warning("[PAWAPAY] Webhook deposit rejeté — signature invalide")
+                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('depositId', '')
             success = data.get('status', '') == 'COMPLETED'
         elif provider == 'pawapay_payout':
@@ -337,6 +374,9 @@ class PaymentWebhookView(APIView):
             logger.info("[PAWAPAY PAYOUT] %s", data)
             return Response({'status': 'ok'})
         elif provider == 'pawapay_refund':
+            if not _verify_pawapay_signature(request):
+                logger.warning("[PAWAPAY] Webhook refund rejeté — signature invalide")
+                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             # PawaPay Refund callback
             ref     = data.get('refundId', '')
             success = data.get('status', '') == 'COMPLETED'

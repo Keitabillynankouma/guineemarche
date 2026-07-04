@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.db import transaction
 from .models import Category, Listing, ListingMedia, Favorite, ListingReport, CategoryAttribute, Banner
+from core.file_validators import validate_image_file, validate_video_file, MAX_IMAGE_COUNT
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -44,17 +45,19 @@ class ListingSerializer(serializers.ModelSerializer):
     category_name = serializers.CharField(source='category.name', read_only=True)
     is_favorited  = serializers.SerializerMethodField()
     uploaded_files = serializers.ListField(
-        child=serializers.ImageField(),
+        child=serializers.ImageField(validators=[validate_image_file]),
         write_only=True,
         required=False,
         allow_empty=True,
-        default=list
+        default=list,
+        max_length=MAX_IMAGE_COUNT,
     )
     uploaded_video = serializers.FileField(
         write_only=True,
         required=False,
         allow_null=True,
-        default=None
+        default=None,
+        validators=[validate_video_file],
     )
 
     class Meta:

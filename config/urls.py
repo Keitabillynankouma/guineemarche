@@ -34,10 +34,15 @@ handler400 = bad_request
 handler403 = permission_denied
 handler404 = page_not_found
 
+import os
+
+# URL admin secrète — configurable via DJANGO_ADMIN_URL (par défaut : URL aléatoire non devinable)
+# ⚠️  Ne jamais laisser 'admin/' en production
+_ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'gm-backoffice-9f3a2e/')
+
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path(_ADMIN_URL, admin.site.urls),
     path('api/v1/', include('config.api_urls')),
-    
 ]
 
 if settings.DEBUG:

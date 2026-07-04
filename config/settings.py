@@ -317,5 +317,10 @@ CELERY_BEAT_SCHEDULE = {
         'task':     'apps.orders.tasks.notify_pending_escrow',
         'schedule': crontab(hour='8,20', minute=0),  # 8h et 20h
     },
+    # Agent sécurité IA — scan quotidien à 07h00 (UTC = 07h00 Conakry, pas de décalage)
+    'security-daily-scan': {
+        'task':     'core.security_agent.run_security_scan',
+        'schedule': crontab(hour=7, minute=0),   # 07h00 chaque matin
+    },
 }
 

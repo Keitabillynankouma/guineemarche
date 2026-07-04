@@ -1,13 +1,44 @@
 """
 Middleware de sécurité Guimatrix.
 Détecte les attaques courantes, bloque les requêtes malveillantes et alerte via Sentry.
+V2 : + blocage IP progressif (Redis) + Content-Security-Policy
 """
 import re
 import logging
 from django.http import JsonResponse
 from django.utils.deprecation import MiddlewareMixin
+from django.core.cache import cache
 
 logger = logging.getLogger('security')
+
+# ── Blocage IP progressif ─────────────────────────────────────────────────────
+# Clés Redis : security:fail:{ip} → compteur | security:block:{ip} → flag blocage
+
+BLOCK_THRESHOLD   = 10   # tentatives avant blocage
+BLOCK_DURATION    = 30 * 60    # 30 minutes de blocage
+COUNTER_DURATION  = 60 * 60   # fenêtre de comptage : 1 heure
+
+
+def _ip_record_fail(ip: str) -> int:
+    """Incrémente le compteur d'échecs pour une IP. Retourne le nouveau total."""
+    key = f'security:fail:{ip}'
+    try:
+        count = cache.get(key, 0) + 1
+        cache.set(key, count, COUNTER_DURATION)
+        if count >= BLOCK_THRESHOLD:
+            cache.set(f'security:block:{ip}', 1, BLOCK_DURATION)
+            logger.warning("[SECURITY] IP bloquée après %d tentatives : %s", count, ip)
+        return count
+    except Exception:
+        return 0
+
+
+def _ip_is_blocked(ip: str) -> bool:
+    """Retourne True si l'IP est actuellement bloquée."""
+    try:
+        return bool(cache.get(f'security:block:{ip}'))
+    except Exception:
+        return False
 
 # ── Patterns d'attaques à détecter ────────────────────────────────────────────
 
@@ -71,61 +102,64 @@ class GuineeSecurityMiddleware(MiddlewareMixin):
         user_agent = request.META.get('HTTP_USER_AGENT', '')
         client_ip  = self._get_client_ip(request)
 
+        # 0. IP bloquée ?
+        if _ip_is_blocked(client_ip):
+            return JsonResponse({'error': 'Too many requests'}, status=429)
+
         # 1. Scanner / outil d'attaque connu
         if MALICIOUS_UA_PATTERNS.search(user_agent):
-            self._alert('SCANNER_DETECTED', request, {
-                'user_agent': user_agent,
-                'path': path,
-            })
+            self._alert('SCANNER_DETECTED', request, {'user_agent': user_agent, 'path': path})
+            _ip_record_fail(client_ip)
             return JsonResponse({'error': 'Forbidden'}, status=403)
 
         # 2. Chemins sensibles
         if SENSITIVE_PATHS.search(path):
-            self._alert('SENSITIVE_PATH_ACCESS', request, {
-                'path': path,
-                'ip': client_ip,
-            })
+            self._alert('SENSITIVE_PATH_ACCESS', request, {'path': path, 'ip': client_ip})
+            _ip_record_fail(client_ip)
             return JsonResponse({'error': 'Not found'}, status=404)
 
         # 3. Path traversal dans l'URL
         if PATH_TRAVERSAL_PATTERNS.search(full_url):
-            self._alert('PATH_TRAVERSAL_ATTEMPT', request, {
-                'url': full_url,
-                'ip': client_ip,
-            })
+            self._alert('PATH_TRAVERSAL_ATTEMPT', request, {'url': full_url, 'ip': client_ip})
+            _ip_record_fail(client_ip)
             return JsonResponse({'error': 'Bad request'}, status=400)
 
         # 4. SQL injection dans les paramètres GET
         query_string = request.META.get('QUERY_STRING', '')
         if SQL_INJECTION_PATTERNS.search(query_string):
-            self._alert('SQL_INJECTION_ATTEMPT', request, {
-                'query': query_string[:500],
-                'ip': client_ip,
-            })
+            self._alert('SQL_INJECTION_ATTEMPT', request, {'query': query_string[:500], 'ip': client_ip})
+            _ip_record_fail(client_ip)
             return JsonResponse({'error': 'Bad request'}, status=400)
 
         # 5. XSS dans les paramètres GET
         if XSS_PATTERNS.search(query_string):
-            self._alert('XSS_ATTEMPT', request, {
-                'query': query_string[:500],
-                'ip': client_ip,
-            })
+            self._alert('XSS_ATTEMPT', request, {'query': query_string[:500], 'ip': client_ip})
+            _ip_record_fail(client_ip)
             return JsonResponse({'error': 'Bad request'}, status=400)
 
         return None
 
     def process_response(self, request, response):
         """Ajoute des en-têtes de sécurité HTTP à toutes les réponses."""
-        # Empêche le sniffing MIME
         response['X-Content-Type-Options'] = 'nosniff'
-        # Empêche le clickjacking
         response['X-Frame-Options'] = 'DENY'
-        # Force HTTPS pour 1 an (HSTS)
         response['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-        # Politique de référent
         response['Referrer-Policy'] = 'strict-origin-when-cross-origin'
-        # Désactive les fonctionnalités dangereuses du navigateur
         response['Permissions-Policy'] = 'geolocation=(), microphone=(), camera=()'
+        response['X-XSS-Protection'] = '1; mode=block'
+
+        # Content-Security-Policy : autorise uniquement les sources connues
+        # L'API ne sert pas de HTML directement → policy stricte
+        response['Content-Security-Policy'] = (
+            "default-src 'none'; "
+            "script-src 'none'; "
+            "style-src 'none'; "
+            "img-src https://res.cloudinary.com data:; "
+            "connect-src 'self' https://api.guimatrix.com https://guineemarche-production.up.railway.app; "
+            "frame-ancestors 'none'; "
+            "base-uri 'none'; "
+            "form-action 'self';"
+        )
         return response
 
     @staticmethod
