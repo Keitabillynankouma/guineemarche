@@ -1,10 +1,16 @@
 from django.urls import path
 from . import views
+from .ai_features import AISearchView, ListingAssistantView, SimilarListingsView
 
 urlpatterns = [
+    # ── AI Features ───────────────────────────────────────────────────────────
+    path('ai-search/',              AISearchView.as_view(),         name='ai-search'),
+    path('assistant/',              ListingAssistantView.as_view(), name='listing-assistant'),
+
     path('',                          views.ListingListCreateView.as_view(),  name='listing-list'),
     path('<uuid:pk>/',                views.ListingDetailView.as_view(),      name='listing-detail'),
-    path('<uuid:pk>/boost/',          views.BoostListingView.as_view(),       name='listing-boost'),
+    path('<uuid:pk>/similar/',          SimilarListingsView.as_view(),          name='listing-similar'),
+    path('<uuid:pk>/boost/',            views.BoostListingView.as_view(),       name='listing-boost'),
     path('<uuid:pk>/favorite/',       views.FavoriteToggleView.as_view(),     name='listing-favorite-toggle'),
     path('my/',                       views.MyListingsView.as_view(),         name='my-listings'),
     path('my/stats/',                 views.MySellerStatsView.as_view(),      name='my-seller-stats'),

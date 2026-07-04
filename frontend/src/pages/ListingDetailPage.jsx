@@ -5,6 +5,8 @@ import { listingsAPI, messagingAPI, ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import Logo from '../components/Logo'
+import ListingAssistant from '../components/ListingAssistant'
+import SimilarListings from '../components/SimilarListings'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -909,6 +911,20 @@ export default function ListingDetailPage() {
                     </div>
                 </div>
             </div>
+
+            {/* ── Annonces similaires ── */}
+            <div className="max-w-5xl mx-auto px-4 pb-8">
+                <SimilarListings listingId={listing.id} />
+            </div>
+
+            {/* ── Assistant IA flottant ── */}
+            {!isSeller && (
+                <ListingAssistant
+                    listingId={listing.id}
+                    listingTitle={listing.title}
+                    listingPrice={listing.price_gnf}
+                />
+            )}
 
             {/* Modal commande */}
             {showBuyModal && (

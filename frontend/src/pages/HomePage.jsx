@@ -5,6 +5,7 @@ import { listingsAPI, shopsAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useDarkMode } from '../hooks/useDarkMode'
 import Logo from '../components/Logo'
+import AISearchBar from '../components/AISearchBar'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -230,6 +231,7 @@ export default function HomePage() {
     const [priceMin, setPriceMin]               = useState('')
     const [priceMax, setPriceMax]               = useState('')
     const [showFilters, setShowFilters]         = useState(false)
+    const [aiResults, setAiResults]             = useState(null)  // résultats de la recherche IA
     const [nearLat, setNearLat]                 = useState(null)
     const [nearLng, setNearLng]                 = useState(null)
     const [radiusKm, setRadiusKm]               = useState(20)
@@ -322,9 +324,26 @@ export default function HomePage() {
                         🇬🇳 La plateforme N°1 en Guinée
                     </div>
                     <h1 className="text-4xl font-extrabold mb-2 leading-tight tracking-tight">Achetez et vendez<br />en Guinée</h1>
-                    <p className="text-green-200 mb-8 text-sm">Des milliers d'annonces près de chez vous</p>
+                    <p className="text-green-200 mb-6 text-sm">Des milliers d'annonces près de chez vous</p>
 
-                    {/* Barre principale */}
+                    {/* Recherche IA */}
+                    <div className="mb-4">
+                        <AISearchBar
+                            onResults={(data) => {
+                                setAiResults(data)
+                                window.scrollTo({ top: 500, behavior: 'smooth' })
+                            }}
+                            placeholder="✨ Décrivez ce que vous cherchez en français…"
+                        />
+                    </div>
+
+                    <div className="flex items-center gap-3 my-4">
+                        <div className="flex-1 h-px bg-white/20"/>
+                        <span className="text-white/50 text-xs">ou recherche classique</span>
+                        <div className="flex-1 h-px bg-white/20"/>
+                    </div>
+
+                    {/* Barre classique */}
                     <div className="search-bar flex gap-2">
                         <input type="text" placeholder="Rechercher une annonce..."
                             value={search} onChange={handleSearchChange}
@@ -441,8 +460,40 @@ export default function HomePage() {
                 </div>
             )}
 
-            {/* Grille annonces */}
-            <div className="max-w-5xl mx-auto px-4 py-6">
+            {/* Résultats IA */}
+            {aiResults && (
+                <div className="max-w-5xl mx-auto px-4 py-4">
+                    <div className="flex items-center justify-between mb-4">
+                        <div>
+                            <h2 className="text-base font-semibold text-gray-700 flex items-center gap-2">
+                                <span>✨</span> Résultats IA
+                                <span className="text-xs font-normal text-gray-400">({aiResults.count} annonce{aiResults.count > 1 ? 's' : ''})</span>
+                            </h2>
+                            {aiResults.interpretation && (
+                                <p className="text-xs text-emerald-600 mt-0.5">🤖 {aiResults.interpretation}</p>
+                            )}
+                        </div>
+                        <button onClick={() => setAiResults(null)}
+                            className="text-xs text-gray-400 hover:text-gray-600 underline">
+                            Effacer
+                        </button>
+                    </div>
+                    {aiResults.results.length === 0 ? (
+                        <div className="text-center py-12 text-gray-400">
+                            <p className="text-4xl mb-3">🔍</p>
+                            <p className="text-sm">Aucun résultat pour cette recherche.</p>
+                            <p className="text-xs mt-1">Essayez avec d'autres mots ou une autre ville.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            {aiResults.results.map(l => <ListingCard key={l.id} listing={l} />)}
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* Grille annonces classiques */}
+            <div className={`max-w-5xl mx-auto px-4 py-6 ${aiResults ? 'opacity-50 pointer-events-none' : ''}`}>
                 <div className="flex items-center justify-between mb-4">
                     <div>
                         <h2 className="text-base font-semibold text-gray-700">
