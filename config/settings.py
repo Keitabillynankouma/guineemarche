@@ -259,9 +259,31 @@ if SENTRY_DSN:
 # Définir dans les variables d'environnement Render
 ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
 
-# ── PawaPay — agrégateur Mobile Money (Orange GN + MTN GN) ───────────────────
-PAWAPAY_API_TOKEN = env('PAWAPAY_API_TOKEN', default='')
-PAWAPAY_SANDBOX   = env('PAWAPAY_SANDBOX', default=str(DEBUG)).lower() in ('true', '1', 'yes')
+# ── Paycard Guinée — agrégateur Mobile Money (Orange Money GN + MTN MoMo GN) ─
+# Configurer dans Railway quand tu reçois les clés Paycard :
+PAYCARD_API_KEY     = env('PAYCARD_API_KEY', default='')
+PAYCARD_SECRET_KEY  = env('PAYCARD_SECRET_KEY', default='')
+PAYCARD_MERCHANT_ID = env('PAYCARD_MERCHANT_ID', default='')
+PAYCARD_SANDBOX     = env('PAYCARD_SANDBOX', default=str(DEBUG)).lower() in ('true', '1', 'yes')
+# URL Railway à communiquer à Paycard comme callback webhook :
+# https://api.guimatrix.com/api/v1/orders/webhook/paycard/
+PAYCARD_WEBHOOK_URL = env('PAYCARD_WEBHOOK_URL', default='https://api.guimatrix.com/api/v1/orders/webhook/paycard/')
+
+# ── Brevo (ex-Sendinblue) — Email transactionnel ──────────────────────────────
+# Créer un compte sur brevo.com → Settings → SMTP & API → SMTP
+# Copier SMTP Login et SMTP Password dans Railway :
+EMAIL_BACKEND       = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST          = 'smtp-relay.brevo.com'
+EMAIL_PORT          = 587
+EMAIL_USE_TLS       = True
+EMAIL_HOST_USER     = env('BREVO_SMTP_USER', default='')      # ex: 123456@smtp-brevo.com
+EMAIL_HOST_PASSWORD = env('BREVO_SMTP_PASSWORD', default='')  # clé SMTP Brevo
+DEFAULT_FROM_EMAIL  = env('DEFAULT_FROM_EMAIL', default='Guimatrix <noreply@guimatrix.com>')
+ADMIN_EMAIL         = env('ADMIN_EMAIL', default='bnkeita020@gmail.com')
+
+# Si pas de config Brevo → console (logs Railway) pour le développement
+if not EMAIL_HOST_USER:
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False

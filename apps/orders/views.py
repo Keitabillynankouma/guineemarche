@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 from .models import Order, Payment, PickupPoint, MeetingZone
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer
-from .payment_service import initiate_orange_money, initiate_pawapay
+from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card
 from core.permissions import IsAdmin
 
 
@@ -123,7 +123,13 @@ class OrderListCreateView(generics.ListCreateAPIView):
             raise PermissionDenied("Vous ne pouvez pas acheter votre propre annonce.")
         if listing and not listing.is_active:
             raise ValidationError("Cette annonce n'est plus disponible.")
-        serializer.save(buyer=user)
+        order = serializer.save(buyer=user)
+        # Email vendeur — nouvelle commande reçue
+        try:
+            from core.email_notifications import send_new_order_seller
+            send_new_order_seller(order)
+        except Exception:
+            pass
 
 
 class SellerOrdersView(generics.ListAPIView):
@@ -162,6 +168,11 @@ class OrderUpdateStatusView(APIView):
                 body=f'Le vendeur a confirmé votre commande pour « {order.listing.title} ».',
                 data={'order_id': str(order.id)},
             )
+            try:
+                from core.email_notifications import send_order_confirmed_buyer
+                send_order_confirmed_buyer(order)
+            except Exception:
+                pass
         elif action == 'complete' and order.buyer == user:
             order.complete()
             Notification.send(
@@ -171,6 +182,11 @@ class OrderUpdateStatusView(APIView):
                 body=f'La commande pour « {order.listing.title} » a été marquée comme terminée.',
                 data={'order_id': str(order.id)},
             )
+            try:
+                from core.email_notifications import send_escrow_released
+                send_escrow_released(order)
+            except Exception:
+                pass
         elif action == 'cancel' and user in [order.buyer, order.seller]:
             order.cancel()
             other = order.seller if user == order.buyer else order.buyer
@@ -181,6 +197,11 @@ class OrderUpdateStatusView(APIView):
                 body=f'La commande pour « {order.listing.title} » a été annulée.',
                 data={'order_id': str(order.id)},
             )
+            try:
+                from core.email_notifications import send_order_cancelled
+                send_order_cancelled(order, user)
+            except Exception:
+                pass
         else:
             return Response({'error': 'Action non autorisée.'}, status=status.HTTP_403_FORBIDDEN)
 
@@ -212,6 +233,11 @@ class ConfirmReceiptView(APIView):
             body=f"L'acheteur a confirmé la réception pour « {order.listing.title} ». Les fonds sont libérés.",
             data={'order_id': str(order.id)},
         )
+        try:
+            from core.email_notifications import send_escrow_released
+            send_escrow_released(order)
+        except Exception:
+            pass
 
         return Response(OrderSerializer(order).data)
 
@@ -240,6 +266,11 @@ class DisputeView(APIView):
             body=f"Un litige a été ouvert pour la commande « {order.listing.title} ».",
             data={'order_id': str(order.id)},
         )
+        try:
+            from core.email_notifications import send_dispute_opened
+            send_dispute_opened(order)
+        except Exception:
+            pass
 
         return Response(OrderSerializer(order).data)
 
@@ -270,18 +301,40 @@ class InitiatePaymentView(APIView):
         )
 
         if provider == Payment.Provider.ORANGE_MONEY:
-            # Utiliser PawaPay si configuré, sinon fallback direct Orange
-            if getattr(settings, 'PAWAPAY_API_TOKEN', ''):
-                result = initiate_pawapay(phone_number, order.amount_gnf, str(order.id), 'ORANGE_GN')
+            # Paycard si configuré, sinon fallback direct Orange Money
+            if getattr(settings, 'PAYCARD_API_KEY', ''):
+                result = initiate_paycard(phone_number, order.amount_gnf, str(order.id), 'ORANGE_GN')
             else:
                 result = initiate_orange_money(phone_number, order.amount_gnf, str(order.id))
         elif provider == Payment.Provider.MTN_MOMO:
-            # Utiliser PawaPay si configuré, sinon fallback direct MTN
-            if getattr(settings, 'PAWAPAY_API_TOKEN', ''):
-                result = initiate_pawapay(phone_number, order.amount_gnf, str(order.id), 'MTN_MOMO_GN')
+            # Paycard si configuré, sinon fallback direct MTN MoMo
+            if getattr(settings, 'PAYCARD_API_KEY', ''):
+                result = initiate_paycard(phone_number, order.amount_gnf, str(order.id), 'MTN_GN')
             else:
                 from .payment_service import initiate_mtn_momo
                 result = initiate_mtn_momo(phone_number, order.amount_gnf, str(order.id))
+        elif provider == Payment.Provider.CARD:
+            # Paiement par carte Visa/Mastercard via Paycard
+            result = initiate_paycard_card(
+                amount=order.amount_gnf,
+                order_id=str(order.id),
+                customer_email=getattr(request.user, 'email', ''),
+                customer_name=getattr(request.user, 'full_name', ''),
+            )
+            if result.success and result.payment_url:
+                # Pour les cartes : commande reste PENDING jusqu'au webhook Paycard
+                payment.external_ref = result.reference
+                payment.save(update_fields=['external_ref'])
+                return Response({
+                    'message':     result.message,
+                    'payment':     PaymentSerializer(payment).data,
+                    'payment_url': result.payment_url,   # Frontend redirige ici
+                    'card':        True,
+                }, status=status.HTTP_201_CREATED)
+            else:
+                payment.status = Payment.Status.FAILED
+                payment.save(update_fields=['status'])
+                return Response({'error': result.message}, status=status.HTTP_502_BAD_GATEWAY)
         else:
             result = type('R', (), {'success': True, 'reference': '', 'message': 'Paiement en espèces enregistré'})()
 
@@ -293,6 +346,12 @@ class InitiatePaymentView(APIView):
             # Planifier la libération escrow pour paiements mobiles
             if provider in (Payment.Provider.ORANGE_MONEY, Payment.Provider.MTN_MOMO):
                 order.set_escrow_schedule()
+            # Email confirmation paiement (acheteur + vendeur)
+            try:
+                from core.email_notifications import send_payment_received
+                send_payment_received(order, payment)
+            except Exception:
+                pass
         else:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=['status'])
@@ -316,22 +375,24 @@ def _verify_orange_signature(request):
     return hmac.compare_digest(sig_header, expected)
 
 
-def _verify_pawapay_signature(request):
+def _verify_paycard_signature(request):
     """
-    Vérifie la signature HMAC-SHA256 des webhooks PawaPay.
-    PawaPay signe avec : HMAC-SHA256(timestamp + '.' + body, API_TOKEN)
-    Headers: X-PawaPay-Timestamp, X-PawaPay-Signature
-    """
-    token = getattr(settings, 'PAWAPAY_API_TOKEN', '')
-    if not token:
-        logger.warning("[PAWAPAY] PAWAPAY_API_TOKEN non configuré — webhook non vérifié")
-        return True  # En sandbox, on laisse passer mais on log
+    Vérifie la signature HMAC-SHA256 des webhooks Paycard Guinée.
+    Paycard signe avec : HMAC-SHA256(timestamp + '.' + body, SECRET_KEY)
+    Headers attendus: X-Paycard-Timestamp, X-Paycard-Signature
 
-    timestamp = request.headers.get('X-PawaPay-Timestamp', '')
-    sig_header = request.headers.get('X-PawaPay-Signature', '')
+    TODO : adapter les noms de headers selon la doc Paycard officielle.
+    """
+    secret_key = getattr(settings, 'PAYCARD_SECRET_KEY', '')
+    if not secret_key:
+        logger.warning("[PAYCARD] PAYCARD_SECRET_KEY non configuré — webhook non vérifié (mode test)")
+        return True  # En sandbox / avant config → on laisse passer
+
+    timestamp  = request.headers.get('X-Paycard-Timestamp', '')
+    sig_header = request.headers.get('X-Paycard-Signature', '')
 
     if not timestamp or not sig_header:
-        logger.warning("[PAWAPAY] Webhook sans headers de signature — potentielle attaque")
+        logger.warning("[PAYCARD] Webhook sans headers de signature — potentielle attaque")
         return False
 
     # Vérifier que le timestamp n'est pas trop vieux (protection replay attack)
@@ -339,14 +400,14 @@ def _verify_pawapay_signature(request):
         import time
         ts = int(timestamp)
         if abs(time.time() - ts) > 300:  # 5 minutes max
-            logger.warning("[PAWAPAY] Webhook trop ancien (replay attack?) ts=%s", timestamp)
+            logger.warning("[PAYCARD] Webhook trop ancien (replay attack?) ts=%s", timestamp)
             return False
     except (ValueError, TypeError):
         return False
 
     body = request.body
     message = f"{timestamp}.{body.decode('utf-8', errors='replace')}".encode()
-    expected = hmac.new(token.encode(), message, hashlib.sha256).hexdigest()
+    expected = hmac.new(secret_key.encode(), message, hashlib.sha256).hexdigest()
     return hmac.compare_digest(sig_header, expected)
 
 
@@ -362,32 +423,32 @@ class PaymentWebhookView(APIView):
                 return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('pay_token', '')
             success = data.get('status', '') == 'SUCCESS'
-        elif provider in ('pawapay_deposit', 'pawapay'):
-            # Vérification signature PawaPay
-            if not _verify_pawapay_signature(request):
-                logger.warning("[PAWAPAY] Webhook deposit rejeté — signature invalide")
+        elif provider in ('paycard', 'paycard_payment', 'paycard_card'):
+            # Webhook Paycard — paiement Mobile Money OU carte Visa
+            # TODO : vérifier les champs exacts dans la doc Paycard
+            if not _verify_paycard_signature(request):
+                logger.warning("[PAYCARD] Webhook rejeté — signature invalide")
                 return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
-            ref     = data.get('depositId', '')
-            success = data.get('status', '') == 'COMPLETED'
-        elif provider == 'pawapay_payout':
-            # PawaPay Payout callback (versement vendeur) — log uniquement pour l'instant
-            logger.info("[PAWAPAY PAYOUT] %s", data)
-            return Response({'status': 'ok'})
-        elif provider == 'pawapay_refund':
-            if not _verify_pawapay_signature(request):
-                logger.warning("[PAWAPAY] Webhook refund rejeté — signature invalide")
+            ref     = data.get('transaction_id', data.get('reference', ''))
+            success = data.get('status', '').upper() in ('SUCCESS', 'COMPLETED', 'PAID')
+            is_card = provider == 'paycard_card' or data.get('payment_method') == 'card'
+            logger.info("[PAYCARD%s] Webhook reçu — ref=%s status=%s",
+                        ' CARD' if is_card else '', ref, data.get('status', ''))
+        elif provider == 'paycard_refund':
+            # Webhook Paycard — remboursement
+            if not _verify_paycard_signature(request):
+                logger.warning("[PAYCARD] Webhook refund rejeté — signature invalide")
                 return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
-            # PawaPay Refund callback
-            ref     = data.get('refundId', '')
-            success = data.get('status', '') == 'COMPLETED'
+            ref     = data.get('transaction_id', data.get('refund_id', ''))
+            success = data.get('status', '').upper() in ('SUCCESS', 'COMPLETED')
             try:
                 payment = Payment.objects.filter(external_ref=ref).first()
                 if payment and success:
                     payment.order.escrow_status = Order.EscrowStatus.REFUNDED
                     payment.order.save(update_fields=['escrow_status', 'updated_at'])
-                    logger.info("[PAWAPAY REFUND] Commande %s remboursée.", payment.order.id)
+                    logger.info("[PAYCARD REFUND] Commande %s remboursée.", payment.order.id)
             except Exception as exc:
-                logger.error("[PAWAPAY REFUND] Erreur: %s", exc)
+                logger.error("[PAYCARD REFUND] Erreur: %s", exc)
             return Response({'status': 'ok'})
         else:
             return Response({'error': 'Fournisseur inconnu'}, status=status.HTTP_400_BAD_REQUEST)
@@ -520,6 +581,14 @@ class AdminDisputeResolveView(APIView):
                 body=f'Le litige pour « {order.listing.title} » a été résolu en faveur de l\'acheteur.',
                 data={'order_id': str(order.id)},
             )
+
+        # Email litige résolu — acheteur + vendeur
+        try:
+            from core.email_notifications import send_dispute_resolved
+            winner = 'seller' if action == 'release' else 'buyer'
+            send_dispute_resolved(order, winner)
+        except Exception:
+            pass
 
         return Response(OrderSerializer(order).data)
 
