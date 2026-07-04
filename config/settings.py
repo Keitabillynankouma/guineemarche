@@ -126,6 +126,14 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=30),
     'ROTATE_REFRESH_TOKENS':  True,
     'BLACKLIST_AFTER_ROTATION': True,
+    # Clé de signature dédiée — évite le warning "HMAC key too short"
+    # Si JWT_SIGNING_KEY n'est pas défini, on étend SECRET_KEY à 64 chars via SHA256
+    'SIGNING_KEY': os.environ.get(
+        'JWT_SIGNING_KEY',
+        __import__('hashlib').sha256(
+            os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production').encode()
+        ).hexdigest()  # toujours 64 hex chars (256 bits) — jamais trop court
+    ),
 }
 
 TEMPLATES = [
