@@ -286,6 +286,36 @@ export default function ProfilePage() {
         navigate('/')
     }
 
+    // ── Modifier profil ───────────────────────────────────────────────────────
+    const [showEdit, setShowEdit] = useState(false)
+    const [editForm, setEditForm] = useState({ email: '', city: 'Conakry', quartier: '' })
+    const [editLoading, setEditLoading] = useState(false)
+    const [editSuccess, setEditSuccess] = useState(false)
+
+    const openEdit = () => {
+        setEditForm({ email: user.email || '', city: user.city || 'Conakry', quartier: user.quartier || '' })
+        setEditSuccess(false)
+        setShowEdit(true)
+    }
+
+    const handleSaveProfile = async (e) => {
+        e.preventDefault()
+        setEditLoading(true)
+        try {
+            await authAPI.updateProfile(editForm)
+            await fetchMe()
+            setEditSuccess(true)
+            setTimeout(() => setShowEdit(false), 1200)
+        } catch {
+            // erreur silencieuse — le champ email invalide sera refusé par Django
+        } finally {
+            setEditLoading(false)
+        }
+    }
+
+    const VILLES_EDIT = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré', 'Siguiri', 'Mamou', 'Boké', 'Coyah']
+    const QUARTIERS_EDIT = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
+
     if (!user) return (
         <div className="min-h-screen flex items-center justify-center">
             <div className="text-green-600">Chargement...</div>
@@ -314,7 +344,14 @@ export default function ProfilePage() {
                         </div>
                         <h1 className="text-xl font-bold text-gray-900 mt-3">{user.full_name}</h1>
                         <p className="text-gray-500 text-sm mt-0.5">{String(user.phone_number)}</p>
+                        {user.email && (
+                            <p className="text-xs text-green-600 mt-0.5">✉️ {user.email}</p>
+                        )}
                         <p className="text-xs text-gray-400 mt-1">📍 {user.city}{user.quartier && ` · ${user.quartier}`}</p>
+                        <button onClick={openEdit}
+                            className="mt-3 text-xs text-green-600 border border-green-200 rounded-full px-3 py-1 hover:bg-green-50 transition">
+                            ✏️ Modifier mon profil
+                        </button>
                         {user.profile && (
                             <div className="flex justify-center gap-8 mt-5 text-sm border-t pt-4">
                                 <Link to={`/reviews/${user.id}`} className="text-center hover:text-green-600 transition">
@@ -461,6 +498,67 @@ export default function ProfilePage() {
                     </button>
                 </div>
             </div>
+
+            {/* ── Modal modifier profil ────────────────────────────────────── */}
+            {showEdit && (
+                <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4"
+                    onClick={(e) => e.target === e.currentTarget && setShowEdit(false)}>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="font-bold text-gray-900">Modifier mon profil</h2>
+                            <button onClick={() => setShowEdit(false)} className="text-gray-400 hover:text-gray-600 text-xl leading-none">×</button>
+                        </div>
+
+                        {editSuccess ? (
+                            <div className="text-center py-6">
+                                <div className="text-4xl mb-2">✅</div>
+                                <p className="text-green-700 font-semibold">Profil mis à jour !</p>
+                            </div>
+                        ) : (
+                            <form onSubmit={handleSaveProfile} className="space-y-4">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                    <input
+                                        type="email"
+                                        placeholder="votre@email.com"
+                                        value={editForm.email}
+                                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">Pour recevoir commandes et paiements par email</p>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Ville</label>
+                                    <select
+                                        value={editForm.city}
+                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    >
+                                        {VILLES_EDIT.map(v => <option key={v}>{v}</option>)}
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-600 mb-1">Quartier</label>
+                                    <input
+                                        type="text"
+                                        placeholder="Hamdallaye, Kipé…"
+                                        value={editForm.quartier}
+                                        onChange={(e) => setEditForm({ ...editForm, quartier: e.target.value })}
+                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                    />
+                                </div>
+
+                                <button type="submit" disabled={editLoading}
+                                    className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50 text-sm">
+                                    {editLoading ? 'Enregistrement…' : 'Enregistrer'}
+                                </button>
+                            </form>
+                        )}
+                    </div>
+                </div>
+            )}
         </div>
     )
 }

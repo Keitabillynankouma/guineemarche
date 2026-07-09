@@ -34,6 +34,7 @@ export const authAPI = {
   login: (data) => api.post('/accounts/login/', data),
   logout: (data) => api.post('/accounts/logout/', data),
   me: () => api.get('/accounts/me/'),
+  updateProfile: (data) => api.patch('/accounts/me/', data),
   resendOTP: (data) => api.post('/accounts/resend-otp/', data),
   getSubscription: () => api.get('/accounts/subscription/'),
   subscribe: (data) => api.post('/accounts/subscription/', data),

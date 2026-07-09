@@ -8,7 +8,7 @@ export default function RegisterPage() {
 
     const [step, setStep] = useState(1)
     const [form, setForm] = useState({
-        phone_number: '', full_name: '', password: '', password2: '',
+        phone_number: '', full_name: '', email: '', password: '', password2: '',
         city: 'Conakry', quartier: '', referral_code: refCode
     })
 
@@ -90,6 +90,17 @@ export default function RegisterPage() {
                             className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
                             required
                         />
+                        <div>
+                            <input
+                                type="email" placeholder="Email (optionnel — pour recevoir vos notifications)"
+                                value={form.email}
+                                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:outline-none focus:ring-2 focus:ring-green-500"
+                            />
+                            <p className="text-xs text-gray-400 mt-1">
+                                💡 Recommandé pour la diaspora — recevez vos commandes et paiements par email.
+                            </p>
+                        </div>
                         <select
                             value={form.city}
                             onChange={(e) => setForm({ ...form, city: e.target.value })}
