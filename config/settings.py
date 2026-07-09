@@ -286,6 +286,10 @@ BREVO_SENDER_EMAIL = env('BREVO_SENDER_EMAIL', default='')
 ADMIN_EMAIL        = env('ADMIN_EMAIL', default='bnkeita020@gmail.com')
 DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Guimatrix <noreply@guimatrix.com>')
 
+# Backend email Django → Brevo HTTP API (contourne le blocage SMTP Railway)
+# Toutes les fonctions Django (send_mail, password_reset, admin) passent par Brevo
+EMAIL_BACKEND = 'core.brevo_backend.BrevoEmailBackend'
+
 CSRF_COOKIE_SECURE = True
 CSRF_USE_SESSIONS = False
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
