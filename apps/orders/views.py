@@ -368,7 +368,11 @@ def _verify_orange_signature(request):
     """Vérifie la signature HMAC-SHA256 d'Orange Money."""
     secret = getattr(settings, 'ORANGE_WEBHOOK_SECRET', '')
     if not secret:
-        return True  # non configuré → laisser passer (log warning)
+        logger.error(
+            "[WEBHOOK ORANGE] ORANGE_WEBHOOK_SECRET non configuré — requête rejetée (faille sécurité). "
+            "Configurez cette variable dans Railway."
+        )
+        return False  # SÉCURITÉ : rejeter si secret non configuré
     sig_header = request.headers.get('X-Orange-Signature', '')
     body        = request.body
     expected    = hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()

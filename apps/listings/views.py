@@ -150,13 +150,33 @@ class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
         return Response(serializer.data)
 
     def update(self, request, *args, **kwargs):
+        import logging
+        logger = logging.getLogger(__name__)
         instance = self.get_object()
         if instance.seller != request.user:
             return Response(
                 {'error': 'Vous ne pouvez modifier que vos propres annonces.'},
                 status=status.HTTP_403_FORBIDDEN
             )
-        return super().update(request, *args, **kwargs)
+        # Détecter si le contenu textuel change → re-modération obligatoire
+        content_changed = (
+            'title'       in request.data and request.data['title']       != instance.title or
+            'description' in request.data and request.data['description'] != instance.description
+        )
+        response = super().update(request, *args, **kwargs)
+        if content_changed:
+            # Repasser en DRAFT le temps de la re-modération
+            instance.refresh_from_db()
+            instance.status = Listing.Status.DRAFT
+            instance.save(update_fields=['status'])
+            try:
+                from .tasks import moderate_listing_task
+                moderate_listing_task.delay(str(instance.id))
+            except Exception as e:
+                logger.warning("Re-modération Celery indisponible: %s — activation directe", e)
+                instance.status = Listing.Status.ACTIVE
+                instance.save(update_fields=['status'])
+        return response
 
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()

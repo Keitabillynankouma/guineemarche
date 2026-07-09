@@ -171,10 +171,11 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle',
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon':  '200/day',
-        'user':  '1000/day',
-        'otp':   '5/hour',
-        'login': '10/hour',
+        'anon':         '200/day',
+        'user':         '1000/day',
+        'otp':          '5/hour',
+        'login':        '10/hour',
+        'message_send': '60/hour',    # Anti-spam messagerie
     },
 }
 
