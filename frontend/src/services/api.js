@@ -29,8 +29,13 @@ api.interceptors.response.use(
 )
 
 export const authAPI = {
+  // Guinée — téléphone + OTP SMS
   register: (data) => api.post('/accounts/register/', data),
   verifyOTP: (data) => api.post('/accounts/verify-otp/', data),
+  // Diaspora — email + OTP email
+  registerEmail: (data) => api.post('/accounts/register/email/', data),
+  verifyEmailOTP: (data) => api.post('/accounts/verify-otp/email/', data),
+  // Commun
   login: (data) => api.post('/accounts/login/', data),
   logout: (data) => api.post('/accounts/logout/', data),
   me: () => api.get('/accounts/me/'),

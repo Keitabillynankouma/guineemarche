@@ -26,7 +26,9 @@ class LoginRateThrottle(AnonRateThrottle):
 
 from .models import User, OTPCode, Subscription, Badge, Shop, Referral
 from .serializers import (
-    RegisterSerializer, VerifyOTPSerializer, LoginSerializer,
+    RegisterSerializer, EmailRegisterSerializer,
+    VerifyOTPSerializer, VerifyEmailOTPSerializer,
+    LoginSerializer,
     UserSerializer, UserProfileSerializer, ChangePasswordSerializer,
     SubscriptionSerializer, BadgeSerializer, ShopSerializer, AdminShopSerializer,
 )
@@ -67,6 +69,61 @@ class RegisterView(APIView):
             'message': 'Compte créé. Vérifiez votre code OTP.',
             'phone_number': str(user.phone_number),
         }, status=status.HTTP_201_CREATED)
+
+
+class EmailRegisterView(APIView):
+    """Inscription diaspora — email + mot de passe, OTP envoyé par email."""
+    permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
+
+    def post(self, request):
+        serializer = EmailRegisterSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        # Parrainage éventuel
+        ref_code = request.data.get('referral_code', '').strip().upper()
+        if ref_code:
+            try:
+                referrer = User.objects.get(referral_code=ref_code)
+                if referrer.id != user.id:
+                    user.referred_by = referrer
+                    user.save(update_fields=['referred_by'])
+                    referral = Referral.objects.create(referrer=referrer, referred=user)
+                    referral.give_reward()
+            except User.DoesNotExist:
+                pass
+
+        return Response({
+            'message': 'Compte créé. Vérifiez votre email pour le code OTP.',
+            'email': user.email,
+        }, status=status.HTTP_201_CREATED)
+
+
+class VerifyEmailOTPView(APIView):
+    """Vérifie l'OTP reçu par email et active le compte diaspora."""
+    permission_classes = [permissions.AllowAny]
+    throttle_classes   = [OTPRateThrottle]
+
+    def post(self, request):
+        serializer = VerifyEmailOTPSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        user = serializer.validated_data['user']
+        otp  = serializer.validated_data['otp']
+
+        otp.is_used = True
+        otp.save(update_fields=['is_used'])
+
+        user.is_verified = True
+        user.save(update_fields=['is_verified'])
+
+        tokens = get_tokens_for_user(user)
+        return Response({
+            'message': 'Email vérifié. Bienvenue sur Guimatrix !',
+            'tokens': tokens,
+            'user': UserSerializer(user).data,
+        })
 
 
 class VerifyOTPView(APIView):

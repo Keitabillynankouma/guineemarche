@@ -419,3 +419,40 @@ def send_dispute_resolved(order, winner: str) -> None:
             _send(f'{emoji} Litige résolu — Guimatrix', html, email, name)
     except Exception as e:
         logger.warning("[EMAIL] send_dispute_resolved error: %s", e)
+
+
+# ── OTP par email (inscription diaspora) ──────────────────────────────────────
+
+def send_otp_email(recipient_email: str, code: str, name: str = '') -> None:
+    """
+    Envoie le code OTP de vérification par email.
+    Utilisé pour l'inscription diaspora (sans numéro guinéen).
+    """
+    greeting = f'Bonjour <strong>{name}</strong>' if name else 'Bonjour'
+    content = f'''
+    <p style="color:{GRAY};font-size:15px;line-height:1.6;">
+      {greeting},<br><br>
+      Voici votre code de vérification pour activer votre compte Guimatrix.
+    </p>
+    <div style="text-align:center;margin:32px 0;">
+      <div style="display:inline-block;background:#f0fdf4;border:2px solid #86efac;
+                  border-radius:16px;padding:20px 40px;">
+        <span style="font-size:44px;letter-spacing:14px;font-weight:800;
+                     color:{DARK};font-family:monospace;">{code}</span>
+      </div>
+    </div>
+    <p style="color:{GRAY};font-size:13px;text-align:center;">
+      ⏱️ Ce code expire dans <strong>30 minutes</strong>.<br>
+      Ne le partagez jamais — Guimatrix ne vous le demandera pas.
+    </p>
+    '''
+    html = _base(
+        title='Vérifiez votre adresse email',
+        content=content,
+    )
+    _send(
+        subject='🔐 Votre code Guimatrix',
+        html=html,
+        recipient_email=recipient_email,
+        recipient_name=name,
+    )

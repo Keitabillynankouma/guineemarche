@@ -28,8 +28,8 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         SELLER = 'seller', 'Vendeur'
         ADMIN  = 'admin',  'Administrateur'
 
-    phone_number = PhoneNumberField(unique=True, region='GN')
-    email        = models.EmailField(blank=True, null=True)
+    phone_number = PhoneNumberField(unique=True, null=True, blank=True, region='GN')
+    email        = models.EmailField(unique=True, null=True, blank=True)
     full_name    = models.CharField(max_length=150)
     role         = models.CharField(max_length=10, choices=Role.choices, default=Role.BUYER)
 

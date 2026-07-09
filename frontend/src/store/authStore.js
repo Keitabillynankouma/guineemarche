@@ -6,9 +6,14 @@ const useAuthStore = create((set) => ({
     isLoading: false,
     isAuthenticated: !!localStorage.getItem('access_token'),
 
-    login: async (phone_number, password) => {
+    // identifier = numéro de téléphone (Guinée) ou email (diaspora)
+    login: async (identifier, password) => {
         set({ isLoading: true })
-        const res = await authAPI.login({ phone_number, password })
+        const isEmail = identifier.includes('@')
+        const payload = isEmail
+            ? { email: identifier, password }
+            : { phone_number: identifier, password }
+        const res = await authAPI.login(payload)
         const { tokens, user } = res.data
         localStorage.setItem('access_token', tokens.access)
         localStorage.setItem('refresh_token', tokens.refresh)
