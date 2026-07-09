@@ -1,12 +1,16 @@
 """
-Service d'emails transactionnels Guimatrix — via Brevo SMTP.
-Tous les emails sont en français, mobile-friendly, avec le design Guimatrix.
+Service d'emails transactionnels Guimatrix — via Brevo HTTP API.
 
-Appeler ces fonctions de manière asynchrone (thread) pour ne pas bloquer les requêtes.
+Railway bloque les connexions SMTP sortantes (port 587).
+On utilise donc l'API REST Brevo (HTTPS port 443) qui n'est jamais bloquée.
+
+Variables Railway requises :
+    BREVO_API_KEY      — clé API Brevo (Settings → API Keys)
+    BREVO_SENDER_EMAIL — email expéditeur vérifié dans Brevo (ex: bnkeita020@gmail.com)
 """
 import logging
 import threading
-from django.core.mail import send_mail
+import requests as _requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -18,24 +22,43 @@ GRAY   = '#6b7280'
 LIGHT  = '#f9fafb'
 BORDER = '#e5e7eb'
 
+BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
+
 
 def _send(subject: str, html: str, recipient_email: str, recipient_name: str = ''):
-    """Envoie un email en arrière-plan (non bloquant)."""
+    """Envoie un email via l'API HTTP Brevo (non bloquant, arrière-plan)."""
     if not recipient_email or '@' not in recipient_email:
         logger.debug("[EMAIL] Destinataire sans email valide — ignoré (%s)", recipient_name)
         return
 
     def _do_send():
+        api_key      = getattr(settings, 'BREVO_API_KEY', '')
+        sender_email = getattr(settings, 'BREVO_SENDER_EMAIL', '')
+
+        if not api_key or not sender_email:
+            logger.warning("[EMAIL] BREVO_API_KEY ou BREVO_SENDER_EMAIL manquant — email non envoyé")
+            return
+
         try:
-            send_mail(
-                subject=subject,
-                message='',           # texte brut vide — on envoie uniquement HTML
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[recipient_email],
-                html_message=html,
-                fail_silently=False,
+            resp = _requests.post(
+                BREVO_API_URL,
+                headers={
+                    'api-key':      api_key,
+                    'Content-Type': 'application/json',
+                    'Accept':       'application/json',
+                },
+                json={
+                    'sender':      {'name': 'Guimatrix', 'email': sender_email},
+                    'to':          [{'email': recipient_email, 'name': recipient_name or recipient_email}],
+                    'subject':     subject,
+                    'htmlContent': html,
+                },
+                timeout=15,
             )
-            logger.info("[EMAIL] ✓ Envoyé à %s — %s", recipient_email, subject)
+            if resp.status_code in (200, 201, 202):
+                logger.info("[EMAIL] ✓ Envoyé à %s — %s", recipient_email, subject)
+            else:
+                logger.warning("[EMAIL] ✗ Brevo API %s : %s", resp.status_code, resp.text[:300])
         except Exception as exc:
             logger.warning("[EMAIL] ✗ Échec %s → %s : %s", recipient_email, subject, exc)
 
