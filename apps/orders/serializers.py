@@ -33,25 +33,42 @@ class OrderSerializer(serializers.ModelSerializer):
     buyer_name    = serializers.CharField(source='buyer.full_name',   read_only=True)
     seller_name   = serializers.CharField(source='seller.full_name',  read_only=True)
     pickup_point_detail = PickupPointSerializer(source='pickup_point', read_only=True)
+    delivery_assignment_detail = serializers.SerializerMethodField()
 
     class Meta:
         model  = Order
         fields = (
             'id', 'listing', 'listing_title',
             'buyer', 'buyer_name', 'seller', 'seller_name',
-            'amount_gnf', 'status',
+            'amount_gnf', 'commission_gnf', 'seller_payout_gnf', 'status',
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
             'meet_location', 'delivery_address', 'delivery_fee_gnf',
             'note',
-            'escrow_status', 'escrow_released_at',
-            'payments', 'created_at', 'updated_at',
+            'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
+            'payments', 'delivery_assignment_detail',
+            'created_at', 'updated_at',
         )
         read_only_fields = (
             'id', 'buyer', 'seller', 'amount_gnf', 'status',
             'commission_gnf', 'seller_payout_gnf',
-            'escrow_status', 'escrow_released_at',
+            'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
             'created_at', 'updated_at',
         )
+
+    def get_delivery_assignment_detail(self, obj):
+        try:
+            da = obj.delivery_assignment
+            return {
+                'id':                str(da.id),
+                'status':            da.status,
+                'livreur_id':        str(da.livreur.id),
+                'livreur_name':      da.livreur.full_name,
+                'livreur_phone':     str(da.livreur.phone_number or ''),
+                'pickup_code':       da.pickup_code,        # vendeur le vérifie quand livreur arrive
+                'verification_code': da.verification_code,  # acheteur le donne au livreur à la réception
+            }
+        except Exception:
+            return None
 
     def create(self, validated_data):
         listing = validated_data['listing']
@@ -83,20 +100,23 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'order', 'order_detail',
             'livreur', 'livreur_name', 'livreur_phone',
-            'status', 'verification_code',
+            'status', 'pickup_code', 'verification_code',
             'assigned_at', 'delivered_at', 'notes',
         )
-        read_only_fields = ('id', 'verification_code', 'assigned_at', 'delivered_at')
+        read_only_fields = ('id', 'pickup_code', 'verification_code', 'assigned_at', 'delivered_at')
 
     def get_order_detail(self, obj):
         o = obj.order
         return {
-            'id':             str(o.id),
-            'listing_title':  o.listing.title,
-            'buyer_name':     o.buyer.full_name,
-            'buyer_phone':    str(o.buyer.phone_number or ''),
+            'id':               str(o.id),
+            'listing_title':    o.listing.title,
+            'buyer_id':         str(o.buyer.id),
+            'buyer_name':       o.buyer.full_name,
+            'buyer_phone':      str(o.buyer.phone_number or ''),
+            'seller_id':        str(o.seller.id),
+            'seller_name':      o.seller.full_name,
             'delivery_address': o.delivery_address,
-            'amount_gnf':     o.amount_gnf,
+            'amount_gnf':       o.amount_gnf,
         }
 
 

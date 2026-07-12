@@ -119,6 +119,14 @@ class Order(BaseModel):
     def complete(self):
         self.status = self.Status.COMPLETED
         self.save(update_fields=['status', 'updated_at'])
+        # Marquer l'annonce comme vendue
+        try:
+            listing = self.listing
+            if listing.status != 'sold':
+                listing.status = 'sold'
+                listing.save(update_fields=['status'])
+        except Exception:
+            pass
 
     def cancel(self):
         self.status = self.Status.CANCELLED
@@ -234,7 +242,8 @@ class DeliveryAssignment(BaseModel):
     order             = models.OneToOneField(Order,  on_delete=models.CASCADE, related_name='delivery_assignment')
     livreur           = models.ForeignKey(User,   on_delete=models.PROTECT,  related_name='delivery_assignments')
     status            = models.CharField(max_length=12, choices=Status.choices, default=Status.ASSIGNED)
-    verification_code = models.CharField(max_length=6, help_text="Code 6 chiffres que l'acheteur fournit au livreur")
+    verification_code = models.CharField(max_length=6, help_text="Code 6 chiffres que l'acheteur fournit au livreur à la réception")
+    pickup_code       = models.CharField(max_length=6, blank=True, help_text="Code 6 chiffres que le livreur montre au vendeur pour récupérer le colis")
     assigned_at       = models.DateTimeField(auto_now_add=True)
     delivered_at      = models.DateTimeField(null=True, blank=True)
     notes             = models.TextField(blank=True)
@@ -248,7 +257,9 @@ class DeliveryAssignment(BaseModel):
         return f"Livraison #{str(self.order.id)[:8]} → {self.livreur.full_name}"
 
     def save(self, *args, **kwargs):
+        import random
         if not self.verification_code:
-            import random
             self.verification_code = str(random.randint(100000, 999999))
+        if not self.pickup_code:
+            self.pickup_code = str(random.randint(100000, 999999))
         super().save(*args, **kwargs)

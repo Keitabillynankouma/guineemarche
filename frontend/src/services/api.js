@@ -102,6 +102,12 @@ export const ordersAPI = {
   assignLivreur:       (orderId, livreurId) => api.post(`/orders/admin/orders/${orderId}/assign/`, { livreur_id: livreurId }),
 }
 
+export const reviewsAPI = {
+  // data = { order, rating, comment, reviewee (uuid, optionnel — déduit si absent) }
+  create:  (data)   => api.post('/reviews/', data),
+  getUser: (userId) => api.get(`/reviews/user/${userId}/`),
+}
+
 export const referralAPI = {
   getStats: () => api.get('/accounts/referral/'),
 }

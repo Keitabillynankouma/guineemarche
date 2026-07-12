@@ -65,10 +65,10 @@ class PaymentAdmin(admin.ModelAdmin):
 
 @admin.register(DeliveryAssignment)
 class DeliveryAssignmentAdmin(admin.ModelAdmin):
-    list_display   = ('order', 'livreur', 'status', 'verification_code', 'assigned_at', 'delivered_at')
+    list_display   = ('order', 'livreur', 'status', 'pickup_code', 'verification_code', 'assigned_at', 'delivered_at')
     list_filter    = ('status',)
-    search_fields  = ('livreur__full_name', 'livreur__phone_number', 'order__buyer__full_name', 'verification_code')
-    readonly_fields = ('id', 'verification_code', 'assigned_at', 'created_at', 'updated_at')
+    search_fields  = ('livreur__full_name', 'livreur__phone_number', 'order__buyer__full_name', 'verification_code', 'pickup_code')
+    readonly_fields = ('id', 'pickup_code', 'verification_code', 'assigned_at', 'created_at', 'updated_at')
     ordering       = ('-assigned_at',)
     actions        = ['mark_delivered']
 

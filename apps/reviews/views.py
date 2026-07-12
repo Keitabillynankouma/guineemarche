@@ -15,26 +15,50 @@ class ReviewListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         from apps.orders.models import Order
+        from apps.accounts.models import User
+
         reviewer = self.request.user
         order    = serializer.validated_data.get('order')
 
         if not order:
             raise ValidationError("Une commande est requise pour laisser un avis.")
 
-        # Vérifier que la commande est bien COMPLETED
-        if order.status != Order.Status.COMPLETED:
-            raise PermissionDenied("Vous ne pouvez laisser un avis qu'après la finalisation de la commande.")
+        # ── Parties prenantes de cette commande ──────────────────────────────
+        parties = {order.buyer, order.seller}
+        livreur = None
+        try:
+            livreur = order.delivery_assignment.livreur
+            parties.add(livreur)
+        except Exception:
+            pass
 
-        # Vérifier que le reviewer est bien acheteur ou vendeur de cette commande
-        if reviewer not in (order.buyer, order.seller):
+        if reviewer not in parties:
             raise PermissionDenied("Vous n'êtes pas partie prenante de cette commande.")
 
-        # Déterminer le reviewee : l'autre partie
-        reviewee = order.seller if reviewer == order.buyer else order.buyer
+        # ── Déterminer le reviewee ────────────────────────────────────────────
+        reviewee_id = self.request.data.get('reviewee')
+        if reviewee_id:
+            try:
+                reviewee = User.objects.get(pk=str(reviewee_id))
+            except User.DoesNotExist:
+                raise ValidationError("Destinataire introuvable.")
+            if reviewee not in parties:
+                raise PermissionDenied("Ce destinataire n'est pas partie prenante de cette commande.")
+            if reviewee == reviewer:
+                raise ValidationError("Vous ne pouvez pas vous noter vous-même.")
+        else:
+            # Comportement par défaut (sans livreur) : noter l'autre partie principale
+            if reviewer == order.buyer:
+                reviewee = order.seller
+            elif reviewer == order.seller:
+                reviewee = order.buyer
+            else:
+                # Le livreur doit préciser qui noter
+                raise ValidationError("Précisez la personne à noter (champ 'reviewee').")
 
-        # Vérifier l'unicité (unique_together couvre déjà DB, mais on renvoie un message clair)
-        if Review.objects.filter(order=order, reviewer=reviewer).exists():
-            raise ValidationError("Vous avez déjà laissé un avis pour cette commande.")
+        # ── Unicité (order, reviewer, reviewee) ──────────────────────────────
+        if Review.objects.filter(order=order, reviewer=reviewer, reviewee=reviewee).exists():
+            raise ValidationError("Vous avez déjà noté cette personne pour cette commande.")
 
         serializer.save(reviewer=reviewer, reviewee=reviewee)
 

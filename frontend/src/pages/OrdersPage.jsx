@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { ordersAPI } from '../services/api'
+import { ordersAPI, reviewsAPI } from '../services/api'
 import Logo from '../components/Logo'
 
 const STATUS_STEPS = ['pending', 'confirmed', 'completed']
@@ -291,11 +291,64 @@ function PayModal({ order, onClose, onPaid }) {
     )
 }
 
+// ── Modal notation ──────────────────────────────────────────────────────────
+function RatingModal({ orderId, revieweeId, revieweeName, label, onClose, onDone }) {
+    const [rating, setRating]   = useState(0)
+    const [comment, setComment] = useState('')
+    const [loading, setLoading] = useState(false)
+    const [error, setError]     = useState('')
+
+    async function submit() {
+        if (!rating) { setError('Choisissez une note.'); return }
+        setLoading(true); setError('')
+        try {
+            await reviewsAPI.create({ order: orderId, rating, comment, reviewee: revieweeId })
+            onDone()
+        } catch (e) {
+            const d = e.response?.data
+            setError(Array.isArray(d) ? d[0] : (d?.detail || d?.non_field_errors?.[0] || 'Erreur.'))
+        } finally { setLoading(false) }
+    }
+
+    return (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4" onClick={onClose}>
+            <div className="bg-white rounded-2xl w-full max-w-md p-6 space-y-4" onClick={e => e.stopPropagation()}>
+                <h2 className="font-bold text-gray-800 text-lg">Noter {label}</h2>
+                <p className="text-sm text-gray-500">{revieweeName}</p>
+                <div className="flex justify-center gap-2">
+                    {[1,2,3,4,5].map(s => (
+                        <button key={s} onClick={() => setRating(s)}
+                            className={`text-3xl transition ${s <= rating ? 'opacity-100' : 'opacity-30'}`}>⭐</button>
+                    ))}
+                </div>
+                <textarea
+                    value={comment} onChange={e => setComment(e.target.value)}
+                    placeholder="Commentaire (optionnel)" rows={3}
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-400/30"
+                />
+                {error && <p className="text-red-500 text-sm">{error}</p>}
+                <div className="flex gap-3">
+                    <button onClick={onClose}
+                        className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">
+                        Annuler
+                    </button>
+                    <button onClick={submit} disabled={loading || !rating}
+                        className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-bold transition disabled:opacity-50">
+                        {loading ? '…' : 'Envoyer'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 // ── Carte commande ──────────────────────────────────────────────────────────
 function OrderCard({ order, isBuyer, onInvalidate }) {
-    const qc = useQueryClient()
-    const [payOpen, setPayOpen] = useState(false)
-    const st = STATUS[order.status] || STATUS.pending
+    const [payOpen, setPayOpen]         = useState(false)
+    const [ratingModal, setRatingModal] = useState(null)   // { id, name, label }
+    const [rated, setRated]             = useState({})     // { [revieweeId]: true }
+    const st  = STATUS[order.status] || STATUS.pending
+    const da  = order.delivery_assignment_detail           // assignment (home_delivery)
 
     const confirmMutation = useMutation({
         mutationFn: () => ordersAPI.confirmReceipt(order.id),
@@ -309,6 +362,11 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
     const canPay     = isBuyer && order.status === 'pending' && !order.payments?.length
     const canConfirm = isBuyer && order.status === 'confirmed'
     const canDispute = isBuyer && ['pending', 'confirmed'].includes(order.status)
+
+    // Notation : disponible seulement si commande terminée
+    const isCompleted  = order.status === 'completed'
+    const hasLivreur   = !!da?.livreur_name
+    const livreurId    = da?.livreur_id    // absent pour l'instant — voir note ci-dessous
 
     return (
         <>
@@ -348,6 +406,35 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                         <p className="text-green-700">{order.delivery_address}</p>
                         {order.delivery_fee_gnf > 0 && (
                             <p className="text-green-600">Frais : {new Intl.NumberFormat('fr-GN').format(order.delivery_fee_gnf)} GNF</p>
+                        )}
+                    </div>
+                )}
+
+                {/* Codes de livraison — affichés seulement si un livreur est assigné */}
+                {da && order.delivery_mode === 'home_delivery' && (
+                    <div className="space-y-2">
+                        {/* Vendeur : code que le livreur doit lui montrer */}
+                        {!isBuyer && da.pickup_code && da.status !== 'delivered' && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs space-y-1">
+                                <p className="font-bold text-amber-800">🔑 Code de retrait livreur</p>
+                                <p className="text-2xl font-black tracking-[0.2em] text-amber-900 text-center py-1">{da.pickup_code}</p>
+                                <p className="text-amber-700">Le livreur vous montrera ce code — vérifiez-le avant de lui remettre le colis.</p>
+                            </div>
+                        )}
+                        {/* Acheteur : code qu'il doit donner au livreur */}
+                        {isBuyer && da.verification_code && da.status !== 'delivered' && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs space-y-1">
+                                <p className="font-bold text-blue-800">🔐 Votre code de réception</p>
+                                <p className="text-2xl font-black tracking-[0.2em] text-blue-900 text-center py-1">{da.verification_code}</p>
+                                <p className="text-blue-700">Donnez ce code au livreur UNIQUEMENT quand vous recevez votre colis.</p>
+                            </div>
+                        )}
+                        {/* Nom du livreur si assigné */}
+                        {da.livreur_name && (
+                            <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
+                                🚗 Livreur : <span className="font-semibold text-gray-700">{da.livreur_name}</span>
+                                {da.livreur_phone && ` · ${da.livreur_phone}`}
+                            </p>
                         )}
                     </div>
                 )}
@@ -414,6 +501,39 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                     </Link>
                 </div>
 
+                {/* ── Notation (commande terminée) ── */}
+                {isCompleted && (
+                    <div className="border-t pt-3 space-y-2">
+                        <p className="text-xs text-gray-400 font-medium">Laisser un avis :</p>
+                        <div className="flex gap-2 flex-wrap">
+                            {/* Acheteur note le vendeur */}
+                            {isBuyer && !rated[order.seller] && (
+                                <button
+                                    onClick={() => setRatingModal({ id: order.seller, name: order.seller_name, label: 'le vendeur' })}
+                                    className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold py-2 px-3 rounded-xl border border-amber-200 transition">
+                                    ⭐ Vendeur
+                                </button>
+                            )}
+                            {/* Vendeur note l'acheteur */}
+                            {!isBuyer && !rated[order.buyer] && (
+                                <button
+                                    onClick={() => setRatingModal({ id: order.buyer, name: order.buyer_name, label: "l'acheteur" })}
+                                    className="flex-1 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 font-semibold py-2 px-3 rounded-xl border border-amber-200 transition">
+                                    ⭐ Acheteur
+                                </button>
+                            )}
+                            {/* Acheteur ou vendeur note le livreur */}
+                            {hasLivreur && da?.livreur_id && !rated[da.livreur_id] && (
+                                <button
+                                    onClick={() => setRatingModal({ id: da.livreur_id, name: da.livreur_name, label: 'le livreur' })}
+                                    className="flex-1 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold py-2 px-3 rounded-xl border border-blue-200 transition">
+                                    ⭐ Livreur
+                                </button>
+                            )}
+                        </div>
+                    </div>
+                )}
+
                 <p className="text-xs text-gray-400">
                     {new Date(order.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
                 </p>
@@ -424,6 +544,21 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                     order={order}
                     onClose={() => setPayOpen(false)}
                     onPaid={onInvalidate}
+                />
+            )}
+
+            {ratingModal && (
+                <RatingModal
+                    orderId={order.id}
+                    revieweeId={ratingModal.id}
+                    revieweeName={ratingModal.name}
+                    label={ratingModal.label}
+                    onClose={() => setRatingModal(null)}
+                    onDone={() => {
+                        setRated(p => ({ ...p, [ratingModal.id]: true }))
+                        setRatingModal(null)
+                        onInvalidate()
+                    }}
                 />
             )}
         </>

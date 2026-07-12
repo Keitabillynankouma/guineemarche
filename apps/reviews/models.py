@@ -18,7 +18,7 @@ class Review(BaseModel):
         verbose_name = 'Avis'
         verbose_name_plural = 'Avis'
         ordering = ['-created_at']
-        unique_together = ('order', 'reviewer')
+        unique_together = ('order', 'reviewer', 'reviewee')
 
     def __str__(self):
         return f"{self.reviewer.full_name} → {self.reviewee.full_name} : {self.rating}/5"

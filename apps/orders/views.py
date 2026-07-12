@@ -182,6 +182,12 @@ class OrderListCreateView(generics.ListCreateAPIView):
             send_order_sms_buyer(order)
         except Exception:
             pass
+        # Auto-assign livreur pour les livraisons à domicile
+        if order.delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
+            try:
+                _auto_assign_livreur(order)
+            except Exception:
+                pass
 
 
 class SellerOrdersView(generics.ListAPIView):
@@ -721,6 +727,121 @@ class AdminExportCSVView(APIView):
 
 # ── Livreur ────────────────────────────────────────────────────────────────────
 
+def _auto_assign_livreur(order):
+    """
+    Cherche un livreur disponible et crée l'affectation automatiquement.
+    Priorité : livreur de la même ville que l'acheteur, sinon n'importe quel livreur actif.
+    Envoie pickup_code au vendeur + verification_code à l'acheteur.
+    """
+    from apps.accounts.models import User as AppUser
+    from apps.notifications.models import Notification
+
+    # 1. Livreurs sans livraison active en priorité
+    busy_livreur_ids = DeliveryAssignment.objects.filter(
+        status__in=[DeliveryAssignment.Status.ASSIGNED, DeliveryAssignment.Status.EN_ROUTE]
+    ).values_list('livreur_id', flat=True)
+
+    livreurs = AppUser.objects.filter(
+        role='livreur', is_active=True,
+    ).exclude(id__in=busy_livreur_ids)
+
+    # Si aucun dispo sans commande active, prendre n'importe quel livreur actif
+    if not livreurs.exists():
+        livreurs = AppUser.objects.filter(role='livreur', is_active=True)
+
+    if not livreurs.exists():
+        return  # Aucun livreur dans le système
+
+    # 2. Préférer la même ville que l'acheteur
+    buyer_city = getattr(order.buyer, 'city', '') or ''
+    if buyer_city:
+        city_match = livreurs.filter(city__iexact=buyer_city)
+        if city_match.exists():
+            livreurs = city_match
+
+    livreur = livreurs.order_by('?').first()
+
+    # 3. Créer l'affectation (évite les doublons)
+    assignment, created = DeliveryAssignment.objects.get_or_create(
+        order=order,
+        defaults={'livreur': livreur},
+    )
+    if not created:
+        return  # Déjà assignée
+
+    # 4. Notifier le livreur
+    Notification.send(
+        user=livreur,
+        type=Notification.Type.ORDER_UPDATE,
+        title='📦 Nouvelle livraison assignée',
+        body=(
+            f'Article : « {order.listing.title} »\n'
+            f'Adresse : {order.delivery_address}\n'
+            f'Code retrait (montrez au vendeur) : {assignment.pickup_code}\n'
+            f'Code livraison (acheteur vous le donne) : {assignment.verification_code}'
+        ),
+        data={'assignment_id': str(assignment.id)},
+    )
+    try:
+        from core.sms import send_sms
+        send_sms(
+            str(livreur.phone_number),
+            f'[Guimatrix] Nouvelle livraison !\n'
+            f'Article : {order.listing.title}\n'
+            f'Adresse : {order.delivery_address}\n'
+            f'Acheteur : {order.buyer.full_name} - {order.buyer.phone_number}\n'
+            f'Code retrait vendeur : {assignment.pickup_code}\n'
+            f'Code confirm. acheteur : {assignment.verification_code}',
+        )
+    except Exception:
+        pass
+
+    # 5. Notifier le vendeur avec pickup_code
+    Notification.send(
+        user=order.seller,
+        type=Notification.Type.ORDER_UPDATE,
+        title='🚗 Un livreur va récupérer votre colis',
+        body=(
+            f'Article : « {order.listing.title} »\n'
+            f'Code de retrait : {assignment.pickup_code}\n'
+            f'Le livreur vous montrera ce code — vérifiez-le avant de remettre le colis.'
+        ),
+        data={'order_id': str(order.id), 'pickup_code': assignment.pickup_code},
+    )
+    try:
+        from core.sms import send_sms
+        send_sms(
+            str(order.seller.phone_number),
+            f'[Guimatrix] Un livreur va récupérer « {order.listing.title} ».\n'
+            f'Code de retrait : {assignment.pickup_code}\n'
+            f'Vérifiez ce code avant de remettre le colis au livreur.',
+        )
+    except Exception:
+        pass
+
+    # 6. Notifier l'acheteur avec verification_code
+    Notification.send(
+        user=order.buyer,
+        type=Notification.Type.ORDER_UPDATE,
+        title='🚗 Un livreur va vous livrer',
+        body=(
+            f'Votre code de vérification : {assignment.verification_code}\n'
+            f'Donnez ce code au livreur UNIQUEMENT après réception de votre colis.'
+        ),
+        data={'order_id': str(order.id), 'verification_code': assignment.verification_code},
+    )
+    try:
+        from core.sms import send_sms
+        send_sms(
+            str(order.buyer.phone_number),
+            f'[Guimatrix] Un livreur va livrer « {order.listing.title} ».\n'
+            f'Votre code de vérification : {assignment.verification_code}\n'
+            f'Donnez ce code au livreur UNIQUEMENT à la réception de votre colis.',
+        )
+    except Exception:
+        pass
+
+
 class IsLivreur(permissions.BasePermission):
     """Accès réservé aux utilisateurs avec le rôle livreur."""
     def has_permission(self, request, view):
@@ -734,11 +855,10 @@ class LivreurOrderListView(generics.ListAPIView):
     pagination_class     = None   # Pas de pagination — tableau direct
 
     def get_queryset(self):
+        # Inclut DELIVERED pour permettre la notation après livraison
         return DeliveryAssignment.objects.filter(
             livreur=self.request.user
-        ).select_related('order', 'order__listing', 'order__buyer', 'livreur').exclude(
-            status=DeliveryAssignment.Status.DELIVERED
-        )
+        ).select_related('order', 'order__listing', 'order__buyer', 'order__seller', 'livreur')
 
 
 class LivreurStartDeliveryView(APIView):
@@ -828,14 +948,18 @@ class AdminAssignLivreurView(APIView):
             defaults={'livreur': livreur, 'status': DeliveryAssignment.Status.ASSIGNED},
         )
 
-        # Notifier le livreur par SMS + notification
         from apps.notifications.models import Notification
+
+        # Notifier le livreur
         Notification.send(
             user=livreur,
             type=Notification.Type.ORDER_UPDATE,
             title='📦 Nouvelle livraison assignée',
-            body=f'Livraison à effectuer : « {order.listing.title} » → {order.delivery_address}.\n'
-                 f'Code vérif. acheteur : {assignment.verification_code}',
+            body=(
+                f'Article : « {order.listing.title} » → {order.delivery_address}\n'
+                f'Code retrait (montrez au vendeur) : {assignment.pickup_code}\n'
+                f'Code confirm. (acheteur vous le donne) : {assignment.verification_code}'
+            ),
             data={'assignment_id': str(assignment.id)},
         )
         try:
@@ -845,28 +969,54 @@ class AdminAssignLivreurView(APIView):
                 f'[Guimatrix] Nouvelle livraison !\n'
                 f'Article : {order.listing.title}\n'
                 f'Adresse : {order.delivery_address}\n'
-                f'Acheteur : {order.buyer.full_name} ({order.buyer.phone_number})\n'
-                f'Code vérif : {assignment.verification_code}',
+                f'Acheteur : {order.buyer.full_name} - {order.buyer.phone_number}\n'
+                f'Code retrait vendeur : {assignment.pickup_code}\n'
+                f'Code confirm. acheteur : {assignment.verification_code}',
             )
         except Exception:
             pass
 
-        # Notifier l'acheteur du code
+        # Notifier le vendeur avec pickup_code
+        Notification.send(
+            user=order.seller,
+            type=Notification.Type.ORDER_UPDATE,
+            title='🚗 Un livreur va récupérer votre colis',
+            body=(
+                f'Article : « {order.listing.title} »\n'
+                f'Code de retrait : {assignment.pickup_code}\n'
+                f'Vérifiez ce code avant de remettre le colis au livreur.'
+            ),
+            data={'order_id': str(order.id), 'pickup_code': assignment.pickup_code},
+        )
+        try:
+            from core.sms import send_sms
+            send_sms(
+                str(order.seller.phone_number),
+                f'[Guimatrix] Un livreur va récupérer « {order.listing.title} ».\n'
+                f'Code de retrait : {assignment.pickup_code}\n'
+                f'Vérifiez ce code avant de remettre le colis.',
+            )
+        except Exception:
+            pass
+
+        # Notifier l'acheteur avec verification_code
         Notification.send(
             user=order.buyer,
             type=Notification.Type.ORDER_UPDATE,
             title='🚗 Un livreur va vous livrer',
-            body=f'Votre code de vérification est : {assignment.verification_code}\n'
-                 f'Donnez ce code au livreur à la réception.',
+            body=(
+                f'Votre code de vérification : {assignment.verification_code}\n'
+                f'Donnez-le au livreur UNIQUEMENT à la réception de votre colis.'
+            ),
             data={'order_id': str(order.id), 'verification_code': assignment.verification_code},
         )
         try:
             from core.sms import send_sms
             send_sms(
                 str(order.buyer.phone_number),
-                f'[Guimatrix] Un livreur va livrer votre commande « {order.listing.title} ».\n'
+                f'[Guimatrix] Un livreur va livrer « {order.listing.title} ».\n'
                 f'Votre code de vérification : {assignment.verification_code}\n'
-                f'Donnez ce code au livreur pour confirmer la réception.',
+                f'Donnez ce code au livreur UNIQUEMENT à la réception.',
             )
         except Exception:
             pass
