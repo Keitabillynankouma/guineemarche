@@ -220,3 +220,35 @@ class Payment(BaseModel):
 
     def __str__(self):
         return f"Paiement {self.provider} — {self.amount_gnf} GNF"
+
+
+class DeliveryAssignment(BaseModel):
+    """Affectation d'un livreur à une commande home_delivery."""
+
+    class Status(models.TextChoices):
+        ASSIGNED  = 'assigned',  'Affectée'
+        EN_ROUTE  = 'en_route',  'En route'
+        DELIVERED = 'delivered', 'Livrée'
+        FAILED    = 'failed',    'Échec livraison'
+
+    order             = models.OneToOneField(Order,  on_delete=models.CASCADE, related_name='delivery_assignment')
+    livreur           = models.ForeignKey(User,   on_delete=models.PROTECT,  related_name='delivery_assignments')
+    status            = models.CharField(max_length=12, choices=Status.choices, default=Status.ASSIGNED)
+    verification_code = models.CharField(max_length=6, help_text="Code 6 chiffres que l'acheteur fournit au livreur")
+    assigned_at       = models.DateTimeField(auto_now_add=True)
+    delivered_at      = models.DateTimeField(null=True, blank=True)
+    notes             = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name        = 'Affectation livreur'
+        verbose_name_plural = 'Affectations livreurs'
+        ordering            = ['-assigned_at']
+
+    def __str__(self):
+        return f"Livraison #{str(self.order.id)[:8]} → {self.livreur.full_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.verification_code:
+            import random
+            self.verification_code = str(random.randint(100000, 999999))
+        super().save(*args, **kwargs)

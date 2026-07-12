@@ -11,8 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone
-from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment
+from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer
 from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card
 from core.permissions import IsAdmin
 
@@ -173,6 +173,13 @@ class OrderListCreateView(generics.ListCreateAPIView):
         try:
             from core.email_notifications import send_new_order_seller
             send_new_order_seller(order)
+        except Exception:
+            pass
+        # SMS vendeur + acheteur
+        try:
+            from core.sms import send_order_sms_seller, send_order_sms_buyer
+            send_order_sms_seller(order)
+            send_order_sms_buyer(order)
         except Exception:
             pass
 
@@ -710,3 +717,185 @@ class AdminExportCSVView(APIView):
                 ])
 
         return response
+
+
+# ── Livreur ────────────────────────────────────────────────────────────────────
+
+class IsLivreur(permissions.BasePermission):
+    """Accès réservé aux utilisateurs avec le rôle livreur."""
+    def has_permission(self, request, view):
+        return request.user.is_authenticated and request.user.role == 'livreur'
+
+
+class LivreurOrderListView(generics.ListAPIView):
+    """Livreur : liste ses livraisons assignées."""
+    permission_classes = [IsLivreur]
+    serializer_class   = DeliveryAssignmentSerializer
+
+    def get_queryset(self):
+        return DeliveryAssignment.objects.filter(
+            livreur=self.request.user
+        ).select_related('order', 'order__listing', 'order__buyer', 'livreur').exclude(
+            status=DeliveryAssignment.Status.DELIVERED
+        )
+
+
+class LivreurStartDeliveryView(APIView):
+    """Livreur : marquer une livraison 'en route'."""
+    permission_classes = [IsLivreur]
+
+    def post(self, request, pk):
+        assignment = get_object_or_404(DeliveryAssignment, pk=pk, livreur=request.user)
+        if assignment.status != DeliveryAssignment.Status.ASSIGNED:
+            return Response({'error': 'Cette livraison ne peut pas être mise en route.'}, status=400)
+        assignment.status = DeliveryAssignment.Status.EN_ROUTE
+        assignment.save(update_fields=['status', 'updated_at'])
+        # Notifier l'acheteur
+        from apps.notifications.models import Notification
+        Notification.send(
+            user=assignment.order.buyer,
+            type=Notification.Type.ORDER_UPDATE,
+            title='🚗 Votre colis est en route !',
+            body=f'Le livreur est en chemin pour « {assignment.order.listing.title} ». '
+                 f'Préparez votre code de vérification.',
+            data={'order_id': str(assignment.order.id)},
+        )
+        return Response(DeliveryAssignmentSerializer(assignment).data)
+
+
+class LivreurConfirmDeliveryView(APIView):
+    """Livreur : confirme la livraison via le code de vérification fourni par l'acheteur."""
+    permission_classes = [IsLivreur]
+
+    def post(self, request, pk):
+        from django.utils import timezone
+        assignment = get_object_or_404(DeliveryAssignment, pk=pk, livreur=request.user)
+
+        if assignment.status == DeliveryAssignment.Status.DELIVERED:
+            return Response({'error': 'Cette livraison a déjà été confirmée.'}, status=400)
+
+        code = str(request.data.get('verification_code', '')).strip()
+        if code != assignment.verification_code:
+            return Response({'error': 'Code de vérification incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        assignment.status       = DeliveryAssignment.Status.DELIVERED
+        assignment.delivered_at = timezone.now()
+        assignment.save(update_fields=['status', 'delivered_at', 'updated_at'])
+
+        # Compléter la commande + libérer l'escrow
+        order = assignment.order
+        order.complete()
+        if order.escrow_status == Order.EscrowStatus.HELD:
+            order.release_escrow()
+
+        from apps.notifications.models import Notification
+        Notification.send(
+            user=order.buyer,
+            type=Notification.Type.ORDER_UPDATE,
+            title='✅ Livraison confirmée',
+            body=f'Votre commande « {order.listing.title} » a été livrée avec succès.',
+            data={'order_id': str(order.id)},
+        )
+        Notification.send(
+            user=order.seller,
+            type=Notification.Type.ORDER_UPDATE,
+            title='💰 Commande livrée — paiement libéré',
+            body=f'La livraison pour « {order.listing.title} » a été confirmée.',
+            data={'order_id': str(order.id)},
+        )
+
+        return Response(DeliveryAssignmentSerializer(assignment).data)
+
+
+class AdminAssignLivreurView(APIView):
+    """Admin : affecter un livreur à une commande home_delivery."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from apps.accounts.models import User as AppUser
+        order      = get_object_or_404(Order, pk=pk, delivery_mode=Order.DeliveryMode.HOME_DELIVERY)
+        livreur_id = request.data.get('livreur_id')
+
+        if not livreur_id:
+            return Response({'error': 'livreur_id requis.'}, status=400)
+
+        livreur = get_object_or_404(AppUser, pk=livreur_id, role='livreur')
+
+        # Créer ou mettre à jour l'affectation
+        assignment, created = DeliveryAssignment.objects.update_or_create(
+            order=order,
+            defaults={'livreur': livreur, 'status': DeliveryAssignment.Status.ASSIGNED},
+        )
+
+        # Notifier le livreur par SMS + notification
+        from apps.notifications.models import Notification
+        Notification.send(
+            user=livreur,
+            type=Notification.Type.ORDER_UPDATE,
+            title='📦 Nouvelle livraison assignée',
+            body=f'Livraison à effectuer : « {order.listing.title} » → {order.delivery_address}.\n'
+                 f'Code vérif. acheteur : {assignment.verification_code}',
+            data={'assignment_id': str(assignment.id)},
+        )
+        try:
+            from core.sms import send_sms
+            send_sms(
+                str(livreur.phone_number),
+                f'[Guimatrix] Nouvelle livraison !\n'
+                f'Article : {order.listing.title}\n'
+                f'Adresse : {order.delivery_address}\n'
+                f'Acheteur : {order.buyer.full_name} ({order.buyer.phone_number})\n'
+                f'Code vérif : {assignment.verification_code}',
+            )
+        except Exception:
+            pass
+
+        # Notifier l'acheteur du code
+        Notification.send(
+            user=order.buyer,
+            type=Notification.Type.ORDER_UPDATE,
+            title='🚗 Un livreur va vous livrer',
+            body=f'Votre code de vérification est : {assignment.verification_code}\n'
+                 f'Donnez ce code au livreur à la réception.',
+            data={'order_id': str(order.id), 'verification_code': assignment.verification_code},
+        )
+        try:
+            from core.sms import send_sms
+            send_sms(
+                str(order.buyer.phone_number),
+                f'[Guimatrix] Un livreur va livrer votre commande « {order.listing.title} ».\n'
+                f'Votre code de vérification : {assignment.verification_code}\n'
+                f'Donnez ce code au livreur pour confirmer la réception.',
+            )
+        except Exception:
+            pass
+
+        return Response(DeliveryAssignmentSerializer(assignment).data, status=201 if created else 200)
+
+
+class AdminLivreurListView(generics.ListAPIView):
+    """Admin : liste tous les livreurs disponibles."""
+    permission_classes = [IsAdmin]
+    serializer_class   = DeliveryAssignmentSerializer  # dummy — on va override
+
+    def list(self, request):
+        from apps.accounts.models import User as AppUser
+        livreurs = AppUser.objects.filter(role='livreur').values(
+            'id', 'full_name', 'phone_number', 'city', 'is_active',
+        )
+        return Response(list(livreurs))
+
+
+class AdminDeliveryAssignmentListView(generics.ListAPIView):
+    """Admin : liste toutes les affectations livreurs."""
+    permission_classes = [IsAdmin]
+    serializer_class   = DeliveryAssignmentSerializer
+
+    def get_queryset(self):
+        qs = DeliveryAssignment.objects.select_related(
+            'order', 'order__listing', 'order__buyer', 'livreur'
+        )
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        return qs

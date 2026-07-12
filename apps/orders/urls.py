@@ -49,6 +49,17 @@ urlpatterns = [
         views.OrderUpdateStatusView.as_view(),
         name='order-status'),
 
+    # Livreur
+    path('livreur/assignments/',
+        views.LivreurOrderListView.as_view(),
+        name='livreur-assignments'),
+    path('livreur/assignments/<uuid:pk>/start/',
+        views.LivreurStartDeliveryView.as_view(),
+        name='livreur-start-delivery'),
+    path('livreur/assignments/<uuid:pk>/confirm/',
+        views.LivreurConfirmDeliveryView.as_view(),
+        name='livreur-confirm-delivery'),
+
     # Admin
     path('admin/pickup-points/',
         views.AdminPickupPointView.as_view(),
@@ -68,6 +79,15 @@ urlpatterns = [
     path('admin/delivery-zones/<uuid:pk>/',
         views.AdminDeliveryZoneDetailView.as_view(),
         name='admin-delivery-zone-detail'),
+    path('admin/livreurs/',
+        views.AdminLivreurListView.as_view(),
+        name='admin-livreurs'),
+    path('admin/assignments/',
+        views.AdminDeliveryAssignmentListView.as_view(),
+        name='admin-assignments'),
+    path('admin/orders/<uuid:pk>/assign/',
+        views.AdminAssignLivreurView.as_view(),
+        name='admin-assign-livreur'),
     path('admin/disputes/',
         views.AdminDisputeListView.as_view(),
         name='admin-disputes'),

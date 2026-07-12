@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment
 
 
 class PickupPointSerializer(serializers.ModelSerializer):
@@ -71,6 +71,33 @@ class OrderSerializer(serializers.ModelSerializer):
 
         validated_data['amount_gnf'] = listing.price_gnf + delivery_fee
         return super().create(validated_data)
+
+
+class DeliveryAssignmentSerializer(serializers.ModelSerializer):
+    livreur_name = serializers.CharField(source='livreur.full_name', read_only=True)
+    livreur_phone = serializers.CharField(source='livreur.phone_number', read_only=True)
+    order_detail  = serializers.SerializerMethodField()
+
+    class Meta:
+        model  = DeliveryAssignment
+        fields = (
+            'id', 'order', 'order_detail',
+            'livreur', 'livreur_name', 'livreur_phone',
+            'status', 'verification_code',
+            'assigned_at', 'delivered_at', 'notes',
+        )
+        read_only_fields = ('id', 'verification_code', 'assigned_at', 'delivered_at')
+
+    def get_order_detail(self, obj):
+        o = obj.order
+        return {
+            'id':             str(o.id),
+            'listing_title':  o.listing.title,
+            'buyer_name':     o.buyer.full_name,
+            'buyer_phone':    str(o.buyer.phone_number or ''),
+            'delivery_address': o.delivery_address,
+            'amount_gnf':     o.amount_gnf,
+        }
 
 
 class CreatePaymentSerializer(serializers.Serializer):

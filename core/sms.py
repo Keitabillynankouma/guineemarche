@@ -61,3 +61,34 @@ def send_sms(to: str, body: str) -> bool:
 def send_otp_sms(phone_number: str, code: str) -> bool:
     body = f"[Guimatrix] Votre code de vérification est : {code}\nValide 10 minutes."
     return send_sms(to=phone_number, body=body)
+
+
+def send_order_sms_seller(order) -> bool:
+    """Alerte SMS au vendeur quand une nouvelle commande est passée."""
+    if not order.seller.phone_number:
+        return False
+    amount = f"{order.amount_gnf:,}".replace(',', ' ')
+    body = (
+        f"[Guimatrix] Nouvelle commande !\n"
+        f"Article : {order.listing.title}\n"
+        f"Acheteur : {order.buyer.full_name}\n"
+        f"Montant : {amount} GNF\n"
+        f"Mode : {order.get_delivery_mode_display()}\n"
+        f"Connectez-vous pour confirmer."
+    )
+    return send_sms(to=str(order.seller.phone_number), body=body)
+
+
+def send_order_sms_buyer(order) -> bool:
+    """Confirmation SMS à l'acheteur après passage de commande."""
+    if not order.buyer.phone_number:
+        return False
+    amount = f"{order.amount_gnf:,}".replace(',', ' ')
+    body = (
+        f"[Guimatrix] Commande enregistrée !\n"
+        f"Article : {order.listing.title}\n"
+        f"Vendeur : {order.seller.full_name}\n"
+        f"Montant : {amount} GNF\n"
+        f"Vous serez alerté dès confirmation."
+    )
+    return send_sms(to=str(order.buyer.phone_number), body=body)

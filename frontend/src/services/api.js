@@ -92,6 +92,14 @@ export const ordersAPI = {
   getMeetingZones:   (city) => api.get('/orders/meeting-zones/',   { params: city ? { city } : {} }),
   getDeliveryZones:  (city) => api.get('/orders/delivery-zones/',  { params: city ? { city } : {} }),
   getSeller: () => api.get('/orders/received/'),
+  // Livreur
+  getMyAssignments:    ()        => api.get('/orders/livreur/assignments/'),
+  startDelivery:       (id)      => api.post(`/orders/livreur/assignments/${id}/start/`),
+  confirmDelivery:     (id, code)=> api.post(`/orders/livreur/assignments/${id}/confirm/`, { verification_code: code }),
+  // Admin — livreurs
+  getLivreurs:         ()        => api.get('/orders/admin/livreurs/'),
+  getAllAssignments:    (params)  => api.get('/orders/admin/assignments/', { params }),
+  assignLivreur:       (orderId, livreurId) => api.post(`/orders/admin/orders/${orderId}/assign/`, { livreur_id: livreurId }),
 }
 
 export const referralAPI = {

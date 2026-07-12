@@ -24,9 +24,10 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
     class Role(models.TextChoices):
-        BUYER  = 'buyer',  'Acheteur'
-        SELLER = 'seller', 'Vendeur'
-        ADMIN  = 'admin',  'Administrateur'
+        BUYER    = 'buyer',    'Acheteur'
+        SELLER   = 'seller',   'Vendeur'
+        ADMIN    = 'admin',    'Administrateur'
+        LIVREUR  = 'livreur',  'Livreur'
 
     phone_number = PhoneNumberField(unique=True, null=True, blank=True, region='GN')
     email        = models.EmailField(unique=True, null=True, blank=True)
