@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
-import { ordersAPI, reviewsAPI } from '../services/api'
+import { ordersAPI, reviewsAPI, authAPI } from '../services/api'
+import useAuthStore from '../store/authStore'
 
 const STATUS_LABEL = {
   assigned:  { label: 'Assignée',  color: 'bg-amber-100 text-amber-700 border-amber-200' },
@@ -14,16 +15,6 @@ function CodeBox({ label, code, subtitle }) {
       <p className="text-xs text-gray-500 font-medium uppercase tracking-wide">{label}</p>
       <p className="text-3xl font-black tracking-[0.2em] text-gray-900">{code}</p>
       {subtitle && <p className="text-xs text-gray-400">{subtitle}</p>}
-    </div>
-  )
-}
-
-function QRCodeDisplay({ code }) {
-  const url = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(code)}&size=180x180&margin=10`
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <img src={url} alt={`QR ${code}`} className="rounded-xl border border-gray-200 shadow-sm" width={180} height={180} />
-      <p className="text-sm text-gray-500">Code : <span className="font-black text-gray-800 tracking-widest">{code}</span></p>
     </div>
   )
 }
@@ -81,7 +72,6 @@ function RatingModal({ orderId, revieweeId, revieweeName, label, onClose, onDone
 
 // ── Carte livraison ───────────────────────────────────────────────────────────
 function AssignmentCard({ assignment, onStart, onConfirm, onRefresh }) {
-  const [showConfirm, setShowConfirm] = useState(false)
   const [inputCode, setInputCode]     = useState('')
   const [error, setError]             = useState('')
   const [loading, setLoading]         = useState(false)
@@ -182,40 +172,25 @@ function AssignmentCard({ assignment, onStart, onConfirm, onRefresh }) {
           {assignment.status === 'en_route' && (
             <div className="border-t pt-4 space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-800">
-                <p className="font-bold mb-1">📋 Étape 2 — Livrer à l'acheteur</p>
-                <p>L'acheteur doit vous donner son code à la réception pour confirmer la livraison.</p>
+                <p className="font-bold mb-1">📋 Étape 2 — Confirmer la remise à l'acheteur</p>
+                <p>Demandez le code à l'acheteur et saisissez-le ci-dessous pour confirmer la livraison.</p>
               </div>
-              <div className="flex flex-col items-center gap-2">
-                <p className="text-sm text-gray-600 font-medium">Code que l'acheteur doit vous donner :</p>
-                <QRCodeDisplay code={assignment.verification_code} />
-              </div>
-              {!showConfirm ? (
-                <button onClick={() => setShowConfirm(true)}
-                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition">
-                  ✅ Saisir le code de l'acheteur
+              <div className="space-y-2">
+                <p className="text-sm text-gray-600 font-medium text-center">Code donné par l'acheteur :</p>
+                <input
+                  type="number" value={inputCode}
+                  onChange={e => { setInputCode(e.target.value.slice(0, 6)); setError('') }}
+                  placeholder="_ _ _ _ _ _"
+                  inputMode="numeric"
+                  autoFocus
+                  className="w-full text-center text-3xl font-black tracking-[0.3em] px-4 py-4 bg-gray-50 border-2 border-gray-200 rounded-xl focus:outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
+                />
+                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                <button onClick={handleConfirm} disabled={loading || inputCode.length !== 6}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition disabled:opacity-50">
+                  {loading ? '…' : '✅ Confirmer la livraison'}
                 </button>
-              ) : (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600 font-medium">Code donné par l'acheteur :</p>
-                  <input
-                    type="number" value={inputCode}
-                    onChange={e => { setInputCode(e.target.value.slice(0, 6)); setError('') }}
-                    placeholder="123456"
-                    className="w-full text-center text-2xl font-black tracking-widest px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-                  />
-                  {error && <p className="text-red-500 text-sm">{error}</p>}
-                  <div className="flex gap-2">
-                    <button onClick={() => { setShowConfirm(false); setInputCode(''); setError('') }}
-                      className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold py-3 rounded-xl transition">
-                      Annuler
-                    </button>
-                    <button onClick={handleConfirm} disabled={loading}
-                      className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition disabled:opacity-60">
-                      {loading ? '…' : 'Valider'}
-                    </button>
-                  </div>
-                </div>
-              )}
+              </div>
             </div>
           )}
 
@@ -268,9 +243,15 @@ function AssignmentCard({ assignment, onStart, onConfirm, onRefresh }) {
 
 // ── Page principale ───────────────────────────────────────────────────────────
 export default function LivreurDashboard() {
+  const user                          = useAuthStore(s => s.user)
+  const setUser                       = useAuthStore(s => s.setUser)
   const [assignments, setAssignments] = useState([])
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState('')
+  const [toggling, setToggling]       = useState(false)
+
+  // is_available vient du store auth (mis à jour par /me/ au login)
+  const isAvailable = user?.is_available ?? true
 
   async function load() {
     try {
@@ -285,6 +266,18 @@ export default function LivreurDashboard() {
   }
 
   useEffect(() => { load() }, [])
+
+  async function handleToggleAvailability() {
+    setToggling(true)
+    try {
+      const res = await authAPI.toggleAvailability()
+      // Mettre à jour le store auth pour refléter le nouveau statut
+      if (user) setUser({ ...user, is_available: res.data.is_available })
+    } catch {
+      alert('Erreur lors du changement de statut.')
+    } finally {
+      setToggling(false) }
+  }
 
   async function handleStart(id) {
     try {
@@ -313,10 +306,32 @@ export default function LivreurDashboard() {
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-gradient-to-r from-green-800 to-emerald-700 px-4 pt-10 pb-8">
-        <h1 className="text-white text-2xl font-black">Mes livraisons</h1>
-        <p className="text-emerald-200 text-sm mt-1">
-          {active.length} en cours · {delivered.length} livrée{delivered.length !== 1 ? 's' : ''}
-        </p>
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <h1 className="text-white text-2xl font-black">Mes livraisons</h1>
+            <p className="text-emerald-200 text-sm mt-1">
+              {active.length} en cours · {delivered.length} livrée{delivered.length !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {/* Toggle disponibilité */}
+          <button
+            onClick={handleToggleAvailability}
+            disabled={toggling}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl font-bold text-sm transition-all shadow-lg
+              ${isAvailable
+                ? 'bg-emerald-400 hover:bg-emerald-300 text-emerald-900'
+                : 'bg-white/20 hover:bg-white/30 text-white border border-white/30'
+              } disabled:opacity-60`}
+          >
+            <span className={`w-3 h-3 rounded-full ${isAvailable ? 'bg-emerald-900 animate-pulse' : 'bg-white/50'}`} />
+            {toggling ? '…' : isAvailable ? 'Disponible' : 'Indisponible'}
+          </button>
+        </div>
+        {!isAvailable && (
+          <div className="mt-3 bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-xs text-white/80">
+            ⚠️ Vous êtes indisponible — aucune nouvelle commande ne vous sera assignée.
+          </div>
+        )}
       </div>
 
       <div className="px-4 py-6 max-w-lg mx-auto space-y-4">
