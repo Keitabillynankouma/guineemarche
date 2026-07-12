@@ -645,3 +645,41 @@ class AdminUserUpdateView(APIView):
             'is_available': user.is_available,
             'is_staff':     user.is_staff,
         })
+
+
+# ── Suppression de compte ──────────────────────────────────────────────────────
+
+class DeleteAccountView(APIView):
+    """
+    POST /accounts/delete/
+    Body: { password: "...", refresh_token: "..." }
+    Vérifie le mot de passe, anonymise les données PII et désactive le compte.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user     = request.user
+        password = request.data.get('password', '').strip()
+
+        if not password:
+            return Response({'error': 'Le mot de passe est obligatoire.'}, status=400)
+
+        if not user.check_password(password):
+            return Response({'error': 'Mot de passe incorrect.'}, status=400)
+
+        # Blacklister le refresh token pour invalider la session
+        try:
+            refresh_token = request.data.get('refresh_token')
+            if refresh_token:
+                token = RefreshToken(refresh_token)
+                token.blacklist()
+        except Exception:
+            pass
+
+        # Anonymisation PII + désactivation (soft delete)
+        user.full_name = 'Compte supprimé'
+        user.email     = None
+        user.is_active = False
+        user.save(update_fields=['full_name', 'email', 'is_active', 'updated_at'])
+
+        return Response(status=204)

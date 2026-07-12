@@ -46,6 +46,8 @@ export const authAPI = {
   getBadges: () => api.get('/accounts/badges/'),
   // Livreur
   toggleAvailability: () => api.post('/accounts/livreur/toggle-availability/'),
+  // Compte
+  deleteAccount: (data) => api.post('/accounts/delete/', data),
 }
 
 export const listingsAPI = {

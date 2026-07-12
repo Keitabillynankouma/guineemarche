@@ -31,4 +31,7 @@ urlpatterns = [
     path('admin/shops/<uuid:pk>/',          views.AdminShopUpdateView.as_view(),  name='admin-shop-update'),
     path('admin/users/',                    views.AdminUserListView.as_view(),    name='admin-user-list'),
     path('admin/users/<uuid:pk>/',          views.AdminUserUpdateView.as_view(),  name='admin-user-update'),
+
+    # Suppression de compte
+    path('delete/',                         views.DeleteAccountView.as_view(),    name='delete-account'),
 ]

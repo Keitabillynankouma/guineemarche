@@ -286,6 +286,34 @@ export default function ProfilePage() {
         navigate('/')
     }
 
+    // ── Supprimer compte ──────────────────────────────────────────────────────
+    const [showDelete, setShowDelete]       = useState(false)
+    const [deletePassword, setDeletePassword] = useState('')
+    const [deleteLoading, setDeleteLoading] = useState(false)
+    const [deleteError, setDeleteError]     = useState('')
+
+    const openDeleteModal = () => {
+        setDeletePassword('')
+        setDeleteError('')
+        setShowDelete(true)
+    }
+
+    const handleDeleteAccount = async (e) => {
+        e.preventDefault()
+        setDeleteLoading(true)
+        setDeleteError('')
+        try {
+            const refresh = localStorage.getItem('refresh_token')
+            await authAPI.deleteAccount({ password: deletePassword, refresh_token: refresh })
+            await logout()
+            navigate('/')
+        } catch (err) {
+            setDeleteError(err?.response?.data?.error || 'Une erreur est survenue.')
+        } finally {
+            setDeleteLoading(false)
+        }
+    }
+
     // ── Modifier profil ───────────────────────────────────────────────────────
     const [showEdit, setShowEdit] = useState(false)
     const [editForm, setEditForm] = useState({ email: '', city: 'Conakry', quartier: '' })
@@ -498,12 +526,68 @@ export default function ProfilePage() {
                         </Link>
                     )}
                     <button onClick={handleLogout}
-                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-red-50 text-red-500 transition-colors">
+                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-red-50 text-red-500 transition-colors border-b border-gray-50">
                         <span className="font-medium">🚪 Se déconnecter</span>
+                        <span className="text-lg">›</span>
+                    </button>
+                    <button onClick={openDeleteModal}
+                        className="w-full flex items-center justify-between px-5 py-4 hover:bg-red-50 text-red-400 transition-colors">
+                        <span className="font-medium text-sm">🗑️ Supprimer mon compte</span>
                         <span className="text-lg">›</span>
                     </button>
                 </div>
             </div>
+
+            {/* ── Modal suppression de compte ─────────────────────────────── */}
+            {showDelete && (
+                <div className="fixed inset-0 bg-black/60 z-50 flex items-end sm:items-center justify-center p-4"
+                    onClick={(e) => e.target === e.currentTarget && setShowDelete(false)}>
+                    <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6">
+                        <div className="text-center mb-5">
+                            <div className="text-4xl mb-3">⚠️</div>
+                            <h2 className="font-bold text-gray-900 text-lg">Supprimer mon compte</h2>
+                            <p className="text-sm text-gray-500 mt-2 leading-relaxed">
+                                Cette action est <strong>irréversible</strong>. Toutes vos données personnelles seront effacées. Vos annonces et historique de commandes seront anonymisés.
+                            </p>
+                        </div>
+
+                        <form onSubmit={handleDeleteAccount} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-600 mb-1">
+                                    Confirmez avec votre mot de passe
+                                </label>
+                                <input
+                                    type="password"
+                                    placeholder="Votre mot de passe"
+                                    value={deletePassword}
+                                    onChange={(e) => setDeletePassword(e.target.value)}
+                                    className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-400"
+                                    autoFocus
+                                />
+                            </div>
+
+                            {deleteError && (
+                                <p className="text-xs text-red-600 bg-red-50 rounded-lg px-3 py-2">{deleteError}</p>
+                            )}
+
+                            <button
+                                type="submit"
+                                disabled={deleteLoading || !deletePassword}
+                                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-40 text-sm"
+                            >
+                                {deleteLoading ? 'Suppression…' : 'Oui, supprimer définitivement'}
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setShowDelete(false)}
+                                className="w-full text-gray-500 text-sm py-2 hover:text-gray-700 transition"
+                            >
+                                Annuler
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* ── Modal modifier profil ────────────────────────────────────── */}
             {showEdit && (
