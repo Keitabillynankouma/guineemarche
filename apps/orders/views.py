@@ -11,8 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .models import Order, Payment, PickupPoint, MeetingZone
-from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone
+from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer
 from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card
 from core.permissions import IsAdmin
 
@@ -103,6 +103,51 @@ class AdminMeetingZoneDetailView(APIView):
 
     def delete(self, request, pk):
         obj = get_object_or_404(MeetingZone, pk=pk)
+        obj.delete()
+        return Response(status=204)
+
+
+class DeliveryZoneListView(generics.ListAPIView):
+    """Public : liste les zones de livraison actives, filtrables par ville."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = DeliveryZoneSerializer
+
+    def get_queryset(self):
+        qs   = DeliveryZone.objects.filter(is_active=True)
+        city = self.request.query_params.get('city')
+        if city:
+            qs = qs.filter(city__iexact=city)
+        return qs
+
+
+class AdminDeliveryZoneView(APIView):
+    """Admin : CRUD complet sur les zones de livraison."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        qs = DeliveryZone.objects.all().order_by('city')
+        return Response(DeliveryZoneSerializer(qs, many=True).data)
+
+    def post(self, request):
+        serializer = DeliveryZoneSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data, status=201)
+
+
+class AdminDeliveryZoneDetailView(APIView):
+    """Admin : modifier ou supprimer une zone de livraison."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        obj = get_object_or_404(DeliveryZone, pk=pk)
+        serializer = DeliveryZoneSerializer(obj, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def delete(self, request, pk):
+        obj = get_object_or_404(DeliveryZone, pk=pk)
         obj.delete()
         return Response(status=204)
 

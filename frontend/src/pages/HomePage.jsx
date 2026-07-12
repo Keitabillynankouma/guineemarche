@@ -318,13 +318,22 @@ export default function HomePage() {
             <Navbar isAuthenticated={isAuthenticated} />
 
             {/* Hero + Recherche */}
-            <div className="hero-section text-white py-12 px-4">
+            <div className="hero-section text-white py-14 px-4 relative overflow-hidden">
+                {/* Décoration */}
+                <div className="absolute -top-20 -right-20 w-80 h-80 bg-white/5 rounded-full pointer-events-none" />
+                <div className="absolute -bottom-16 -left-16 w-64 h-64 bg-white/5 rounded-full pointer-events-none" />
+                <div className="absolute top-1/2 left-1/4 w-2 h-2 bg-white/20 rounded-full pointer-events-none" />
+                <div className="absolute top-1/3 right-1/3 w-1.5 h-1.5 bg-emerald-300/40 rounded-full pointer-events-none" />
+
                 <div className="max-w-2xl mx-auto text-center relative z-10">
-                    <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1 text-xs font-medium text-green-100 mb-4">
-                        🇬🇳 La plateforme N°1 en Guinée
+                    <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm border border-white/20 rounded-full px-4 py-1.5 text-xs font-semibold text-emerald-100 mb-5 tracking-wide">
+                        🇬🇳 Marketplace N°1 en Guinée
                     </div>
-                    <h1 className="text-4xl font-extrabold mb-2 leading-tight tracking-tight">Achetez et vendez<br />en Guinée</h1>
-                    <p className="text-green-200 mb-6 text-sm">Des milliers d'annonces près de chez vous</p>
+                    <h1 className="text-4xl md:text-5xl font-extrabold mb-3 leading-tight tracking-tight">
+                        Achetez et vendez<br />
+                        <span className="text-emerald-300">partout en Guinée</span>
+                    </h1>
+                    <p className="text-green-200/80 mb-7 text-sm">Des milliers d'annonces vérifiées, près de chez vous</p>
 
                     {/* Recherche IA */}
                     <div className="mb-4">
@@ -338,69 +347,69 @@ export default function HomePage() {
                     </div>
 
                     <div className="flex items-center gap-3 my-4">
-                        <div className="flex-1 h-px bg-white/20"/>
-                        <span className="text-white/50 text-xs">ou recherche classique</span>
-                        <div className="flex-1 h-px bg-white/20"/>
+                        <div className="flex-1 h-px bg-white/15"/>
+                        <span className="text-white/40 text-xs font-medium">ou recherche classique</span>
+                        <div className="flex-1 h-px bg-white/15"/>
                     </div>
 
                     {/* Barre classique */}
                     <div className="search-bar flex gap-2">
                         <input type="text" placeholder="Rechercher une annonce..."
                             value={search} onChange={handleSearchChange}
-                            className="flex-1 px-3 py-2 text-gray-800 outline-none rounded-lg text-sm" />
+                            className="flex-1 px-4 py-2.5 text-gray-800 outline-none rounded-xl text-sm placeholder:text-gray-400" />
                         <select value={city} onChange={e => setCity(e.target.value)}
-                            className="text-gray-700 px-3 py-2 rounded-lg outline-none text-sm border-l border-gray-200">
+                            className="text-gray-700 px-3 py-2.5 rounded-xl outline-none text-sm border-l border-gray-200 bg-white">
                             {VILLES.map(v => <option key={v} value={v}>{v || 'Toute la Guinée'}</option>)}
                         </select>
                         <button onClick={() => setShowFilters(v => !v)}
-                            className={`px-3 py-2 rounded-lg text-sm font-medium transition border-l border-gray-200
+                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition border-l border-gray-200
                                 ${showFilters ? 'text-green-700 bg-green-50' : 'text-gray-500 hover:bg-gray-50'}`}
                             title="Filtres avancés">⚙️</button>
                     </div>
 
                     {/* Panneau filtres avancés */}
                     {showFilters && (
-                        <div className="mt-3 bg-white/95 backdrop-blur rounded-xl p-4 shadow-lg text-left text-gray-700 space-y-3">
+                        <div className="mt-3 bg-white/97 backdrop-blur rounded-2xl p-5 shadow-2xl text-left text-gray-700 space-y-4 border border-white/50">
+                            <p className="text-xs font-bold text-gray-400 uppercase tracking-widest">Filtres avancés</p>
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Prix min (GNF)</label>
+                                    <label className="text-xs font-semibold text-gray-500 block mb-1.5">Prix min (GNF)</label>
                                     <input type="number" placeholder="0" value={priceMin}
                                         onChange={e => setPriceMin(e.target.value)}
-                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400 bg-gray-50" />
                                 </div>
                                 <div>
-                                    <label className="text-xs font-medium text-gray-500 block mb-1">Prix max (GNF)</label>
+                                    <label className="text-xs font-semibold text-gray-500 block mb-1.5">Prix max (GNF)</label>
                                     <input type="number" placeholder="∞" value={priceMax}
                                         onChange={e => setPriceMax(e.target.value)}
-                                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+                                        className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400 focus:border-green-400 bg-gray-50" />
                                 </div>
                             </div>
                             <div>
-                                <label className="text-xs font-medium text-gray-500 block mb-1">Trier par</label>
+                                <label className="text-xs font-semibold text-gray-500 block mb-2">Trier par</label>
                                 <div className="flex flex-wrap gap-2">
                                     {TRIS.map(t => (
                                         <button key={t.value} onClick={() => setOrdering(t.value)}
-                                            className={`px-3 py-1.5 rounded-full text-xs font-medium transition
-                                                ${ordering === t.value ? 'bg-green-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition
+                                                ${ordering === t.value ? 'bg-green-600 text-white shadow-sm shadow-green-500/30' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                                             {t.label}
                                         </button>
                                     ))}
                                 </div>
                             </div>
-                            {/* Filtre par distance */}
                             <div>
                                 <div className="flex items-center justify-between mb-2">
-                                    <label className="text-xs font-medium text-gray-500">📍 Près de moi</label>
+                                    <label className="text-xs font-semibold text-gray-500">📍 Près de moi</label>
                                     {nearLat && (
                                         <button onClick={() => { setNearLat(null); setNearLng(null) }}
-                                            className="text-xs text-red-400 hover:underline">Désactiver</button>
+                                            className="text-xs text-red-400 hover:text-red-600 font-medium">Désactiver</button>
                                     )}
                                 </div>
                                 {nearLat ? (
-                                    <div className="space-y-1">
+                                    <div className="space-y-2">
                                         <div className="flex items-center gap-2">
-                                            <span className="text-xs text-green-600 font-medium">✓ Position activée</span>
-                                            <span className="text-xs text-gray-400">{radiusKm} km</span>
+                                            <span className="text-xs text-green-600 font-semibold">✓ Position activée</span>
+                                            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full">{radiusKm} km</span>
                                         </div>
                                         <input type="range" min="5" max="200" step="5" value={radiusKm}
                                             onChange={e => setRadiusKm(Number(e.target.value))}
@@ -409,19 +418,29 @@ export default function HomePage() {
                                     </div>
                                 ) : (
                                     <button onClick={handleGeolocate} disabled={geoLoading}
-                                        className="w-full py-2 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition disabled:opacity-50">
-                                        {geoLoading ? '⏳ Détection...' : '📍 Détecter ma position'}
+                                        className="w-full py-2.5 border-2 border-dashed border-gray-200 rounded-xl text-sm text-gray-500 hover:border-green-400 hover:text-green-600 transition disabled:opacity-50 font-medium">
+                                        {geoLoading ? '⏳ Détection en cours...' : '📍 Détecter ma position'}
                                     </button>
                                 )}
                             </div>
                             {(priceMin || priceMax || ordering !== '-is_boosted,-created_at' || nearLat) && (
                                 <button onClick={() => { setPriceMin(''); setPriceMax(''); setOrdering('-is_boosted,-created_at'); setNearLat(null); setNearLng(null) }}
-                                    className="text-xs text-red-500 hover:underline">
-                                    Réinitialiser les filtres
+                                    className="text-xs text-red-500 hover:text-red-700 font-medium underline underline-offset-2">
+                                    Réinitialiser tous les filtres
                                 </button>
                             )}
                         </div>
                     )}
+
+                    {/* Chiffres clés */}
+                    <div className="grid grid-cols-3 gap-3 mt-7">
+                        {[['10K+', 'Annonces'], ['5K+', 'Vendeurs actifs'], ['4.8★', 'Note moyenne']].map(([val, lbl]) => (
+                            <div key={lbl} className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl py-3 px-2">
+                                <p className="text-lg font-black text-white">{val}</p>
+                                <p className="text-emerald-200/80 text-xs mt-0.5 leading-tight">{lbl}</p>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
 

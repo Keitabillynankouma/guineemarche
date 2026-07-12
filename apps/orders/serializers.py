@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, Payment, PickupPoint, MeetingZone
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone
 
 
 class PickupPointSerializer(serializers.ModelSerializer):
@@ -12,6 +12,12 @@ class MeetingZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model  = MeetingZone
         fields = ('id', 'city', 'name', 'address', 'latitude', 'longitude', 'is_active')
+
+
+class DeliveryZoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = DeliveryZone
+        fields = ('id', 'city', 'fee_gnf', 'estimated_days', 'is_active')
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -35,7 +41,8 @@ class OrderSerializer(serializers.ModelSerializer):
             'buyer', 'buyer_name', 'seller', 'seller_name',
             'amount_gnf', 'status',
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
-            'meet_location', 'note',
+            'meet_location', 'delivery_address', 'delivery_fee_gnf',
+            'note',
             'escrow_status', 'escrow_released_at',
             'payments', 'created_at', 'updated_at',
         )
@@ -48,8 +55,21 @@ class OrderSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         listing = validated_data['listing']
-        validated_data['seller']     = listing.seller
-        validated_data['amount_gnf'] = listing.price_gnf
+        validated_data['seller'] = listing.seller
+
+        # Calcul du montant total : prix annonce + frais de livraison à domicile
+        delivery_mode = validated_data.get('delivery_mode', Order.DeliveryMode.MEETING_POINT)
+        delivery_fee  = 0
+        if delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
+            city = listing.city
+            try:
+                zone = DeliveryZone.objects.get(city__iexact=city, is_active=True)
+                delivery_fee = zone.fee_gnf
+            except DeliveryZone.DoesNotExist:
+                pass
+            validated_data['delivery_fee_gnf'] = delivery_fee
+
+        validated_data['amount_gnf'] = listing.price_gnf + delivery_fee
         return super().create(validated_data)
 
 

@@ -81,11 +81,17 @@ class EmailRegisterSerializer(serializers.ModelSerializer):
             purpose=OTPCode.Purpose.REGISTER,
             expires_at=otp_expiry(minutes=30),
         )
+        import logging as _log
+        _logger = _log.getLogger(__name__)
         try:
             from core.email_notifications import send_otp_email
             send_otp_email(user.email, code, user.full_name)
-        except Exception:
-            pass
+        except Exception as _e:
+            # NE PAS avaler silencieusement — logger pour diagnostic Railway
+            _logger.error(
+                "[REGISTER EMAIL] Échec envoi OTP à %s : %s",
+                user.email, _e, exc_info=True
+            )
         return user
 
 

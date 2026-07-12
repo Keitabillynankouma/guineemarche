@@ -4,6 +4,22 @@ from apps.accounts.models import User
 from apps.listings.models import Listing
 
 
+class DeliveryZone(BaseModel):
+    """Tarif fixe de livraison à domicile par ville."""
+    city           = models.CharField(max_length=100, unique=True, db_index=True)
+    fee_gnf        = models.BigIntegerField(default=0, help_text="Frais de livraison en GNF")
+    estimated_days = models.PositiveSmallIntegerField(default=1, help_text="Délai estimé en jours ouvrables")
+    is_active      = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name        = 'Zone de livraison'
+        verbose_name_plural = 'Zones de livraison'
+        ordering            = ['city']
+
+    def __str__(self):
+        return f"{self.city} — {self.fee_gnf:,} GNF ({self.estimated_days}j)"
+
+
 class PickupPoint(BaseModel):
     name      = models.CharField(max_length=200)
     address   = models.CharField(max_length=300)
@@ -76,6 +92,8 @@ class Order(BaseModel):
     escrow_release_at  = models.DateTimeField(null=True, blank=True)   # date planifiée de libération auto
     escrow_admin_hold  = models.BooleanField(default=False)             # admin a bloqué manuellement
     note               = models.TextField(blank=True)
+    delivery_address   = models.CharField(max_length=400, blank=True, help_text="Adresse de livraison à domicile")
+    delivery_fee_gnf   = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
 
     # Seuils escrow
     LARGE_AMOUNT_GNF  = 500_000   # montants ≥ 500 000 GNF → délai étendu + alerte admin

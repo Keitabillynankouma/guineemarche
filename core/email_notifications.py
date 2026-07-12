@@ -25,44 +25,67 @@ BORDER = '#e5e7eb'
 BREVO_API_URL = 'https://api.brevo.com/v3/smtp/email'
 
 
-def _send(subject: str, html: str, recipient_email: str, recipient_name: str = ''):
-    """Envoie un email via l'API HTTP Brevo (non bloquant, arrière-plan)."""
+def _do_send_now(subject: str, html: str, recipient_email: str, recipient_name: str) -> bool:
+    """Appel direct Brevo API (bloquant). Retourne True si succès."""
+    api_key      = getattr(settings, 'BREVO_API_KEY', '')
+    sender_email = getattr(settings, 'BREVO_SENDER_EMAIL', '')
+
+    if not api_key or not sender_email:
+        logger.error(
+            "[EMAIL] BREVO_API_KEY ou BREVO_SENDER_EMAIL manquant dans les variables Railway — "
+            "email non envoyé à %s", recipient_email
+        )
+        return False
+
+    try:
+        resp = _requests.post(
+            BREVO_API_URL,
+            headers={
+                'api-key':      api_key,
+                'Content-Type': 'application/json',
+                'Accept':       'application/json',
+            },
+            json={
+                'sender':      {'name': 'Guimatrix', 'email': sender_email},
+                'to':          [{'email': recipient_email, 'name': recipient_name or recipient_email}],
+                'subject':     subject,
+                'htmlContent': html,
+            },
+            timeout=15,
+        )
+        if resp.status_code in (200, 201, 202):
+            logger.info("[EMAIL] ✓ Envoyé à %s — %s", recipient_email, subject)
+            return True
+        else:
+            logger.error("[EMAIL] ✗ Brevo API %s pour %s : %s",
+                         resp.status_code, recipient_email, resp.text[:400])
+            return False
+    except Exception as exc:
+        logger.error("[EMAIL] ✗ Exception réseau pour %s → %s : %s", recipient_email, subject, exc)
+        return False
+
+
+def _send(subject: str, html: str, recipient_email: str, recipient_name: str = '',
+          sync: bool = False):
+    """
+    Envoie un email via l'API HTTP Brevo.
+
+    sync=False (défaut) : envoi en arrière-plan (non bloquant) — pour les emails
+                          non-critiques (bienvenue, notifications commande…).
+    sync=True            : envoi synchrone dans le thread courant — OBLIGATOIRE pour
+                          les codes OTP, car Railway coupe les threads daemon avant
+                          qu'ils aient le temps d'envoyer.
+    """
     if not recipient_email or '@' not in recipient_email:
         logger.debug("[EMAIL] Destinataire sans email valide — ignoré (%s)", recipient_name)
         return
 
-    def _do_send():
-        api_key      = getattr(settings, 'BREVO_API_KEY', '')
-        sender_email = getattr(settings, 'BREVO_SENDER_EMAIL', '')
-
-        if not api_key or not sender_email:
-            logger.warning("[EMAIL] BREVO_API_KEY ou BREVO_SENDER_EMAIL manquant — email non envoyé")
-            return
-
-        try:
-            resp = _requests.post(
-                BREVO_API_URL,
-                headers={
-                    'api-key':      api_key,
-                    'Content-Type': 'application/json',
-                    'Accept':       'application/json',
-                },
-                json={
-                    'sender':      {'name': 'Guimatrix', 'email': sender_email},
-                    'to':          [{'email': recipient_email, 'name': recipient_name or recipient_email}],
-                    'subject':     subject,
-                    'htmlContent': html,
-                },
-                timeout=15,
-            )
-            if resp.status_code in (200, 201, 202):
-                logger.info("[EMAIL] ✓ Envoyé à %s — %s", recipient_email, subject)
-            else:
-                logger.warning("[EMAIL] ✗ Brevo API %s : %s", resp.status_code, resp.text[:300])
-        except Exception as exc:
-            logger.warning("[EMAIL] ✗ Échec %s → %s : %s", recipient_email, subject, exc)
-
-    threading.Thread(target=_do_send, daemon=True).start()
+    if sync:
+        _do_send_now(subject, html, recipient_email, recipient_name)
+    else:
+        def _bg():
+            _do_send_now(subject, html, recipient_email, recipient_name)
+        threading.Thread(target=_bg, daemon=True).start()
 
 
 # ── Template de base ──────────────────────────────────────────────────────────
@@ -473,9 +496,12 @@ def send_otp_email(recipient_email: str, code: str, name: str = '') -> None:
         title='Vérifiez votre adresse email',
         content=content,
     )
+    # CRITIQUE : sync=True — Railway coupe les threads daemon avant l'envoi.
+    # L'OTP doit impérativement être envoyé avant que la réponse HTTP soit retournée.
     _send(
-        subject='🔐 Votre code Guimatrix',
+        subject='🔐 Votre code de vérification Guimatrix',
         html=html,
         recipient_email=recipient_email,
         recipient_name=name,
+        sync=True,
     )

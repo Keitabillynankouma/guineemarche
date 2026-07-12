@@ -88,8 +88,9 @@ export const ordersAPI = {
   pay: (id, data) => api.post(`/orders/${id}/pay/`, data),
   confirmReceipt: (id) => api.post(`/orders/${id}/confirm-receipt/`),
   dispute: (id) => api.post(`/orders/${id}/dispute/`),
-  getPickupPoints:  (city) => api.get('/orders/pickup-points/',  { params: city ? { city } : {} }),
-  getMeetingZones:  (city) => api.get('/orders/meeting-zones/',  { params: city ? { city } : {} }),
+  getPickupPoints:   (city) => api.get('/orders/pickup-points/',   { params: city ? { city } : {} }),
+  getMeetingZones:   (city) => api.get('/orders/meeting-zones/',   { params: city ? { city } : {} }),
+  getDeliveryZones:  (city) => api.get('/orders/delivery-zones/',  { params: city ? { city } : {} }),
   getSeller: () => api.get('/orders/received/'),
 }
 

@@ -134,7 +134,7 @@ function EscrowInfoModal({ onConfirm }) {
 const PROVIDERS = [
     { value: 'orange_money', label: 'Orange Money',         emoji: '🟠', desc: 'Mobile Money Guinea' },
     { value: 'mtn_momo',     label: 'MTN Mobile Money',     emoji: '🟡', desc: 'Mobile Money Guinea' },
-    { value: 'card',         label: 'Carte Visa / Mastercard', emoji: '💳', desc: 'Diaspora & international', badge: 'Paycard' },
+    { value: 'card',         label: 'Carte Visa / Mastercard', emoji: '💳', desc: 'Paiement international sécurisé', badge: 'Paycard' },
     { value: 'cash',         label: 'Espèces (remise en main)', emoji: '💵', desc: 'Paiement à la livraison' },
 ]
 
@@ -269,7 +269,7 @@ function PayModal({ order, onClose, onPaid }) {
                 {provider === 'card' && (
                     <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 space-y-1">
                         <p className="font-medium">💳 Paiement sécurisé Visa / Mastercard</p>
-                        <p>Vous serez redirigé vers la page sécurisée Paycard. Accepté depuis la Guinée et l'étranger (diaspora).</p>
+                        <p>Vous serez redirigé vers la page sécurisée Paycard. Accepté depuis la Guinée et partout dans le monde.</p>
                     </div>
                 )}
 
@@ -336,11 +336,20 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                     <span className="font-bold text-green-700">{fmt(order.amount_gnf)}</span>
                 </div>
 
-                {/* Point retrait / lieu */}
+                {/* Point retrait / lieu / adresse domicile */}
                 {(order.pickup_point_detail?.name || order.meet_location) && (
                     <p className="text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg">
                         📍 {order.pickup_point_detail?.name || order.meet_location}
                     </p>
+                )}
+                {order.delivery_mode === 'home_delivery' && order.delivery_address && (
+                    <div className="text-xs bg-green-50 border border-green-100 px-3 py-2 rounded-lg text-green-800 space-y-0.5">
+                        <p className="font-semibold">🚗 Livraison à domicile</p>
+                        <p className="text-green-700">{order.delivery_address}</p>
+                        {order.delivery_fee_gnf > 0 && (
+                            <p className="text-green-600">Frais : {new Intl.NumberFormat('fr-GN').format(order.delivery_fee_gnf)} GNF</p>
+                        )}
+                    </div>
                 )}
 
                 {/* Countdown escrow côté vendeur */}

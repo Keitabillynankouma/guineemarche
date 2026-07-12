@@ -115,7 +115,7 @@ function BrandPanel() {
         {[
           { icon: '🛍️', title: 'Achetez & vendez', desc: 'Des milliers d\'annonces dans toutes les catégories' },
           { icon: '📱', title: 'Paiement sécurisé', desc: 'Orange Money, MTN MoMo, Visa — escrow intégré' },
-          { icon: '🌍', title: 'Ouvert à la diaspora', desc: 'Inscrivez-vous depuis n\'importe où dans le monde' },
+          { icon: '🌍', title: 'Accessible partout', desc: 'Inscrivez-vous depuis la Guinée ou depuis l\'étranger' },
           { icon: '🤖', title: 'Recherche IA', desc: 'Trouvez ce que vous cherchez en langage naturel' },
         ].map(feat => (
           <div key={feat.title} className="flex items-start gap-4">
@@ -263,7 +263,7 @@ export default function RegisterPage() {
 
                 {/* Toggle mode */}
                 <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
-                  {[{ key: 'guinea', label: '🇬🇳 Je suis en Guinée' }, { key: 'diaspora', label: '🌍 Diaspora' }].map(m => (
+                  {[{ key: 'guinea', label: '🇬🇳 Je suis en Guinée' }, { key: 'international', label: '🌍 Je suis à l\'étranger' }].map(m => (
                     <button key={m.key} type="button"
                       onClick={() => { setMode(m.key); setError('') }}
                       className={`flex-1 py-2.5 rounded-lg text-sm font-semibold transition-all ${
@@ -273,7 +273,7 @@ export default function RegisterPage() {
                   ))}
                 </div>
 
-                {mode === 'diaspora' && (
+                {mode === 'international' && (
                   <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl p-3.5 mb-5">
                     <span className="text-lg">📧</span>
                     <p className="text-blue-700 text-xs leading-relaxed">
@@ -294,11 +294,11 @@ export default function RegisterPage() {
 
                   <Input
                     icon={<MailIcon />}
-                    label={mode === 'diaspora' ? 'Adresse email' : 'Email'}
+                    label={mode === 'international' ? 'Adresse email' : 'Email'}
                     type="email"
-                    placeholder={mode === 'diaspora' ? 'votre@gmail.com' : 'votre@email.com (optionnel)'}
+                    placeholder={mode === 'international' ? 'votre@gmail.com' : 'votre@email.com (optionnel)'}
                     value={form.email} onChange={f('email')}
-                    required={mode === 'diaspora'}
+                    required={mode === 'international'}
                   />
 
                   {mode === 'guinea' && (
@@ -374,15 +374,15 @@ export default function RegisterPage() {
 
                 <div className="text-center mb-8">
                   <div className="w-16 h-16 bg-green-50 border-2 border-green-100 rounded-2xl flex items-center justify-center text-3xl mx-auto mb-4">
-                    {mode === 'diaspora' ? '📧' : '📱'}
+                    {mode === 'international' ? '📧' : '📱'}
                   </div>
                   <h2 className="text-2xl font-black text-gray-900 mb-2">
-                    Vérifiez votre {mode === 'diaspora' ? 'email' : 'téléphone'}
+                    Vérifiez votre {mode === 'international' ? 'email' : 'téléphone'}
                   </h2>
                   <p className="text-gray-500 text-sm">
-                    Code envoyé à <strong className="text-gray-700">{mode === 'diaspora' ? form.email : form.phone_number}</strong>
+                    Code envoyé à <strong className="text-gray-700">{mode === 'international' ? form.email : form.phone_number}</strong>
                   </p>
-                  {mode === 'diaspora' && <p className="text-xs text-gray-400 mt-1">Vérifiez vos spams · expire dans 30 min</p>}
+                  {mode === 'international' && <p className="text-xs text-gray-400 mt-1">Vérifiez vos spams · expire dans 30 min</p>}
                 </div>
 
                 {error && (

@@ -307,13 +307,14 @@ function MeetingMap({ zones, selected, onSelect, city }) {
 
 // ── Order Modal ────────────────────────────────────────────────────────────────
 function OrderModal({ listing, onClose, onSuccess }) {
-    const [deliveryMode, setDeliveryMode] = useState('meeting_point')
-    const [meetLocation, setMeetLocation] = useState('')
+    const [deliveryMode, setDeliveryMode]   = useState('meeting_point')
+    const [meetLocation, setMeetLocation]   = useState('')
     const [customLocation, setCustomLocation] = useState('')
-    const [pickupPoint, setPickupPoint]   = useState('')
-    const [provider, setProvider]         = useState('orange_money')
-    const [phone, setPhone]               = useState('')
-    const [error, setError]               = useState('')
+    const [pickupPoint, setPickupPoint]     = useState('')
+    const [deliveryAddress, setDeliveryAddress] = useState('')
+    const [provider, setProvider]           = useState('orange_money')
+    const [phone, setPhone]                 = useState('')
+    const [error, setError]                 = useState('')
     const queryClient = useQueryClient()
 
     const { data: pickupPoints = [] } = useQuery({
@@ -328,6 +329,15 @@ function OrderModal({ listing, onClose, onSuccess }) {
         enabled:  deliveryMode === 'meeting_point',
     })
 
+    const { data: deliveryZone = null } = useQuery({
+        queryKey: ['delivery-zone', listing.city],
+        queryFn:  () => ordersAPI.getDeliveryZones(listing.city).then(r => {
+            const list = r.data?.results || r.data || []
+            return Array.isArray(list) ? list[0] || null : null
+        }),
+        enabled:  deliveryMode === 'home_delivery',
+    })
+
     const createOrder = useMutation({
         mutationFn: (data) => ordersAPI.create(data),
         onError: (err) => setError(err.response?.data?.detail || 'Erreur lors de la commande.'),
@@ -340,21 +350,34 @@ function OrderModal({ listing, onClose, onSuccess }) {
     })
 
     const finalMeetLocation = meetLocation || customLocation
+    const deliveryFee       = deliveryMode === 'home_delivery' && deliveryZone ? deliveryZone.fee_gnf : 0
+    const totalAmount       = listing.price_gnf + deliveryFee
 
     const handleOrder = async (e) => {
         e.preventDefault(); setError('')
         if (deliveryMode === 'meeting_point' && !finalMeetLocation) {
             setError('Veuillez choisir ou saisir un lieu de rencontre.'); return
         }
+        if (deliveryMode === 'home_delivery' && !deliveryAddress.trim()) {
+            setError('Veuillez saisir votre adresse de livraison.'); return
+        }
         try {
             const order = await createOrder.mutateAsync({
-                listing: listing.id, delivery_mode: deliveryMode,
-                meet_location: deliveryMode === 'meeting_point' ? finalMeetLocation : '',
-                pickup_point:  deliveryMode === 'pickup_point'  ? pickupPoint  : null,
+                listing:          listing.id,
+                delivery_mode:    deliveryMode,
+                meet_location:    deliveryMode === 'meeting_point'  ? finalMeetLocation : '',
+                pickup_point:     deliveryMode === 'pickup_point'   ? pickupPoint       : null,
+                delivery_address: deliveryMode === 'home_delivery'  ? deliveryAddress   : '',
             })
             await pay.mutateAsync({ id: order.data.id, data: { provider, phone_number: phone } })
         } catch {}
     }
+
+    const DELIVERY_MODES = [
+        { value: 'meeting_point', label: 'Main propre',     icon: '🤝', sub: 'Rencontre physique' },
+        { value: 'pickup_point',  label: 'Point retrait',   icon: '🏪', sub: 'Dans notre réseau' },
+        { value: 'home_delivery', label: 'Domicile',        icon: '🚗', sub: 'Livraison chez vous' },
+    ]
 
     const PROVIDERS = [
         { value: 'orange_money', label: '🟠 Orange Money', color: 'border-orange-400 bg-orange-50' },
@@ -364,68 +387,78 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
-            <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto">
-                <div className="p-5 border-b flex items-center justify-between">
+            <div className="bg-white rounded-2xl w-full max-w-md max-h-[92vh] overflow-y-auto">
+                <div className="p-5 border-b flex items-center justify-between sticky top-0 bg-white z-10">
                     <h2 className="font-bold text-gray-800">Passer commande</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl">✕</button>
                 </div>
                 <div className="p-5">
-                    <div className="bg-gray-50 rounded-xl p-3 mb-5 flex items-center gap-3">
+                    {/* Résumé article */}
+                    <div className="bg-gray-50 rounded-2xl p-4 mb-5 flex items-center gap-3">
                         <span className="text-2xl">📦</span>
-                        <div>
-                            <p className="font-medium text-gray-800 text-sm">{listing.title}</p>
-                            <p className="text-green-600 font-bold">{formatPrice(listing.price_gnf, listing.price_type)}</p>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-800 text-sm truncate">{listing.title}</p>
+                            <p className="text-green-600 font-black">{formatPrice(listing.price_gnf, listing.price_type)}</p>
                         </div>
                     </div>
-                    {error && <div className="bg-red-50 text-red-600 p-3 rounded-lg mb-4 text-sm">{error}</div>}
-                    <form onSubmit={handleOrder} className="space-y-4">
+
+                    {error && (
+                        <div className="bg-red-50 border border-red-100 text-red-700 p-3 rounded-xl mb-4 text-sm flex items-center gap-2">
+                            ⚠️ {error}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleOrder} className="space-y-5">
+
                         {/* Mode livraison */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">Mode de livraison</label>
-                            <div className="grid grid-cols-2 gap-2">
-                                {[{ value:'meeting_point',label:'Remise en main propre',icon:'🤝'},{ value:'pickup_point',label:'Point de retrait',icon:'🏪'}].map(m => (
-                                    <button key={m.value} type="button" onClick={() => { setDeliveryMode(m.value); setMeetLocation(''); setCustomLocation('') }}
-                                        className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200'}`}>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Mode de livraison</label>
+                            <div className="grid grid-cols-3 gap-2">
+                                {DELIVERY_MODES.map(m => (
+                                    <button key={m.value} type="button"
+                                        onClick={() => { setDeliveryMode(m.value); setMeetLocation(''); setCustomLocation(''); setDeliveryAddress('') }}
+                                        className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
                                         <div className="text-xl mb-1">{m.icon}</div>
-                                        <div className="text-xs font-medium text-gray-700">{m.label}</div>
+                                        <div className={`text-xs font-bold ${deliveryMode === m.value ? 'text-green-700' : 'text-gray-700'}`}>{m.label}</div>
+                                        <div className="text-xs text-gray-400 mt-0.5">{m.sub}</div>
                                     </button>
                                 ))}
                             </div>
                         </div>
 
-                        {/* Zone de rencontre — zones dynamiques + carte */}
+                        {/* Zone de rencontre */}
                         {deliveryMode === 'meeting_point' && (
                             <div className="space-y-3">
-                                <label className="block text-sm font-medium text-gray-700">📍 Lieu de rencontre</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">📍 Lieu de rencontre</label>
                                 <MeetingMap zones={meetingZones} selected={meetLocation} onSelect={setMeetLocation} city={listing.city} />
-                                {meetingZones.length > 0 ? (
+                                {meetingZones.length > 0 && (
                                     <select value={meetLocation} onChange={e => { setMeetLocation(e.target.value); setCustomLocation('') }}
-                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
-                                        <option value="">— Choisir un lieu —</option>
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50">
+                                        <option value="">— Choisir un lieu prédéfini —</option>
                                         {meetingZones.map(z => <option key={z.id} value={z.name}>{z.name}{z.address ? ` (${z.address})` : ''}</option>)}
                                     </select>
-                                ) : null}
+                                )}
                                 <div className="flex items-center gap-2 text-xs text-gray-400">
                                     <div className="flex-1 h-px bg-gray-200" />
-                                    {meetingZones.length > 0 ? 'ou saisir librement' : 'Aucun point prédéfini — saisissez le lieu'}
+                                    {meetingZones.length > 0 ? 'ou saisir librement' : 'Saisissez le lieu de rencontre'}
                                     <div className="flex-1 h-px bg-gray-200" />
                                 </div>
                                 <input type="text" placeholder="Ex: Marché Madina, devant la pharmacie"
                                     value={customLocation}
                                     onChange={e => { setCustomLocation(e.target.value); if (e.target.value) setMeetLocation('') }}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" />
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" />
                             </div>
                         )}
 
                         {/* Point de retrait */}
                         {deliveryMode === 'pickup_point' && (
                             <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Point de retrait</label>
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Point de retrait</label>
                                 {pickupPoints.length === 0 ? (
-                                    <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-lg">Aucun point disponible à {listing.city}.</p>
+                                    <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-xl">Aucun point disponible à {listing.city}.</p>
                                 ) : (
                                     <select value={pickupPoint} onChange={e => setPickupPoint(e.target.value)}
-                                        className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required>
+                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" required>
                                         <option value="">Choisir un point</option>
                                         {pickupPoints.map(p => <option key={p.id} value={p.id}>{p.name} — {p.address}</option>)}
                                     </select>
@@ -433,13 +466,65 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Paiement — Orange + MTN + Espèces */}
+                        {/* Livraison à domicile */}
+                        {deliveryMode === 'home_delivery' && (
+                            <div className="space-y-3">
+                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">🏠 Adresse de livraison</label>
+
+                                {deliveryZone ? (
+                                    <div className="bg-green-50 border border-green-200 rounded-xl p-3 flex items-center justify-between">
+                                        <div>
+                                            <p className="text-xs font-bold text-green-800">Livraison disponible à {deliveryZone.city}</p>
+                                            <p className="text-xs text-green-700 mt-0.5">
+                                                Délai estimé : {deliveryZone.estimated_days} jour{deliveryZone.estimated_days > 1 ? 's' : ''} ouvrable{deliveryZone.estimated_days > 1 ? 's' : ''}
+                                            </p>
+                                        </div>
+                                        <span className="bg-green-600 text-white text-xs font-black px-3 py-1.5 rounded-full">
+                                            +{new Intl.NumberFormat('fr-GN').format(deliveryZone.fee_gnf)} GNF
+                                        </span>
+                                    </div>
+                                ) : (
+                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
+                                        ⚠️ Aucun tarif de livraison configuré pour {listing.city}. Contactez le vendeur pour convenir de la livraison.
+                                    </div>
+                                )}
+
+                                <textarea
+                                    rows={3}
+                                    placeholder={`Quartier, rue, repère… (ex: Ratoma, face à l'hôpital)`}
+                                    value={deliveryAddress}
+                                    onChange={e => setDeliveryAddress(e.target.value)}
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 resize-none"
+                                    required
+                                />
+                            </div>
+                        )}
+
+                        {/* Récapitulatif total si livraison */}
+                        {deliveryMode === 'home_delivery' && deliveryFee > 0 && (
+                            <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Prix article</span>
+                                    <span>{formatPrice(listing.price_gnf, listing.price_type)}</span>
+                                </div>
+                                <div className="flex justify-between text-gray-600">
+                                    <span>Frais de livraison</span>
+                                    <span>{new Intl.NumberFormat('fr-GN').format(deliveryFee)} GNF</span>
+                                </div>
+                                <div className="flex justify-between font-black text-gray-900 border-t pt-2 mt-1">
+                                    <span>Total</span>
+                                    <span className="text-green-700">{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Paiement */}
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">💳 Paiement</label>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">💳 Paiement</label>
                             <div className="grid grid-cols-3 gap-2 mb-3">
                                 {PROVIDERS.map(p => (
                                     <button key={p.value} type="button" onClick={() => setProvider(p.value)}
-                                        className={`p-2 rounded-xl border-2 text-xs font-medium transition text-center ${provider === p.value ? p.color + ' border-opacity-100' : 'border-gray-200 bg-white'}`}>
+                                        className={`p-2.5 rounded-xl border-2 text-xs font-bold transition text-center ${provider === p.value ? p.color : 'border-gray-200 bg-white text-gray-600'}`}>
                                         {p.label}
                                     </button>
                                 ))}
@@ -448,19 +533,21 @@ function OrderModal({ listing, onClose, onSuccess }) {
                                 <input type="tel"
                                     placeholder={provider === 'orange_money' ? '+224 6XX XX XX XX (Orange)' : '+224 6XX XX XX XX (MTN)'}
                                     value={phone} onChange={e => setPhone(e.target.value)}
-                                    className="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500" required />
+                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" required />
                             )}
                         </div>
 
                         {provider !== 'cash' && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700">
-                                🔒 <strong>Paiement sécurisé :</strong> votre argent est libéré au vendeur uniquement après votre confirmation de réception.
+                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+                                🔒 <strong>Paiement sécurisé :</strong> vos fonds sont libérés au vendeur uniquement après confirmation de réception.
                             </div>
                         )}
 
                         <button type="submit" disabled={createOrder.isPending || pay.isPending}
-                            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 rounded-lg transition disabled:opacity-50">
-                            {(createOrder.isPending || pay.isPending) ? 'Traitement...' : `Payer ${formatPrice(listing.price_gnf, listing.price_type)}`}
+                            className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50">
+                            {(createOrder.isPending || pay.isPending)
+                                ? 'Traitement en cours…'
+                                : `Payer ${new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF`}
                         </button>
                     </form>
                 </div>

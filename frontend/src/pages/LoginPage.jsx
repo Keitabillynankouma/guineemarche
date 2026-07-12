@@ -136,7 +136,7 @@ export default function LoginPage() {
                   />
                 </div>
                 {isEmail && (
-                  <p className="text-xs text-green-600 mt-1.5 ml-1">✓ Connexion diaspora détectée</p>
+                  <p className="text-xs text-green-600 mt-1.5 ml-1">✓ Connexion internationale détectée</p>
                 )}
               </div>
 
