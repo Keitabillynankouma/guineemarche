@@ -44,6 +44,8 @@ export const authAPI = {
   getSubscription: () => api.get('/accounts/subscription/'),
   subscribe: (data) => api.post('/accounts/subscription/', data),
   getBadges: () => api.get('/accounts/badges/'),
+  // Livreur
+  toggleAvailability: () => api.post('/accounts/livreur/toggle-availability/'),
 }
 
 export const listingsAPI = {
