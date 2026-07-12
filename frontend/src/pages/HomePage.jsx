@@ -1,11 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useNavigate } from 'react-router-dom'
-import { listingsAPI, shopsAPI } from '../services/api'
+import api, { listingsAPI, shopsAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useDarkMode } from '../hooks/useDarkMode'
 import Logo from '../components/Logo'
-import AISearchBar from '../components/AISearchBar'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -213,6 +212,132 @@ function Navbar({ isAuthenticated }) {
     )
 }
 
+// ── Barre de recherche unifiée (IA + classique) ────────────────────────────
+function SmartSearchBar({ onAiResults, onClassicSearch, search, setSearch, city, setCity }) {
+    const [mode, setMode]     = useState('ai')   // 'ai' | 'classic'
+    const [loading, setLoading] = useState(false)
+    const [hint, setHint]     = useState('')
+    const inputRef = useRef(null)
+    const navigate = useNavigate()
+
+    const examples = [
+        'iPhone moins de 3 millions à Conakry',
+        'voiture Toyota occasion bon état',
+        'appartement 2 pièces Kipé',
+        'télé Samsung neuf pas cher',
+    ]
+
+    async function runAiSearch(q) {
+        const text = (q || search).trim()
+        if (!text) return
+        setLoading(true); setHint('')
+        try {
+            const { data } = await api.post('/listings/ai-search/', { query: text })
+            onAiResults(data)
+            if (data.interpretation) setHint(data.interpretation)
+        } catch { setHint('Erreur IA. Réessayez ou passez en mode classique.') }
+        finally { setLoading(false) }
+    }
+
+    function handleKey(e) {
+        if (e.key !== 'Enter') return
+        if (mode === 'ai') runAiSearch()
+        // classic: debounce handles it via onClassicSearch
+    }
+
+    function handleInput(e) {
+        setSearch(e.target.value)
+        if (mode === 'classic') onClassicSearch(e.target.value)
+    }
+
+    return (
+        <div className="w-full">
+            {/* Barre principale */}
+            <div className="relative flex items-center bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+                {/* Toggle mode */}
+                <button
+                    onClick={() => { setMode(m => m === 'ai' ? 'classic' : 'ai'); setHint('') }}
+                    title={mode === 'ai' ? 'Mode IA actif — cliquer pour mode classique' : 'Mode classique actif — cliquer pour mode IA'}
+                    className="pl-4 pr-2 flex-shrink-0 transition-all"
+                >
+                    {loading
+                        ? <svg className="w-5 h-5 text-emerald-500 animate-spin" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"/>
+                          </svg>
+                        : <span className={`text-lg transition-all ${mode === 'ai' ? 'opacity-100' : 'opacity-30'}`}>✨</span>
+                    }
+                </button>
+
+                <input
+                    ref={inputRef}
+                    type="text"
+                    value={search}
+                    onChange={handleInput}
+                    onKeyDown={handleKey}
+                    placeholder={mode === 'ai' ? 'Décrivez ce que vous cherchez…' : 'Rechercher une annonce...'}
+                    disabled={loading}
+                    className="flex-1 py-4 px-2 text-gray-800 placeholder-gray-400 bg-transparent outline-none text-sm md:text-base"
+                />
+
+                {/* Ville (mode classique) */}
+                {mode === 'classic' && (
+                    <select value={city} onChange={e => setCity(e.target.value)}
+                        className="text-gray-700 px-3 py-2.5 outline-none text-sm bg-white border-l border-gray-100 flex-shrink-0">
+                        {VILLES.map(v => <option key={v} value={v}>{v || 'Guinée'}</option>)}
+                    </select>
+                )}
+
+                {/* Bouton */}
+                {mode === 'ai' ? (
+                    <button onClick={() => runAiSearch()}
+                        disabled={loading || !search.trim()}
+                        className="m-1.5 px-5 py-2.5 bg-emerald-500 hover:bg-emerald-600 disabled:bg-gray-200 disabled:text-gray-400 text-white rounded-xl font-semibold text-sm transition-colors flex-shrink-0">
+                        {loading ? '…' : 'Rechercher'}
+                    </button>
+                ) : (
+                    <button onClick={() => onClassicSearch(search)}
+                        className="m-1.5 px-5 py-2.5 bg-gray-700 hover:bg-gray-800 text-white rounded-xl font-semibold text-sm transition-colors flex-shrink-0">
+                        🔍
+                    </button>
+                )}
+            </div>
+
+            {/* Label du mode */}
+            <div className="flex items-center justify-center gap-3 mt-2">
+                <button onClick={() => setMode('ai')}
+                    className={`text-xs px-3 py-1 rounded-full transition font-medium ${mode === 'ai' ? 'bg-emerald-100 text-emerald-700' : 'text-white/50 hover:text-white/80'}`}>
+                    ✨ Recherche IA
+                </button>
+                <span className="text-white/20 text-xs">|</span>
+                <button onClick={() => setMode('classic')}
+                    className={`text-xs px-3 py-1 rounded-full transition font-medium ${mode === 'classic' ? 'bg-white/20 text-white' : 'text-white/50 hover:text-white/80'}`}>
+                    🔍 Classique
+                </button>
+            </div>
+
+            {/* Hint IA */}
+            {hint && (
+                <p className="mt-2 text-xs text-emerald-300 flex items-center gap-1">
+                    <span>🤖</span><span>{hint}</span>
+                </p>
+            )}
+
+            {/* Suggestions (mode IA, champ vide) */}
+            {mode === 'ai' && !search && !loading && (
+                <div className="mt-3 flex flex-wrap gap-2 justify-center">
+                    {examples.map((ex, i) => (
+                        <button key={i} onClick={() => { setSearch(ex); runAiSearch(ex) }}
+                            className="text-xs px-3 py-1.5 bg-white/10 hover:bg-white/20 border border-white/20 text-white/80 rounded-full transition-all">
+                            {ex}
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
+    )
+}
+
 const VILLES = ['', 'Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré', 'Boké', 'Mamou', 'Siguiri', 'Nzérékoré']
 const TRIS   = [
     { value: '-is_boosted,-created_at', label: 'Récent en premier' },
@@ -260,13 +385,6 @@ export default function HomePage() {
             ()    => { setGeoLoading(false); alert('Géolocalisation refusée ou indisponible.') },
             { timeout: 8000 }
         )
-    }
-
-    const handleSearchChange = (e) => {
-        const val = e.target.value
-        setSearch(val)
-        clearTimeout(window._searchTimer)
-        window._searchTimer = setTimeout(() => setDebouncedSearch(val), 400)
     }
 
     const { data: categoriesData } = useQuery({
@@ -341,36 +459,30 @@ export default function HomePage() {
                     </h1>
                     <p className="text-green-200/80 mb-7 text-sm">Des milliers d'annonces vérifiées, près de chez vous</p>
 
-                    {/* Recherche IA */}
-                    <div className="mb-4">
-                        <AISearchBar
-                            onResults={(data) => {
-                                setAiResults(data)
-                                window.scrollTo({ top: 500, behavior: 'smooth' })
-                            }}
-                            placeholder="✨ Décrivez ce que vous cherchez en français…"
-                        />
-                    </div>
+                    {/* Barre de recherche unifiée IA + classique */}
+                    <SmartSearchBar
+                        onAiResults={(data) => {
+                            setAiResults(data)
+                            window.scrollTo({ top: 500, behavior: 'smooth' })
+                        }}
+                        onClassicSearch={(val) => {
+                            setSearch(val)
+                            clearTimeout(window._searchTimer)
+                            window._searchTimer = setTimeout(() => setDebouncedSearch(val), 400)
+                        }}
+                        search={search}
+                        setSearch={setSearch}
+                        city={city}
+                        setCity={setCity}
+                    />
 
-                    <div className="flex items-center gap-3 my-4">
-                        <div className="flex-1 h-px bg-white/15"/>
-                        <span className="text-white/40 text-xs font-medium">ou recherche classique</span>
-                        <div className="flex-1 h-px bg-white/15"/>
-                    </div>
-
-                    {/* Barre classique */}
-                    <div className="search-bar flex gap-2">
-                        <input type="text" placeholder="Rechercher une annonce..."
-                            value={search} onChange={handleSearchChange}
-                            className="flex-1 px-4 py-2.5 text-gray-800 outline-none rounded-xl text-sm placeholder:text-gray-400" />
-                        <select value={city} onChange={e => setCity(e.target.value)}
-                            className="text-gray-700 px-3 py-2.5 rounded-xl outline-none text-sm border-l border-gray-200 bg-white">
-                            {VILLES.map(v => <option key={v} value={v}>{v || 'Toute la Guinée'}</option>)}
-                        </select>
+                    {/* Bouton filtres avancés */}
+                    <div className="mt-3 flex justify-end">
                         <button onClick={() => setShowFilters(v => !v)}
-                            className={`px-3 py-2.5 rounded-xl text-sm font-medium transition border-l border-gray-200
-                                ${showFilters ? 'text-green-700 bg-green-50' : 'text-gray-500 hover:bg-gray-50'}`}
-                            title="Filtres avancés">⚙️</button>
+                            className={`px-4 py-2 rounded-xl text-sm font-medium transition bg-white/10 border border-white/20 text-white/70 hover:bg-white/20
+                                ${showFilters ? 'bg-white/20 text-white' : ''}`}>
+                            ⚙️ Filtres avancés
+                        </button>
                     </div>
 
                     {/* Panneau filtres avancés */}

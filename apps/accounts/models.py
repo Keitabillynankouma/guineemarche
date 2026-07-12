@@ -41,6 +41,8 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     is_verified   = models.BooleanField(default=False)
     is_active     = models.BooleanField(default=True)
     is_staff      = models.BooleanField(default=False)
+    # Livreur : disponibilité manuelle (le livreur bascule lui-même)
+    is_available  = models.BooleanField(default=True, help_text='Livreur disponible pour recevoir des commandes')
 
     referral_code = models.CharField(max_length=12, unique=True, blank=True, db_index=True)
     referred_by   = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals_made')
@@ -76,6 +78,15 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     @property
     def is_admin(self):
         return self.role == self.Role.ADMIN
+
+
+class AdminUser(User):
+    """Proxy model — affiche uniquement les administrateurs dans le panel Django."""
+    class Meta:
+        proxy = True
+        verbose_name = 'Administrateur'
+        verbose_name_plural = 'Équipe Admin'
+        ordering = ['-last_login']
 
 
 class UserProfile(BaseModel):
