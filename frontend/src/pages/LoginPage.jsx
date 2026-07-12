@@ -65,8 +65,10 @@ export default function LoginPage() {
     setError('')
     setLoading(true)
     try {
-      await login(identifier, password)
-      navigate('/')
+      const user = await login(identifier, password)
+      if (user?.role === 'livreur') navigate('/livreur')
+      else if (user?.role === 'admin') navigate('/admin')
+      else navigate('/')
     } catch (err) {
       setError(err.response?.data?.non_field_errors?.[0] || 'Identifiants incorrects.')
     } finally {

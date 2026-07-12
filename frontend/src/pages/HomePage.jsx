@@ -237,7 +237,13 @@ export default function HomePage() {
     const [radiusKm, setRadiusKm]               = useState(20)
     const [geoLoading, setGeoLoading]           = useState(false)
     const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+    const user = useAuthStore(s => s.user)
     const navigate = useNavigate()
+
+    // Livreur → redirection immédiate vers son tableau de bord
+    useEffect(() => {
+        if (user?.role === 'livreur') navigate('/livreur', { replace: true })
+    }, [user])
     const loadMoreRef = useRef(null)
 
     // Annonces récemment vues (localStorage)

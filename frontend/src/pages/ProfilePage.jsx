@@ -485,6 +485,12 @@ export default function ProfilePage() {
                             <span className="text-gray-300 text-lg">›</span>
                         </Link>
                     ))}
+                    {user.role === 'livreur' && (
+                        <Link to="/livreur" className="flex items-center justify-between px-5 py-4 hover:bg-blue-50 border-b transition-colors">
+                            <span className="font-medium text-blue-600">🚗 Mes livraisons</span>
+                            <span className="text-blue-300 text-lg">›</span>
+                        </Link>
+                    )}
                     {user.role === 'admin' && (
                         <Link to="/admin" className="flex items-center justify-between px-5 py-4 hover:bg-red-50 border-b transition-colors">
                             <span className="font-medium text-red-600">🛡️ Administration</span>
