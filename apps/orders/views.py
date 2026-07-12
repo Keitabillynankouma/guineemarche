@@ -729,8 +729,9 @@ class IsLivreur(permissions.BasePermission):
 
 class LivreurOrderListView(generics.ListAPIView):
     """Livreur : liste ses livraisons assignées."""
-    permission_classes = [IsLivreur]
-    serializer_class   = DeliveryAssignmentSerializer
+    permission_classes   = [IsLivreur]
+    serializer_class     = DeliveryAssignmentSerializer
+    pagination_class     = None   # Pas de pagination — tableau direct
 
     def get_queryset(self):
         return DeliveryAssignment.objects.filter(
@@ -890,6 +891,7 @@ class AdminDeliveryAssignmentListView(generics.ListAPIView):
     """Admin : liste toutes les affectations livreurs."""
     permission_classes = [IsAdmin]
     serializer_class   = DeliveryAssignmentSerializer
+    pagination_class   = None   # Pas de pagination — tableau direct
 
     def get_queryset(self):
         qs = DeliveryAssignment.objects.select_related(

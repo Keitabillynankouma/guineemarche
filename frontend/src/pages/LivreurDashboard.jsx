@@ -24,7 +24,7 @@ function AssignmentCard({ assignment, onStart, onConfirm }) {
   const [error, setError]             = useState('')
   const [loading, setLoading]         = useState(false)
 
-  const o    = assignment.order_detail
+  const o    = assignment.order_detail || {}
   const meta = STATUS_LABEL[assignment.status] || STATUS_LABEL.assigned
 
   async function handleStart() {
@@ -165,7 +165,8 @@ export default function LivreurDashboard() {
   async function load() {
     try {
       const res = await ordersAPI.getMyAssignments()
-      setAssignments(res.data)
+      const data = res.data
+      setAssignments(Array.isArray(data) ? data : (data?.results ?? []))
     } catch {
       setError('Impossible de charger vos livraisons.')
     } finally {
