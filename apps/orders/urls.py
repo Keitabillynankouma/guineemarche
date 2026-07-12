@@ -103,4 +103,10 @@ urlpatterns = [
     path('admin/escrow/<uuid:pk>/hold/',
         views.AdminEscrowHoldView.as_view(),
         name='admin-escrow-hold'),
+    path('admin/orders/',
+        views.AdminOrderListView.as_view(),
+        name='admin-orders'),
+    path('admin/assignments/<uuid:pk>/reassign/',
+        views.AdminDeliveryReassignView.as_view(),
+        name='admin-delivery-reassign'),
 ]

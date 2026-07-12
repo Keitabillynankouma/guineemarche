@@ -663,16 +663,27 @@ class AdminStatsView(APIView):
         from apps.accounts.models import User
         from apps.listings.models import Listing
         from django.db.models import Sum
+        from django.utils import timezone
+
+        today = timezone.now().date()
 
         return Response({
-            'users':           User.objects.count(),
-            'active_listings': Listing.objects.filter(status='active').count(),
-            'orders_total':    Order.objects.count(),
-            'orders_disputed': Order.objects.filter(status=Order.Status.DISPUTED).count(),
-            'orders_completed':Order.objects.filter(status=Order.Status.COMPLETED).count(),
-            'revenue_gnf':     Payment.objects.filter(
-                                   status=Payment.Status.SUCCESS
-                               ).aggregate(total=Sum('amount_gnf'))['total'] or 0,
+            'users':                User.objects.count(),
+            'users_sellers':        User.objects.filter(role='seller').count(),
+            'users_livreurs':       User.objects.filter(role='livreur').count(),
+            'livreurs_available':   User.objects.filter(role='livreur', is_available=True, is_active=True).count(),
+            'active_listings':      Listing.objects.filter(status='active').count(),
+            'orders_total':         Order.objects.count(),
+            'orders_disputed':      Order.objects.filter(status=Order.Status.DISPUTED).count(),
+            'orders_completed':     Order.objects.filter(status=Order.Status.COMPLETED).count(),
+            'orders_today':         Order.objects.filter(created_at__date=today).count(),
+            'deliveries_total':     DeliveryAssignment.objects.count(),
+            'deliveries_en_route':  DeliveryAssignment.objects.filter(status='en_route').count(),
+            'deliveries_assigned':  DeliveryAssignment.objects.filter(status='assigned').count(),
+            'deliveries_today':     DeliveryAssignment.objects.filter(delivered_at__date=today).count(),
+            'revenue_gnf':          Payment.objects.filter(
+                                        status=Payment.Status.SUCCESS
+                                    ).aggregate(total=Sum('amount_gnf'))['total'] or 0,
         })
 
 
@@ -729,37 +740,59 @@ class AdminExportCSVView(APIView):
 
 def _auto_assign_livreur(order):
     """
-    Cherche un livreur disponible et crée l'affectation automatiquement.
-    Priorité : livreur de la même ville que l'acheteur, sinon n'importe quel livreur actif.
-    Envoie pickup_code au vendeur + verification_code à l'acheteur.
+    Algorithme d'affectation intelligent — Option B + filtre jour même.
+
+    Priorités (dans l'ordre) :
+      1. Même ville que l'acheteur (si possible)
+      2. Parmi ceux en service aujourd'hui (≥1 livraison ce jour) → le moins chargé
+      3. Sinon (première commande de la journée) → le moins chargé parmi tous
+      4. En cas d'égalité → le premier par ordre alphabétique (stable, pas aléatoire)
+
+    "Chargé" = nombre de livraisons ASSIGNED ou EN_ROUTE en ce moment.
     """
+    from django.utils import timezone
+    from django.db.models import Count, Q
     from apps.accounts.models import User as AppUser
     from apps.notifications.models import Notification
 
-    # 1. Livreurs sans livraison active en priorité
-    busy_livreur_ids = DeliveryAssignment.objects.filter(
-        status__in=[DeliveryAssignment.Status.ASSIGNED, DeliveryAssignment.Status.EN_ROUTE]
-    ).values_list('livreur_id', flat=True)
+    today = timezone.now().date()
 
+    # Base : livreurs actifs ET disponibles, annotés avec leur charge
     livreurs = AppUser.objects.filter(
-        role='livreur', is_active=True,
-    ).exclude(id__in=busy_livreur_ids)
-
-    # Si aucun dispo sans commande active, prendre n'importe quel livreur actif
-    if not livreurs.exists():
-        livreurs = AppUser.objects.filter(role='livreur', is_active=True)
+        role='livreur', is_active=True, is_available=True,
+    ).annotate(
+        # Livraisons en cours (charge immédiate)
+        active_count=Count(
+            'delivery_assignments',
+            filter=Q(delivery_assignments__status__in=['assigned', 'en_route'])
+        ),
+        # Livraisons assignées aujourd'hui (indique qu'il est en service ce jour)
+        today_count=Count(
+            'delivery_assignments',
+            filter=Q(delivery_assignments__assigned_at__date=today)
+        ),
+    )
 
     if not livreurs.exists():
         return  # Aucun livreur dans le système
 
-    # 2. Préférer la même ville que l'acheteur
+    # Filtre ville (priorité géographique)
     buyer_city = getattr(order.buyer, 'city', '') or ''
     if buyer_city:
         city_match = livreurs.filter(city__iexact=buyer_city)
         if city_match.exists():
             livreurs = city_match
 
-    livreur = livreurs.order_by('?').first()
+    # Priorité 1 : livreurs déjà en service aujourd'hui, triés par charge croissante
+    working_today = livreurs.filter(today_count__gt=0).order_by('active_count', 'full_name')
+    if working_today.exists():
+        livreur = working_today.first()
+    else:
+        # Priorité 2 : première commande de la journée → le moins chargé parmi tous
+        livreur = livreurs.order_by('active_count', 'full_name').first()
+
+    if not livreur:
+        return
 
     # 3. Créer l'affectation (évite les doublons)
     assignment, created = DeliveryAssignment.objects.get_or_create(
@@ -1025,14 +1058,14 @@ class AdminAssignLivreurView(APIView):
 
 
 class AdminLivreurListView(generics.ListAPIView):
-    """Admin : liste tous les livreurs disponibles."""
+    """Admin : liste tous les livreurs avec disponibilité."""
     permission_classes = [IsAdmin]
     serializer_class   = DeliveryAssignmentSerializer  # dummy — on va override
 
     def list(self, request):
         from apps.accounts.models import User as AppUser
         livreurs = AppUser.objects.filter(role='livreur').values(
-            'id', 'full_name', 'phone_number', 'city', 'is_active',
+            'id', 'full_name', 'phone_number', 'city', 'is_active', 'is_available',
         )
         return Response(list(livreurs))
 
@@ -1046,8 +1079,77 @@ class AdminDeliveryAssignmentListView(generics.ListAPIView):
     def get_queryset(self):
         qs = DeliveryAssignment.objects.select_related(
             'order', 'order__listing', 'order__buyer', 'livreur'
-        )
+        ).order_by('-assigned_at')
         status_filter = self.request.query_params.get('status')
         if status_filter:
             qs = qs.filter(status=status_filter)
         return qs
+
+
+class AdminDeliveryReassignView(APIView):
+    """Admin : réassigner un livreur à une affectation de livraison."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        try:
+            assignment = DeliveryAssignment.objects.select_related('livreur').get(pk=pk)
+        except DeliveryAssignment.DoesNotExist:
+            return Response({'error': 'Affectation introuvable'}, status=404)
+
+        if assignment.status == 'delivered':
+            return Response({'error': 'Impossible de réassigner une livraison déjà effectuée'}, status=400)
+
+        livreur_id = request.data.get('livreur_id')
+        if not livreur_id:
+            return Response({'error': 'livreur_id requis'}, status=400)
+
+        from apps.accounts.models import User as AppUser
+        try:
+            livreur = AppUser.objects.get(id=livreur_id, role='livreur', is_active=True)
+        except AppUser.DoesNotExist:
+            return Response({'error': 'Livreur introuvable ou inactif'}, status=404)
+
+        old_name = assignment.livreur.full_name
+        assignment.livreur = livreur
+        assignment.save(update_fields=['livreur'])
+        return Response({'message': f'Livreur réassigné : {old_name} → {livreur.full_name}'})
+
+
+class AdminOrderListView(APIView):
+    """Admin : liste toutes les commandes avec filtres."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Q
+        qs = Order.objects.select_related('listing', 'buyer', 'seller').order_by('-created_at')
+
+        status_filter = request.query_params.get('status')
+        mode_filter   = request.query_params.get('mode')
+        search        = request.query_params.get('search')
+
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+        if mode_filter:
+            qs = qs.filter(delivery_mode=mode_filter)
+        if search:
+            qs = qs.filter(
+                Q(listing__title__icontains=search) |
+                Q(buyer__full_name__icontains=search) |
+                Q(seller__full_name__icontains=search)
+            )
+
+        data = [{
+            'id':               str(o.id),
+            'listing_title':    o.listing.title if o.listing else '—',
+            'buyer_name':       o.buyer.full_name,
+            'buyer_phone':      str(o.buyer.phone_number or ''),
+            'seller_name':      o.seller.full_name,
+            'seller_phone':     str(o.seller.phone_number or ''),
+            'amount_gnf':       o.amount_gnf,
+            'status':           o.status,
+            'delivery_mode':    o.delivery_mode,
+            'delivery_address': o.delivery_address or '',
+            'created_at':       o.created_at.isoformat(),
+        } for o in qs[:300]]
+
+        return Response(data)

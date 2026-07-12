@@ -13,6 +13,9 @@ const adminAPI = {
   resolve:     (id, action) => api.post(`/orders/admin/disputes/${id}/resolve/`, { action }),
   holdEscrow:  (id, action) => api.post(`/orders/admin/escrow/${id}/hold/`, { action }),
 
+  // Toutes les commandes
+  getOrders: (params) => api.get('/orders/admin/orders/', { params }),
+
   // Annonces
   getListings:     (params) => api.get('/listings/admin/listings/', { params }),
   suspendListing:  (id)          => api.delete(`/listings/admin/listings/${id}/`),
@@ -50,6 +53,15 @@ const adminAPI = {
   createMeetingZone:  (data) => api.post('/orders/admin/meeting-zones/', data),
   updateMeetingZone:  (id, data) => api.patch(`/orders/admin/meeting-zones/${id}/`, data),
   deleteMeetingZone:  (id) => api.delete(`/orders/admin/meeting-zones/${id}/`),
+
+  // Livraisons
+  getDeliveries:    (params) => api.get('/orders/admin/assignments/', { params }),
+  getLivreurs:      ()       => api.get('/orders/admin/livreurs/'),
+  reassignDelivery: (id, data) => api.post(`/orders/admin/assignments/${id}/reassign/`, data),
+
+  // Utilisateurs
+  getUsers:   (params)      => api.get('/accounts/admin/users/', { params }),
+  updateUser: (id, data)    => api.patch(`/accounts/admin/users/${id}/`, data),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -109,12 +121,17 @@ function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
               </button>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
-            <StatCard label="Utilisateurs"           value={stats.users}            icon="👥" color="blue" />
-            <StatCard label="Annonces actives"        value={stats.active_listings}  icon="📦" color="green" />
-            <StatCard label="Commandes totales"       value={stats.orders_total}     icon="🛍️" color="blue" />
-            <StatCard label="Commandes terminées"     value={stats.orders_completed} icon="✅" color="green" />
-            <StatCard label="Litiges en cours"        value={stats.orders_disputed}  icon="⚠️" color="red" />
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <StatCard label="Utilisateurs"           value={stats.users}                icon="👥" color="blue" />
+            <StatCard label="Vendeurs"               value={stats.users_sellers}         icon="🏷️" color="blue" />
+            <StatCard label="Livreurs actifs"        value={`${stats.livreurs_available ?? '—'}/${stats.users_livreurs ?? '—'}`} icon="🚴" color="green" />
+            <StatCard label="Annonces actives"       value={stats.active_listings}       icon="📦" color="green" />
+            <StatCard label="Commandes totales"      value={stats.orders_total}          icon="🛍️" color="blue" />
+            <StatCard label="Commandes aujourd'hui"  value={stats.orders_today}          icon="📅" color="green" />
+            <StatCard label="Livraisons en cours"    value={(stats.deliveries_assigned ?? 0) + (stats.deliveries_en_route ?? 0)} icon="🚚" color="yellow" />
+            <StatCard label="Litiges en cours"       value={stats.orders_disputed}       icon="⚠️" color="red" />
+            <StatCard label="Commandes terminées"    value={stats.orders_completed}      icon="✅" color="green" />
+            <StatCard label="Livrées aujourd'hui"    value={stats.deliveries_today}      icon="🏁" color="green" />
             <StatCard
               label="Revenus plateforme (5%)"
               value={Math.round((stats.revenue_gnf || 0) * 0.05).toLocaleString('fr-GN') + ' GNF'}
@@ -1376,14 +1393,376 @@ function TabMeetingZones() {
   )
 }
 
+// ── Onglet : Suivi des livraisons ─────────────────────────────────────────────
+
+function TabDeliveries() {
+  const qc = useQueryClient()
+  const [statusFilter, setStatusFilter] = useState('')
+  const [reassignId, setReassignId]     = useState(null)
+  const [selectedLivreur, setSelected]  = useState('')
+
+  const { data: deliveriesData, isLoading } = useQuery({
+    queryKey: ['admin-deliveries', statusFilter],
+    queryFn:  () => adminAPI.getDeliveries({ status: statusFilter || undefined }).then(r => r.data),
+    refetchInterval: 30000,
+  })
+  const deliveries = Array.isArray(deliveriesData) ? deliveriesData : (deliveriesData?.results ?? [])
+
+  const { data: livreursData } = useQuery({
+    queryKey: ['admin-livreurs'],
+    queryFn:  () => adminAPI.getLivreurs().then(r => r.data),
+  })
+  const livreurs = Array.isArray(livreursData) ? livreursData : []
+
+  const reassignMutation = useMutation({
+    mutationFn: ({ id, livreur_id }) => adminAPI.reassignDelivery(id, { livreur_id }),
+    onSuccess:  () => { qc.invalidateQueries(['admin-deliveries']); setReassignId(null); setSelected('') },
+  })
+
+  const ST_COLORS = { assigned: 'bg-blue-100 text-blue-700', en_route: 'bg-amber-100 text-amber-700', delivered: 'bg-green-100 text-green-700', cancelled: 'bg-red-100 text-red-600' }
+  const ST_LABELS = { assigned: '⏳ À récupérer', en_route: '🚚 En route', delivered: '✅ Livrée', cancelled: '❌ Annulée' }
+
+  const inProgress  = deliveries.filter(d => d.status === 'en_route').length
+  const toPickup    = deliveries.filter(d => d.status === 'assigned').length
+  const delivered   = deliveries.filter(d => d.status === 'delivered').length
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-gray-800">🚚 Suivi des livraisons</h2>
+
+      {/* Stats rapides */}
+      <div className="grid grid-cols-3 gap-3">
+        <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100 text-center">
+          <p className="text-2xl font-bold text-blue-700">{toPickup}</p>
+          <p className="text-xs text-blue-600 mt-0.5">⏳ À récupérer</p>
+        </div>
+        <div className="bg-amber-50 rounded-2xl p-4 border border-amber-100 text-center">
+          <p className="text-2xl font-bold text-amber-700">{inProgress}</p>
+          <p className="text-xs text-amber-600 mt-0.5">🚚 En route</p>
+        </div>
+        <div className="bg-green-50 rounded-2xl p-4 border border-green-100 text-center">
+          <p className="text-2xl font-bold text-green-700">{delivered}</p>
+          <p className="text-xs text-green-600 mt-0.5">✅ Livrées</p>
+        </div>
+      </div>
+
+      {/* Filtres */}
+      <div className="flex gap-2 flex-wrap">
+        {[['', 'Toutes'], ['assigned', '⏳ À récupérer'], ['en_route', '🚚 En route'], ['delivered', '✅ Livrées']].map(([v, l]) => (
+          <button key={v} onClick={() => setStatusFilter(v)}
+            className={`text-xs font-medium px-3 py-2 rounded-xl transition ${statusFilter === v ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:border-green-400'}`}>
+            {l}
+          </button>
+        ))}
+      </div>
+
+      {isLoading ? (
+        <div className="space-y-3">{[...Array(4)].map((_, i) => <div key={i} className="bg-white rounded-xl h-28 animate-pulse" />)}</div>
+      ) : deliveries.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
+          <p className="text-5xl mb-3">🚚</p><p>Aucune livraison trouvée</p>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          {deliveries.map(d => {
+            const sc = ST_COLORS[d.status] || 'bg-gray-100 text-gray-600'
+            const sl = ST_LABELS[d.status]  || d.status
+            return (
+              <div key={d.id} className="bg-white rounded-2xl shadow p-4 space-y-3">
+                {/* En-tête */}
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="font-semibold text-gray-800">{d.order_detail?.listing_title || '—'}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      🛒 {d.order_detail?.buyer_name} → 🏷️ {d.order_detail?.seller_name}
+                    </p>
+                    {d.order_detail?.delivery_address && (
+                      <p className="text-xs text-gray-500 mt-0.5">📍 {d.order_detail.delivery_address}</p>
+                    )}
+                  </div>
+                  <div className="text-right flex-shrink-0">
+                    <span className={`text-xs font-medium px-2 py-1 rounded-full ${sc}`}>{sl}</span>
+                    <p className="text-sm font-bold text-green-600 mt-1">{fmt(d.order_detail?.amount_gnf || 0)}</p>
+                  </div>
+                </div>
+
+                {/* Livreur + Codes */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">🚴 Livreur assigné</p>
+                    <p className="text-sm font-semibold text-gray-800">{d.livreur_name}</p>
+                    <p className="text-xs text-gray-500">{d.livreur_phone}</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs text-gray-400 mb-1">🔑 Codes de sécurité</p>
+                    <p className="text-xs">Pickup : <span className="font-bold text-orange-600">{d.pickup_code}</span></p>
+                    <p className="text-xs">Remise : <span className="font-bold text-blue-600">{d.verification_code}</span></p>
+                  </div>
+                </div>
+
+                {/* Réassignation */}
+                {d.status !== 'delivered' && d.status !== 'cancelled' && (
+                  reassignId === d.id ? (
+                    <div className="flex gap-2 items-center">
+                      <select value={selectedLivreur} onChange={e => setSelected(e.target.value)}
+                        className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400">
+                        <option value="">— Choisir un livreur —</option>
+                        {livreurs.filter(l => l.is_active).map(l => (
+                          <option key={l.id} value={l.id}>
+                            {l.full_name} · {l.city} {l.is_available ? '✅' : '⏸️'}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => selectedLivreur && reassignMutation.mutate({ id: d.id, livreur_id: selectedLivreur })}
+                        disabled={!selectedLivreur || reassignMutation.isPending}
+                        className="bg-green-600 hover:bg-green-700 text-white px-3 py-2 rounded-xl text-sm disabled:opacity-50 font-medium"
+                      >✓</button>
+                      <button onClick={() => { setReassignId(null); setSelected('') }}
+                        className="bg-gray-100 text-gray-600 px-3 py-2 rounded-xl text-sm">✕</button>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setReassignId(d.id); setSelected('') }}
+                      className="w-full bg-gray-50 hover:bg-gray-100 border border-gray-200 text-gray-600 text-sm font-medium py-2 rounded-xl transition">
+                      🔄 Réassigner le livreur
+                    </button>
+                  )
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Onglet : Toutes les commandes ─────────────────────────────────────────────
+
+function TabOrders() {
+  const [search, setSearch]     = useState('')
+  const [statusFilter, setStatus] = useState('')
+  const [modeFilter, setMode]   = useState('')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-orders', search, statusFilter, modeFilter],
+    queryFn:  () => adminAPI.getOrders({
+      search:  search        || undefined,
+      status:  statusFilter  || undefined,
+      mode:    modeFilter    || undefined,
+    }).then(r => r.data),
+  })
+  const orders = Array.isArray(data) ? data : []
+
+  const ORDER_STATUS = {
+    pending:   { label: '⏳ En attente',  color: 'bg-gray-100 text-gray-600' },
+    paid:      { label: '💳 Payée',       color: 'bg-blue-100 text-blue-700' },
+    confirmed: { label: '✅ Confirmée',    color: 'bg-emerald-100 text-emerald-700' },
+    completed: { label: '🏁 Terminée',    color: 'bg-green-100 text-green-700' },
+    disputed:  { label: '⚠️ Litige',      color: 'bg-red-100 text-red-700' },
+    cancelled: { label: '❌ Annulée',     color: 'bg-red-50 text-red-500' },
+  }
+  const MODE_LABELS = { home_delivery: '🚚 Livraison', pickup: '📦 Retrait', meetup: '🤝 Rencontre' }
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-gray-800">📋 Toutes les commandes</h2>
+
+      {/* Filtres */}
+      <div className="flex flex-wrap gap-3">
+        <input type="text" placeholder="Acheteur, vendeur, article..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-40 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+        <select value={statusFilter} onChange={e => setStatus(e.target.value)}
+          className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          <option value="">Tous statuts</option>
+          {Object.entries(ORDER_STATUS).map(([v, { label }]) => (
+            <option key={v} value={v}>{label.replace(/[⏳💳✅🏁⚠️❌] /g, '')}</option>
+          ))}
+        </select>
+        <select value={modeFilter} onChange={e => setMode(e.target.value)}
+          className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          <option value="">Tous modes</option>
+          <option value="home_delivery">Livraison à domicile</option>
+          <option value="pickup">Point de retrait</option>
+          <option value="meetup">Rencontre</option>
+        </select>
+      </div>
+
+      {!isLoading && <p className="text-sm text-gray-400">{orders.length} commande{orders.length > 1 ? 's' : ''}</p>}
+
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(6)].map((_, i) => <div key={i} className="bg-white rounded-xl h-16 animate-pulse" />)}</div>
+      ) : orders.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
+          <p className="text-4xl mb-3">🛍️</p><p>Aucune commande trouvée</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {orders.map(o => {
+            const st = ORDER_STATUS[o.status] || { label: o.status, color: 'bg-gray-100 text-gray-500' }
+            return (
+              <div key={o.id} className="bg-white rounded-2xl shadow p-4 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-gray-800 truncate">{o.listing_title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    🛒 {o.buyer_name}
+                    <span className="text-gray-300"> → </span>
+                    🏷️ {o.seller_name}
+                    {o.delivery_mode && <span className="ml-2">{MODE_LABELS[o.delivery_mode] || o.delivery_mode}</span>}
+                  </p>
+                  <p className="text-xs text-gray-300">{new Date(o.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })}</p>
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+                  <span className="text-sm font-bold text-green-600">{fmt(o.amount_gnf)}</span>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Onglet : Gestion des utilisateurs ─────────────────────────────────────────
+
+function TabUsers() {
+  const qc = useQueryClient()
+  const [search, setSearch]     = useState('')
+  const [roleFilter, setRole]   = useState('')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin-users', search, roleFilter],
+    queryFn:  () => adminAPI.getUsers({
+      search: search     || undefined,
+      role:   roleFilter || undefined,
+    }).then(r => r.data),
+  })
+  const users = Array.isArray(data) ? data : []
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...patch }) => adminAPI.updateUser(id, patch),
+    onSuccess:  () => qc.invalidateQueries(['admin-users']),
+  })
+
+  const ROLE_COLORS = { admin: 'bg-red-100 text-red-700', seller: 'bg-blue-100 text-blue-700', buyer: 'bg-gray-100 text-gray-600', livreur: 'bg-amber-100 text-amber-700' }
+  const ROLE_LABELS = { admin: 'Admin', seller: 'Vendeur', buyer: 'Acheteur', livreur: 'Livreur' }
+
+  const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc }, {})
+
+  return (
+    <div className="space-y-5">
+      <h2 className="text-lg font-bold text-gray-800">👥 Gestion des utilisateurs</h2>
+
+      {/* Stats par rôle */}
+      {!isLoading && users.length > 0 && (
+        <div className="grid grid-cols-4 gap-2">
+          {[['buyer','🛒 Acheteurs','bg-gray-50 border-gray-200 text-gray-600'],['seller','🏷️ Vendeurs','bg-blue-50 border-blue-200 text-blue-700'],['livreur','🚴 Livreurs','bg-amber-50 border-amber-200 text-amber-700'],['admin','🔑 Admins','bg-red-50 border-red-200 text-red-700']].map(([r, l, cls]) => (
+            <button key={r} onClick={() => setRole(r === roleFilter ? '' : r)}
+              className={`rounded-xl p-3 border-2 transition text-center ${roleFilter === r ? 'ring-2 ring-green-500' : ''} ${cls}`}>
+              <p className="text-xl font-bold">{roleCounts[r] || 0}</p>
+              <p className="text-xs mt-0.5">{l}</p>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Filtres */}
+      <div className="flex gap-3 flex-wrap">
+        <input type="text" placeholder="Nom, téléphone, email..."
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-40 border border-gray-300 rounded-xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+        />
+        <select value={roleFilter} onChange={e => setRole(e.target.value)}
+          className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
+          <option value="">Tous les rôles</option>
+          <option value="buyer">Acheteurs</option>
+          <option value="seller">Vendeurs</option>
+          <option value="livreur">Livreurs</option>
+          <option value="admin">Admins</option>
+        </select>
+      </div>
+
+      {!isLoading && <p className="text-sm text-gray-400">{users.length} utilisateur{users.length > 1 ? 's' : ''}</p>}
+
+      {isLoading ? (
+        <div className="space-y-2">{[...Array(7)].map((_, i) => <div key={i} className="bg-white rounded-xl h-14 animate-pulse" />)}</div>
+      ) : users.length === 0 ? (
+        <div className="bg-white rounded-2xl shadow p-12 text-center text-gray-400">
+          <p className="text-4xl mb-3">👥</p><p>Aucun utilisateur trouvé</p>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          {users.map(u => (
+            <div key={u.id} className="bg-white rounded-2xl shadow px-4 py-3 flex items-center gap-3">
+              {/* Avatar initial */}
+              <div className="w-9 h-9 rounded-full bg-green-100 flex items-center justify-center text-sm font-bold text-green-700 flex-shrink-0">
+                {u.full_name?.[0]?.toUpperCase() || '?'}
+              </div>
+              {/* Infos */}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="font-semibold text-gray-800 text-sm truncate">{u.full_name}</p>
+                  {u.is_verified && <span className="text-green-500 text-xs" title="Compte vérifié">✓</span>}
+                  {u.is_staff    && <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded font-medium">staff</span>}
+                </div>
+                <p className="text-xs text-gray-400 truncate">{u.phone_number || u.email || '—'} · {u.city}</p>
+              </div>
+              {/* Actions */}
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${ROLE_COLORS[u.role] || 'bg-gray-100 text-gray-600'}`}>
+                  {ROLE_LABELS[u.role] || u.role}
+                </span>
+                {/* Toggle actif/inactif */}
+                <button
+                  onClick={() => updateMutation.mutate({ id: u.id, is_active: !u.is_active })}
+                  disabled={updateMutation.isPending}
+                  className={`text-xs px-2 py-1 rounded-lg font-medium transition disabled:opacity-50
+                    ${u.is_active
+                      ? 'bg-green-100 text-green-700 hover:bg-red-50 hover:text-red-600'
+                      : 'bg-red-100 text-red-600 hover:bg-green-50 hover:text-green-600'}`}
+                  title={u.is_active ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}
+                >
+                  {u.is_active ? 'Actif' : 'Inactif'}
+                </button>
+                {/* Changer rôle */}
+                <select
+                  value={u.role}
+                  onChange={e => {
+                    if (window.confirm(`Changer ${u.full_name} → ${ROLE_LABELS[e.target.value] || e.target.value} ?`)) {
+                      updateMutation.mutate({ id: u.id, role: e.target.value })
+                    }
+                  }}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
+                >
+                  <option value="buyer">Acheteur</option>
+                  <option value="seller">Vendeur</option>
+                  <option value="livreur">Livreur</option>
+                  <option value="admin">Admin</option>
+                </select>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'overview',        label: '📊 Tableau de bord' },
+  { id: 'overview',        label: '📊 Dashboard' },
+  { id: 'deliveries',      label: '🚚 Livraisons' },
+  { id: 'orders',          label: '📋 Commandes' },
+  { id: 'users',           label: '👥 Utilisateurs' },
   { id: 'listings',        label: '📦 Annonces' },
+  { id: 'shops',           label: '🏪 Boutiques' },
   { id: 'banners',         label: '📢 Publicités' },
   { id: 'categories',      label: '🏷️ Catégories' },
-  { id: 'shops',           label: '🏪 Boutiques' },
   { id: 'pickup-points',   label: '📍 Points retrait' },
   { id: 'meeting-zones',   label: '🤝 Zones rencontre' },
   { id: 'settings',        label: '⚙️ Paramètres' },
@@ -1474,6 +1853,9 @@ export default function AdminPage() {
               {tab.id === 'overview' && disputes.length > 0 && (
                 <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{disputes.length}</span>
               )}
+              {tab.id === 'deliveries' && stats && ((stats.deliveries_assigned || 0) + (stats.deliveries_en_route || 0)) > 0 && (
+                <span className="ml-1.5 bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{(stats.deliveries_assigned || 0) + (stats.deliveries_en_route || 0)}</span>
+              )}
               {tab.id === 'shops' && pendingShopsCount > 0 && (
                 <span className="ml-1.5 bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{pendingShopsCount}</span>
               )}
@@ -1482,14 +1864,17 @@ export default function AdminPage() {
         </div>
 
         {/* Contenu */}
-        {activeTab === 'overview'   && <TabOverview stats={stats} disputes={disputes} isLoading={disputesLoading} resolveMutation={resolveMutation} />}
-        {activeTab === 'listings'   && <TabListings />}
-        {activeTab === 'banners'    && <TabBanners />}
-        {activeTab === 'categories' && <TabCategories />}
+        {activeTab === 'overview'      && <TabOverview stats={stats} disputes={disputes} isLoading={disputesLoading} resolveMutation={resolveMutation} />}
+        {activeTab === 'deliveries'    && <TabDeliveries />}
+        {activeTab === 'orders'        && <TabOrders />}
+        {activeTab === 'users'         && <TabUsers />}
+        {activeTab === 'listings'      && <TabListings />}
+        {activeTab === 'banners'       && <TabBanners />}
+        {activeTab === 'categories'    && <TabCategories />}
         {activeTab === 'shops'         && <TabShops />}
-        {activeTab === 'pickup-points'  && <TabPickupPoints />}
-        {activeTab === 'meeting-zones'  && <TabMeetingZones />}
-        {activeTab === 'settings'       && <TabSettings />}
+        {activeTab === 'pickup-points' && <TabPickupPoints />}
+        {activeTab === 'meeting-zones' && <TabMeetingZones />}
+        {activeTab === 'settings'      && <TabSettings />}
       </div>
     </div>
   )

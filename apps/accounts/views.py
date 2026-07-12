@@ -195,6 +195,22 @@ class MeView(generics.RetrieveUpdateAPIView):
         return user
 
 
+class LivreurToggleAvailabilityView(APIView):
+    """Livreur : bascule son propre statut disponible/indisponible."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        if user.role != 'livreur':
+            return Response({'error': 'Réservé aux livreurs.'}, status=403)
+        user.is_available = not user.is_available
+        user.save(update_fields=['is_available', 'updated_at'])
+        return Response({
+            'is_available': user.is_available,
+            'message': 'Vous êtes maintenant disponible.' if user.is_available else 'Vous êtes maintenant indisponible.',
+        })
+
+
 class ChangePasswordView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
@@ -559,3 +575,73 @@ class AdminShopUpdateView(generics.UpdateAPIView):
     permission_classes = [IsAdmin]
     serializer_class   = AdminShopSerializer
     queryset           = Shop.objects.all()
+
+
+# ── Vues Admin Utilisateurs ────────────────────────────────────────────────────
+
+class AdminUserListView(APIView):
+    """Admin : liste tous les utilisateurs avec filtres."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Q
+        qs = User.objects.all().order_by('-created_at')
+
+        role   = request.query_params.get('role')
+        search = request.query_params.get('search')
+        active = request.query_params.get('is_active')
+
+        if role:
+            qs = qs.filter(role=role)
+        if search:
+            qs = qs.filter(
+                Q(full_name__icontains=search) |
+                Q(phone_number__icontains=search) |
+                Q(email__icontains=search)
+            )
+        if active is not None:
+            qs = qs.filter(is_active=(active.lower() == 'true'))
+
+        data = list(qs.values(
+            'id', 'full_name', 'phone_number', 'email',
+            'role', 'city', 'is_active', 'is_verified', 'is_available', 'is_staff',
+            'created_at', 'last_login',
+        )[:500])
+        # Sérialiser UUID et dates
+        for u in data:
+            u['id']         = str(u['id'])
+            u['phone_number'] = str(u['phone_number']) if u['phone_number'] else ''
+            u['created_at'] = u['created_at'].isoformat() if u['created_at'] else None
+            u['last_login'] = u['last_login'].isoformat() if u['last_login'] else None
+        return Response(data)
+
+
+class AdminUserUpdateView(APIView):
+    """Admin : modifier le rôle ou le statut d'un utilisateur."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        from django.shortcuts import get_object_or_404
+        user = get_object_or_404(User, pk=pk)
+
+        allowed_fields = {'role', 'is_active', 'is_available', 'is_staff'}
+        update_fields  = []
+
+        for field in allowed_fields:
+            if field in request.data:
+                setattr(user, field, request.data[field])
+                update_fields.append(field)
+
+        if not update_fields:
+            return Response({'error': 'Aucun champ à modifier'}, status=400)
+
+        update_fields.append('updated_at')
+        user.save(update_fields=update_fields)
+
+        return Response({
+            'id':           str(user.id),
+            'role':         user.role,
+            'is_active':    user.is_active,
+            'is_available': user.is_available,
+            'is_staff':     user.is_staff,
+        })
