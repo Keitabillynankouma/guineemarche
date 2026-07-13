@@ -1770,7 +1770,7 @@ function TabUsers() {
 
 // ── Onglet : Configuration livraison ──────────────────────────────────────────
 
-const COMMUNES_GN = ['Kaloum','Dixinn','Matam','Ratoma','Matoto']
+const COMMUNES_GN = ['Kaloum','Dixinn','Matam','Ratoma','Matoto','Coyah','Dubréka']
 
 function TabDeliveryConfig() {
   const qc = useQueryClient()
