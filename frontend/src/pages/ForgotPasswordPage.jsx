@@ -2,7 +2,8 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import api from '../services/api'
 
-const STEPS = { PHONE: 1, OTP: 2, PASSWORD: 3, DONE: 4 }
+const STEPS   = { CONTACT: 1, OTP: 2, PASSWORD: 3, DONE: 4 }
+const METHODS = { PHONE: 'phone', EMAIL: 'email' }
 
 const EyeIcon = ({ show }) => show
   ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"/></svg>
@@ -10,10 +11,11 @@ const EyeIcon = ({ show }) => show
 
 const Spinner = () => <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin inline-block" />
 
-function StepBar({ step }) {
+function StepBar({ step, method }) {
+  const otpLabel = method === METHODS.EMAIL ? 'Code email' : 'Code SMS'
   const steps = [
-    { id: STEPS.PHONE, label: 'Téléphone' },
-    { id: STEPS.OTP,   label: 'Code SMS' },
+    { id: STEPS.CONTACT,  label: method === METHODS.EMAIL ? 'Email' : 'Téléphone' },
+    { id: STEPS.OTP,      label: otpLabel },
     { id: STEPS.PASSWORD, label: 'Mot de passe' },
   ]
   return (
@@ -22,14 +24,13 @@ function StepBar({ step }) {
         <div key={s.id} className="flex items-center flex-1">
           <div className="flex flex-col items-center">
             <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all ${
-              step > s.id ? 'bg-green-600 text-white' :
+              step > s.id  ? 'bg-green-600 text-white' :
               step === s.id ? 'bg-green-600 text-white ring-4 ring-green-100' :
               'bg-gray-100 text-gray-400'
             }`}>
               {step > s.id
                 ? <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7"/></svg>
-                : i + 1
-              }
+                : i + 1}
             </div>
             <span className={`text-xs mt-1 font-medium ${step >= s.id ? 'text-green-600' : 'text-gray-400'}`}>{s.label}</span>
           </div>
@@ -44,8 +45,10 @@ function StepBar({ step }) {
 
 export default function ForgotPasswordPage() {
   const navigate = useNavigate()
-  const [step, setStep]               = useState(STEPS.PHONE)
+  const [method, setMethod]           = useState(METHODS.PHONE)
+  const [step, setStep]               = useState(STEPS.CONTACT)
   const [phone, setPhone]             = useState('')
+  const [email, setEmail]             = useState('')
   const [otp, setOtp]                 = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirm, setConfirm]         = useState('')
@@ -54,11 +57,15 @@ export default function ForgotPasswordPage() {
   const [showPwd, setShowPwd]         = useState(false)
   const [showConf, setShowConf]       = useState(false)
 
+  const isPhone = method === METHODS.PHONE
+  const contact = isPhone ? phone : email
+
   async function sendOTP(e) {
     e.preventDefault()
     setError(''); setLoading(true)
     try {
-      await api.post('/accounts/forgot-password/', { phone_number: phone })
+      const payload = isPhone ? { phone_number: phone } : { email }
+      await api.post('/accounts/forgot-password/', payload)
       setStep(STEPS.OTP)
     } catch (err) {
       setError(err.response?.data?.error || "Erreur lors de l'envoi du code.")
@@ -68,7 +75,10 @@ export default function ForgotPasswordPage() {
   function verifyOTP(e) {
     e.preventDefault()
     setError('')
-    if (otp.trim().length < 4) { setError('Veuillez saisir le code reçu par SMS.'); return }
+    if (otp.trim().length < 4) {
+      setError(`Veuillez saisir le code reçu par ${isPhone ? 'SMS' : 'email'}.`)
+      return
+    }
     setStep(STEPS.PASSWORD)
   }
 
@@ -76,10 +86,13 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setError('')
     if (newPassword !== confirm) { setError('Les mots de passe ne correspondent pas.'); return }
-    if (newPassword.length < 6) { setError('Le mot de passe doit contenir au moins 6 caractères.'); return }
+    if (newPassword.length < 6)  { setError('Le mot de passe doit contenir au moins 6 caractères.'); return }
     setLoading(true)
     try {
-      await api.post('/accounts/reset-password/', { phone_number: phone, code: otp.trim(), new_password: newPassword })
+      const payload = isPhone
+        ? { phone_number: phone, code: otp.trim(), new_password: newPassword }
+        : { email,               code: otp.trim(), new_password: newPassword }
+      await api.post('/accounts/reset-password/', payload)
       setStep(STEPS.DONE)
     } catch (err) {
       setError(err.response?.data?.error || 'Code invalide ou expiré.')
@@ -113,7 +126,7 @@ export default function ForgotPasswordPage() {
           )}
 
           {/* Stepper */}
-          {step !== STEPS.DONE && <StepBar step={step} />}
+          {step !== STEPS.DONE && <StepBar step={step} method={method} />}
 
           {/* Erreur */}
           {error && (
@@ -122,37 +135,83 @@ export default function ForgotPasswordPage() {
             </div>
           )}
 
-          {/* ── Étape 1 : Téléphone ──────────────────────────────────────── */}
-          {step === STEPS.PHONE && (
+          {/* ── Étape 1 : Contact ─────────────────────────────────────────── */}
+          {step === STEPS.CONTACT && (
             <form onSubmit={sendOTP} className="space-y-4">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Numéro de téléphone</label>
-                <div className="relative">
-                  <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
-                  </div>
-                  <input type="text" placeholder="+224 620 00 00 01" value={phone} onChange={e => setPhone(e.target.value)}
-                    className={inputClass} required autoFocus />
-                </div>
-                <p className="text-xs text-gray-400 mt-1.5 ml-1">Vous recevrez un code SMS de vérification</p>
+
+              {/* Toggle méthode */}
+              <div className="flex bg-gray-100 rounded-xl p-1 gap-1">
+                <button type="button"
+                  onClick={() => { setMethod(METHODS.PHONE); setError('') }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    isPhone ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}>
+                  📱 Téléphone
+                </button>
+                <button type="button"
+                  onClick={() => { setMethod(METHODS.EMAIL); setError('') }}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2.5 rounded-lg text-sm font-semibold transition-all ${
+                    !isPhone ? 'bg-white text-green-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  }`}>
+                  ✉️ Email
+                </button>
               </div>
+
+              {/* Champ téléphone */}
+              {isPhone && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Numéro de téléphone
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"/></svg>
+                    </div>
+                    <input type="text" placeholder="+224 620 00 00 01" value={phone}
+                      onChange={e => setPhone(e.target.value)}
+                      className={inputClass} required autoFocus />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5 ml-1">Vous recevrez un code de vérification par SMS</p>
+                </div>
+              )}
+
+              {/* Champ email */}
+              {!isPhone && (
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                    Adresse email
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>
+                    </div>
+                    <input type="email" placeholder="exemple@gmail.com" value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      className={inputClass} required autoFocus />
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5 ml-1">Vous recevrez un code de vérification par email</p>
+                </div>
+              )}
+
               <button type="submit" disabled={loading}
                 className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600
                   text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-500/20
                   disabled:opacity-50 flex items-center justify-center gap-2">
-                {loading ? <><Spinner /> Envoi du code...</> : 'Recevoir le code SMS →'}
+                {loading ? <><Spinner /> Envoi du code...</> : `Recevoir le code ${isPhone ? 'SMS' : 'par email'} →`}
               </button>
             </form>
           )}
 
-          {/* ── Étape 2 : Code SMS ────────────────────────────────────────── */}
+          {/* ── Étape 2 : Code OTP ────────────────────────────────────────── */}
           {step === STEPS.OTP && (
             <form onSubmit={verifyOTP} className="space-y-4">
               <div className="bg-green-50 border border-green-100 rounded-xl p-3.5 mb-2 text-sm text-green-700">
-                📱 Code envoyé au <strong>{phone}</strong>
+                {isPhone ? '📱' : '✉️'} Code envoyé à <strong>{contact}</strong>
               </div>
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Code de vérification</label>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+                  Code de vérification
+                </label>
                 <div className="relative">
                   <div className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
@@ -169,9 +228,9 @@ export default function ForgotPasswordPage() {
                   flex items-center justify-center gap-2">
                 Vérifier le code →
               </button>
-              <button type="button" onClick={() => setStep(STEPS.PHONE)}
+              <button type="button" onClick={() => setStep(STEPS.CONTACT)}
                 className="w-full text-sm text-gray-400 hover:text-gray-600 transition-colors py-2">
-                ← Changer de numéro
+                ← {isPhone ? 'Changer de numéro' : "Changer d'adresse email"}
               </button>
             </form>
           )}

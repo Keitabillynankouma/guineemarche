@@ -255,24 +255,34 @@ class ResendOTPView(APIView):
 
 
 class ForgotPasswordView(APIView):
-    """POST /auth/forgot-password/ — envoie un OTP de réinitialisation au numéro."""
+    """POST /auth/forgot-password/ — envoie un OTP via SMS (phone_number) ou email."""
     permission_classes = [permissions.AllowAny]
     throttle_classes   = [OTPRateThrottle]
 
     def post(self, request):
         from core.utils import generate_otp, otp_expiry
         from core.sms import send_otp_sms
+        from core.email_notifications import send_otp_email as _send_otp_email
         from .models import User, OTPCode
 
         phone_number = request.data.get('phone_number', '').strip()
-        if not phone_number:
-            return Response({'error': 'Numéro de téléphone requis.'}, status=status.HTTP_400_BAD_REQUEST)
+        email        = request.data.get('email', '').strip().lower()
 
-        try:
-            user = User.objects.get(phone_number=phone_number)
-        except User.DoesNotExist:
-            # Sécurité : ne pas révéler si le numéro existe
-            return Response({'message': 'Si ce numéro est enregistré, vous recevrez un code par SMS.'})
+        if not phone_number and not email:
+            return Response({'error': 'Numéro de téléphone ou adresse email requis.'}, status=400)
+
+        # Recherche de l'utilisateur
+        user = None
+        if phone_number:
+            try:
+                user = User.objects.get(phone_number=phone_number)
+            except User.DoesNotExist:
+                return Response({'message': 'Si ce numéro est enregistré, vous recevrez un code par SMS.'})
+        else:
+            try:
+                user = User.objects.get(email=email)
+            except User.DoesNotExist:
+                return Response({'message': 'Si cette adresse est enregistrée, vous recevrez un code par email.'})
 
         code = generate_otp()
         OTPCode.objects.create(
@@ -281,12 +291,17 @@ class ForgotPasswordView(APIView):
             purpose=OTPCode.Purpose.RESET_PASSWORD,
             expires_at=otp_expiry(minutes=10),
         )
-        send_otp_sms(str(user.phone_number), code)
-        return Response({'message': 'Code de vérification envoyé par SMS.'})
+
+        if phone_number:
+            send_otp_sms(str(user.phone_number), code)
+            return Response({'message': 'Code de vérification envoyé par SMS.'})
+        else:
+            _send_otp_email(user.email, code, user.full_name or '')
+            return Response({'message': 'Code de vérification envoyé par email.'})
 
 
 class ResetPasswordView(APIView):
-    """POST /auth/reset-password/ — vérifie l'OTP et définit le nouveau mot de passe."""
+    """POST /auth/reset-password/ — vérifie l'OTP (SMS ou email) et définit le nouveau mot de passe."""
     permission_classes = [permissions.AllowAny]
     throttle_classes   = [OTPRateThrottle]
 
@@ -294,16 +309,17 @@ class ResetPasswordView(APIView):
         from .models import User, OTPCode
 
         phone_number = request.data.get('phone_number', '').strip()
+        email        = request.data.get('email', '').strip().lower()
         code         = request.data.get('code', '').strip()
         new_password = request.data.get('new_password', '').strip()
 
-        if not all([phone_number, code, new_password]):
+        if not (phone_number or email) or not code or not new_password:
             return Response({'error': 'Tous les champs sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
         if len(new_password) < 6:
             return Response({'error': 'Le mot de passe doit contenir au moins 6 caractères.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            user = User.objects.get(phone_number=phone_number)
+            user = User.objects.get(phone_number=phone_number) if phone_number else User.objects.get(email=email)
         except User.DoesNotExist:
             return Response({'error': 'Utilisateur introuvable.'}, status=status.HTTP_404_NOT_FOUND)
 
