@@ -1811,11 +1811,38 @@ function TabDeliveryConfig() {
   const [rateEditId, setRateEditId] = useState(null)
   const [showRateForm, setShowRateForm] = useState(false)
 
+  // Génération en masse
+  const [bulkCity, setBulkCity]         = useState('Conakry')
+  const [bulkPrice, setBulkPrice]       = useState('')
+  const [bulkHours, setBulkHours]       = useState(2)
+  const [bulkLoading, setBulkLoading]   = useState(false)
+  const [bulkResult, setBulkResult]     = useState(null)   // { created, skipped }
+  const [showBulk, setShowBulk]         = useState(false)
+
   const { data: ratesRaw = [] } = useQuery({
     queryKey: ['admin-zone-rates'],
     queryFn:  () => adminAPI.getZoneRates().then(r => r.data?.results ?? r.data ?? []),
   })
   const rates = Array.isArray(ratesRaw) ? ratesRaw : []
+
+  const handleBulkGenerate = async (e) => {
+    e.preventDefault()
+    setBulkLoading(true); setBulkResult(null)
+    const pairs = []
+    for (const from of COMMUNES_GN)
+      for (const to of COMMUNES_GN)
+        if (from !== to) pairs.push({ city: bulkCity, from_commune: from, to_commune: to, fee_gnf: +bulkPrice, estimated_hours: +bulkHours })
+
+    const existing = rates.filter(r => r.city.toLowerCase() === bulkCity.toLowerCase())
+    const toCreate = pairs.filter(p => !existing.some(e => e.from_commune === p.from_commune && e.to_commune === p.to_commune))
+    let created = 0
+    for (const p of toCreate) {
+      try { await adminAPI.createZoneRate(p); created++ } catch {}
+    }
+    qc.invalidateQueries(['admin-zone-rates'])
+    setBulkResult({ created, skipped: pairs.length - toCreate.length })
+    setBulkLoading(false)
+  }
 
   const saveRate = useMutation({
     mutationFn: (d) => rateEditId ? adminAPI.updateZoneRate(rateEditId, d) : adminAPI.createZoneRate(d),
@@ -1906,11 +1933,48 @@ function TabDeliveryConfig() {
             <h2 className="text-lg font-bold text-gray-800">🗺️ Tarifs inter-communes</h2>
             <p className="text-xs text-gray-400 mt-0.5">Tarifs fixes entre communes (prioritaires sur la distance)</p>
           </div>
-          <button onClick={() => { setRateEditId(null); setRateForm(RATE_EMPTY); setShowRateForm(s => !s) }}
-            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
-            {showRateForm && !rateEditId ? 'Annuler' : '+ Ajouter'}
-          </button>
+          <div className="flex gap-2">
+            <button onClick={() => { setShowBulk(s => !s); setShowRateForm(false) }}
+              className="border border-blue-300 text-blue-600 hover:bg-blue-50 px-4 py-2 rounded-xl text-sm font-medium transition">
+              ⚡ Générer
+            </button>
+            <button onClick={() => { setRateEditId(null); setRateForm(RATE_EMPTY); setShowRateForm(s => !s); setShowBulk(false) }}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
+              {showRateForm && !rateEditId ? 'Annuler' : '+ Ajouter'}
+            </button>
+          </div>
         </div>
+
+        {/* Génération en masse */}
+        {showBulk && (
+          <form onSubmit={handleBulkGenerate} className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 space-y-3">
+            <p className="text-sm font-semibold text-blue-800">⚡ Générer toutes les combinaisons inter-communes</p>
+            <p className="text-xs text-blue-600">Crée automatiquement les {COMMUNES_GN.length * (COMMUNES_GN.length - 1)} paires de communes (les existantes sont ignorées).</p>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={lbl}>Ville</label>
+                <input className={inp} value={bulkCity} onChange={e => setBulkCity(e.target.value)} placeholder="Conakry" required />
+              </div>
+              <div>
+                <label className={lbl}>Tarif par défaut (GNF)</label>
+                <input type="number" className={inp} value={bulkPrice} onChange={e => setBulkPrice(e.target.value)} placeholder="ex: 50000" required />
+              </div>
+              <div>
+                <label className={lbl}>Délai (h)</label>
+                <input type="number" min="1" className={inp} value={bulkHours} onChange={e => setBulkHours(e.target.value)} />
+              </div>
+            </div>
+            {bulkResult && (
+              <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                ✅ {bulkResult.created} tarif(s) créé(s) · {bulkResult.skipped} déjà existant(s) ignoré(s)
+              </p>
+            )}
+            <button type="submit" disabled={bulkLoading}
+              className="bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 rounded-lg text-sm font-medium transition disabled:opacity-50">
+              {bulkLoading ? 'Génération…' : `Générer les ${COMMUNES_GN.length * (COMMUNES_GN.length - 1)} combinaisons`}
+            </button>
+          </form>
+        )}
 
         {showRateForm && (
           <form onSubmit={e => { e.preventDefault(); saveRate.mutate({ ...rateForm, fee_gnf: +rateForm.fee_gnf, estimated_hours: +rateForm.estimated_hours }) }}
