@@ -1772,6 +1772,18 @@ function TabUsers() {
 
 const COMMUNES_GN = ['Kaloum','Dixinn','Matam','Ratoma','Matoto','Coyah','Dubréka']
 
+// Matrice de proximité entre communes (1=proche, 2=moyen, 3=loin)
+// Géographie : Kaloum(pointe) → Dixinn → Matam → Ratoma → Matoto → puis Dubréka(nord ~45km) / Coyah(est ~55km)
+const COMMUNE_TIERS = {
+  'Kaloum':  { 'Dixinn':1,  'Matam':1,  'Ratoma':2, 'Matoto':2, 'Coyah':3, 'Dubréka':3 },
+  'Dixinn':  { 'Kaloum':1,  'Matam':1,  'Ratoma':2, 'Matoto':2, 'Coyah':3, 'Dubréka':3 },
+  'Matam':   { 'Kaloum':1,  'Dixinn':1, 'Ratoma':1, 'Matoto':2, 'Coyah':3, 'Dubréka':3 },
+  'Ratoma':  { 'Kaloum':2,  'Dixinn':2, 'Matam':1,  'Matoto':1, 'Coyah':2, 'Dubréka':2 },
+  'Matoto':  { 'Kaloum':2,  'Dixinn':2, 'Matam':2,  'Ratoma':1, 'Coyah':2, 'Dubréka':2 },
+  'Coyah':   { 'Kaloum':3,  'Dixinn':3, 'Matam':3,  'Ratoma':2, 'Matoto':2, 'Dubréka':3 },
+  'Dubréka': { 'Kaloum':3,  'Dixinn':3, 'Matam':3,  'Ratoma':2, 'Matoto':2, 'Coyah':3  },
+}
+
 function TabDeliveryConfig() {
   const qc = useQueryClient()
 
@@ -1813,7 +1825,9 @@ function TabDeliveryConfig() {
 
   // Génération en masse
   const [bulkCity, setBulkCity]         = useState('Conakry')
-  const [bulkPrice, setBulkPrice]       = useState('')
+  const [bulkPrice1, setBulkPrice1]     = useState('')   // proche
+  const [bulkPrice2, setBulkPrice2]     = useState('')   // moyen
+  const [bulkPrice3, setBulkPrice3]     = useState('')   // loin
   const [bulkHours, setBulkHours]       = useState(2)
   const [bulkLoading, setBulkLoading]   = useState(false)
   const [bulkResult, setBulkResult]     = useState(null)   // { created, skipped }
@@ -1828,10 +1842,14 @@ function TabDeliveryConfig() {
   const handleBulkGenerate = async (e) => {
     e.preventDefault()
     setBulkLoading(true); setBulkResult(null)
+    const tierPrices = { 1: +bulkPrice1, 2: +bulkPrice2, 3: +bulkPrice3 }
     const pairs = []
     for (const from of COMMUNES_GN)
       for (const to of COMMUNES_GN)
-        if (from !== to) pairs.push({ city: bulkCity, from_commune: from, to_commune: to, fee_gnf: +bulkPrice, estimated_hours: +bulkHours })
+        if (from !== to) {
+          const tier = (COMMUNE_TIERS[from] && COMMUNE_TIERS[from][to]) || 2
+          pairs.push({ city: bulkCity, from_commune: from, to_commune: to, fee_gnf: tierPrices[tier] || tierPrices[2], estimated_hours: +bulkHours })
+        }
 
     const existing = rates.filter(r => r.city.toLowerCase() === bulkCity.toLowerCase())
     const toCreate = pairs.filter(p => !existing.some(e => e.from_commune === p.from_commune && e.to_commune === p.to_commune))
@@ -1949,21 +1967,42 @@ function TabDeliveryConfig() {
         {showBulk && (
           <form onSubmit={handleBulkGenerate} className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-5 space-y-3">
             <p className="text-sm font-semibold text-blue-800">⚡ Générer toutes les combinaisons inter-communes</p>
-            <p className="text-xs text-blue-600">Crée automatiquement les {COMMUNES_GN.length * (COMMUNES_GN.length - 1)} paires de communes (les existantes sont ignorées).</p>
-            <div className="grid grid-cols-3 gap-3">
+            <p className="text-xs text-blue-600">
+              Les prix varient selon la distance. Les paires déjà existantes sont ignorées.
+            </p>
+
+            {/* Explication des tiers */}
+            <div className="grid grid-cols-3 gap-2 text-xs text-blue-700 bg-white rounded-lg p-3 border border-blue-100">
+              <div><span className="font-semibold">🟢 Proche</span><br/>ex: Kaloum↔Dixinn, Matam↔Ratoma</div>
+              <div><span className="font-semibold">🟡 Moyen</span><br/>ex: Kaloum↔Ratoma, Ratoma↔Coyah</div>
+              <div><span className="font-semibold">🔴 Loin</span><br/>ex: Kaloum↔Coyah, Dixinn↔Dubréka</div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className={lbl}>Ville</label>
                 <input className={inp} value={bulkCity} onChange={e => setBulkCity(e.target.value)} placeholder="Conakry" required />
               </div>
               <div>
-                <label className={lbl}>Tarif par défaut (GNF)</label>
-                <input type="number" className={inp} value={bulkPrice} onChange={e => setBulkPrice(e.target.value)} placeholder="ex: 50000" required />
-              </div>
-              <div>
-                <label className={lbl}>Délai (h)</label>
+                <label className={lbl}>Délai estimé (h)</label>
                 <input type="number" min="1" className={inp} value={bulkHours} onChange={e => setBulkHours(e.target.value)} />
               </div>
             </div>
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className={lbl}>🟢 Prix Proche (GNF)</label>
+                <input type="number" className={inp} value={bulkPrice1} onChange={e => setBulkPrice1(e.target.value)} placeholder="ex: 30 000" required />
+              </div>
+              <div>
+                <label className={lbl}>🟡 Prix Moyen (GNF)</label>
+                <input type="number" className={inp} value={bulkPrice2} onChange={e => setBulkPrice2(e.target.value)} placeholder="ex: 50 000" required />
+              </div>
+              <div>
+                <label className={lbl}>🔴 Prix Loin (GNF)</label>
+                <input type="number" className={inp} value={bulkPrice3} onChange={e => setBulkPrice3(e.target.value)} placeholder="ex: 100 000" required />
+              </div>
+            </div>
+
             {bulkResult && (
               <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 ✅ {bulkResult.created} tarif(s) créé(s) · {bulkResult.skipped} déjà existant(s) ignoré(s)
