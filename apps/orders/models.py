@@ -44,6 +44,28 @@ class DeliveryZone(BaseModel):
         }
 
 
+class IntraCityZoneRate(BaseModel):
+    """
+    Tarif fixe entre deux communes d'une même ville (ex : Ratoma → Kaloum).
+    Prioritaire sur le calcul distance × prix/km quand une paire est configurée.
+    """
+    city            = models.CharField(max_length=100, db_index=True)
+    from_commune    = models.CharField(max_length=100, help_text="Commune du vendeur")
+    to_commune      = models.CharField(max_length=100, help_text="Commune de l'acheteur")
+    fee_gnf         = models.BigIntegerField(default=0)
+    estimated_hours = models.PositiveSmallIntegerField(default=2, help_text="Délai indicatif en heures")
+    is_active       = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name        = 'Tarif inter-commune'
+        verbose_name_plural = 'Tarifs inter-communes'
+        unique_together     = ('city', 'from_commune', 'to_commune')
+        ordering            = ['city', 'from_commune', 'to_commune']
+
+    def __str__(self):
+        return f"{self.city} : {self.from_commune} → {self.to_commune} — {self.fee_gnf:,} GNF"
+
+
 class PickupPoint(BaseModel):
     name      = models.CharField(max_length=200)
     address   = models.CharField(max_length=300)
@@ -118,10 +140,12 @@ class Order(BaseModel):
     note               = models.TextField(blank=True)
     delivery_address   = models.CharField(max_length=400, blank=True, help_text="Adresse de livraison à domicile")
     delivery_fee_gnf      = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
-    delivery_distance_km  = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
-                                                help_text="Distance de livraison en km (saisie par l'acheteur)")
-    delivery_weight_kg    = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
-                                                help_text="Poids du colis en kg (saisie par l'acheteur)")
+    delivery_distance_km   = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
+                                                 help_text="Distance de livraison en km (GPS ou saisie manuelle)")
+    delivery_weight_kg     = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
+                                                 help_text="Poids du colis en kg (saisie par l'acheteur)")
+    delivery_buyer_commune = models.CharField(max_length=100, blank=True,
+                                              help_text="Commune de l'acheteur — déclenche la tarification inter-commune")
 
     # Seuils escrow
     LARGE_AMOUNT_GNF  = 500_000   # montants ≥ 500 000 GNF → délai étendu + alerte admin
@@ -291,3 +315,40 @@ class DeliveryAssignment(BaseModel):
         if not self.pickup_code:
             self.pickup_code = str(random.randint(100000, 999999))
         super().save(*args, **kwargs)
+
+
+# ── Demandes de retour ─────────────────────────────────────────────────────────
+
+class ReturnRequest(BaseModel):
+    """Demande de retour d'une commande terminée, déposée par l'acheteur."""
+
+    class Status(models.TextChoices):
+        PENDING   = 'pending',   'En attente'
+        APPROVED  = 'approved',  'Approuvé'
+        REJECTED  = 'rejected',  'Refusé'
+        COMPLETED = 'completed', 'Retour effectué'
+
+    class Reason(models.TextChoices):
+        DEFECTIVE        = 'defective',        'Article défectueux'
+        NOT_AS_DESCRIBED = 'not_as_described',  'Ne correspond pas à la description'
+        WRONG_ITEM       = 'wrong_item',        'Mauvais article reçu'
+        CHANGED_MIND     = 'changed_mind',      "Changement d'avis"
+        OTHER            = 'other',             'Autre'
+
+    order       = models.OneToOneField(
+        Order, on_delete=models.CASCADE, related_name='return_request',
+        help_text="La commande concernée (doit être terminée)"
+    )
+    reason      = models.CharField(max_length=20, choices=Reason.choices)
+    description = models.TextField(blank=True, help_text="Détail optionnel de la demande")
+    status      = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    admin_note  = models.TextField(blank=True, help_text="Note interne de l'admin lors du traitement")
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        verbose_name        = 'Demande de retour'
+        verbose_name_plural = 'Demandes de retour'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f"Retour #{str(self.order.id)[:8]} — {self.get_status_display()}"

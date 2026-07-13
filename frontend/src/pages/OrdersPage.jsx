@@ -344,9 +344,13 @@ function RatingModal({ orderId, revieweeId, revieweeName, label, onClose, onDone
 
 // ── Carte commande ──────────────────────────────────────────────────────────
 function OrderCard({ order, isBuyer, onInvalidate }) {
-    const [payOpen, setPayOpen]         = useState(false)
-    const [ratingModal, setRatingModal] = useState(null)   // { id, name, label }
-    const [rated, setRated]             = useState({})     // { [revieweeId]: true }
+    const [payOpen, setPayOpen]           = useState(false)
+    const [ratingModal, setRatingModal]   = useState(null)   // { id, name, label }
+    const [rated, setRated]               = useState({})     // { [revieweeId]: true }
+    const [showReturn, setShowReturn]     = useState(false)
+    const [returnReason, setReturnReason] = useState('')
+    const [returnDesc, setReturnDesc]     = useState('')
+    const [returnDone, setReturnDone]     = useState(!!order.return_request)
     const st  = STATUS[order.status] || STATUS.pending
     const da  = order.delivery_assignment_detail           // assignment (home_delivery)
 
@@ -358,10 +362,15 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
         mutationFn: () => ordersAPI.dispute(order.id),
         onSuccess:  onInvalidate,
     })
+    const returnMutation = useMutation({
+        mutationFn: () => ordersAPI.createReturn(order.id, { reason: returnReason, description: returnDesc }),
+        onSuccess:  () => { setReturnDone(true); setShowReturn(false); onInvalidate() },
+    })
 
     const canPay     = isBuyer && order.status === 'pending' && !order.payments?.length
     const canConfirm = isBuyer && order.status === 'confirmed'
     const canDispute = isBuyer && ['pending', 'confirmed'].includes(order.status)
+    const canReturn  = isBuyer && order.status === 'completed' && !returnDone
 
     // Notation : disponible seulement si commande terminée
     const isCompleted  = order.status === 'completed'
@@ -495,6 +504,27 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                             ⚠️ Litige
                         </button>
                     )}
+                    {canReturn && (
+                        <button onClick={() => setShowReturn(true)}
+                            className="px-4 bg-orange-50 hover:bg-orange-100 text-orange-600 text-sm font-medium py-2.5 rounded-xl transition border border-orange-200">
+                            ↩️ Retour
+                        </button>
+                    )}
+                    {returnDone && order.return_request && (
+                        <span className={`px-3 py-2 rounded-xl text-xs font-medium border ${
+                            order.return_request.status === 'approved'  ? 'bg-green-50 text-green-700 border-green-200' :
+                            order.return_request.status === 'rejected'  ? 'bg-red-50 text-red-700 border-red-200' :
+                            order.return_request.status === 'completed' ? 'bg-blue-50 text-blue-700 border-blue-200' :
+                            'bg-orange-50 text-orange-700 border-orange-200'
+                        }`}>
+                            ↩️ {
+                                order.return_request.status === 'approved'  ? 'Retour approuvé' :
+                                order.return_request.status === 'rejected'  ? 'Retour refusé' :
+                                order.return_request.status === 'completed' ? 'Retour effectué' :
+                                'Retour en attente'
+                            }
+                        </span>
+                    )}
                     <Link to={`/listings/${order.listing}`}
                         className="px-3 bg-gray-100 hover:bg-gray-200 text-gray-600 text-sm py-2.5 rounded-xl transition text-center">
                         Voir annonce
@@ -560,6 +590,62 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                         onInvalidate()
                     }}
                 />
+            )}
+
+            {showReturn && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-4">
+                        <h3 className="text-lg font-bold text-gray-800">↩️ Demander un retour</h3>
+                        <p className="text-sm text-gray-500">Commande : <span className="font-medium text-gray-700">{order.listing_title}</span></p>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Motif *</label>
+                            <select
+                                value={returnReason}
+                                onChange={e => setReturnReason(e.target.value)}
+                                className="w-full border border-gray-300 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400"
+                            >
+                                <option value="">— Choisir un motif —</option>
+                                <option value="defective">Article défectueux</option>
+                                <option value="not_as_described">Ne correspond pas à la description</option>
+                                <option value="wrong_item">Mauvais article reçu</option>
+                                <option value="changed_mind">Changement d&apos;avis</option>
+                                <option value="other">Autre</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Description (optionnel)</label>
+                            <textarea
+                                value={returnDesc}
+                                onChange={e => setReturnDesc(e.target.value)}
+                                rows={3}
+                                placeholder="Décrivez le problème..."
+                                className="w-full border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-400 resize-none"
+                            />
+                        </div>
+
+                        {returnMutation.isError && (
+                            <p className="text-sm text-red-600 bg-red-50 rounded-xl px-3 py-2">
+                                {returnMutation.error?.response?.data?.error || 'Une erreur est survenue.'}
+                            </p>
+                        )}
+
+                        <div className="flex gap-3 pt-1">
+                            <button
+                                onClick={() => { setShowReturn(false); setReturnReason(''); setReturnDesc('') }}
+                                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50 transition">
+                                Annuler
+                            </button>
+                            <button
+                                onClick={() => returnMutation.mutate()}
+                                disabled={!returnReason || returnMutation.isPending}
+                                className="flex-1 py-2.5 rounded-xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold transition disabled:opacity-50">
+                                {returnMutation.isPending ? 'Envoi…' : 'Envoyer la demande'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </>
     )

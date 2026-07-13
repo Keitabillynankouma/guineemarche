@@ -1,7 +1,13 @@
 #!/bin/bash
-# Fix #35 — 4 corrections livreur
+# Fix #35 + #36 — Livreur : 4 bugs + disponibilité manuelle
 cd "$(dirname "$0")"
 git add \
+  apps/accounts/models.py \
+  apps/accounts/admin.py \
+  apps/accounts/views.py \
+  apps/accounts/urls.py \
+  apps/accounts/serializers.py \
+  apps/accounts/migrations/0009_user_is_available.py \
   apps/orders/models.py \
   apps/orders/serializers.py \
   apps/orders/views.py \
@@ -15,18 +21,26 @@ git add \
   frontend/src/pages/OrdersPage.jsx \
   frontend/src/services/api.js
 
-git commit -m "fix(livreur): auto-assign, listing sold, dual codes, 3-way rating
+git commit -m "feat(livreur): disponibilité manuelle + auto-assign smart + dual codes + 3-way rating
 
-- Auto-assign livreur dès création commande home_delivery (priorité même ville)
+Disponibilité (#36)
+- Champ is_available sur User (migration 0009)
+- Toggle POST /accounts/livreur/toggle-availability/
+- LivreurDashboard : bouton Disponible/Indisponible dans le header
+- Algorithme auto-assign filtre is_available=True
+- Admin : is_available visible et éditable en liste
+
+Auto-assign (#35)
+- Algorithme Option B : même ville → en service aujourd'hui → moins chargé
 - Listing marqué 'sold' dans Order.complete()
 - Dual codes : pickup_code (livreur→vendeur) + verification_code (acheteur→livreur)
 - Migration 0010 : champ pickup_code sur DeliveryAssignment
-- Notation 3-way : acheteur, vendeur et livreur peuvent tous se noter
-- Migration 0002 reviews : unique_together (order, reviewer, reviewee)
-- OrderSerializer expose delivery_assignment_detail (codes + livreur_id)
-- LivreurDashboard : étape 1 pickup_code, étape 2 verification QR, notation post-livraison
-- OrdersPage : codes visibles par vendeur/acheteur + boutons notation livreur
-- api.js : reviewsAPI.create() avec reviewee explicite"
+- Notation 3-way : unique_together (order, reviewer, reviewee)
+- Migration 0002 reviews
+- OrderSerializer expose delivery_assignment_detail avec tous les codes
+- LivreurDashboard : étape 1 pickup_code, étape 2 QR, notation post-livraison
+- OrdersPage : codes + boutons notation livreur
+- api.js : reviewsAPI + authAPI.toggleAvailability"
 
 git push
 echo "✅ Déployé — Railway lance les migrations automatiquement"

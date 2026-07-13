@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment, IntraCityZoneRate, ReturnRequest
 
 
 class PickupPointSerializer(serializers.ModelSerializer):
@@ -24,11 +24,23 @@ class DeliveryZoneSerializer(serializers.ModelSerializer):
         )
 
 
+class IntraCityZoneRateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = IntraCityZoneRate
+        fields = ('id', 'city', 'from_commune', 'to_commune', 'fee_gnf', 'estimated_hours', 'is_active')
+
+
 class PaymentSerializer(serializers.ModelSerializer):
     class Meta:
         model  = Payment
         fields = ('id', 'provider', 'phone_number', 'amount_gnf', 'status', 'external_ref', 'created_at')
         read_only_fields = ('id', 'status', 'created_at')
+
+
+class ReturnRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ReturnRequest
+        fields = ('id', 'reason', 'description', 'status', 'admin_note', 'resolved_at', 'created_at')
 
 
 class OrderSerializer(serializers.ModelSerializer):
@@ -38,6 +50,7 @@ class OrderSerializer(serializers.ModelSerializer):
     seller_name   = serializers.CharField(source='seller.full_name',  read_only=True)
     pickup_point_detail = PickupPointSerializer(source='pickup_point', read_only=True)
     delivery_assignment_detail = serializers.SerializerMethodField()
+    return_request = ReturnRequestSerializer(read_only=True)
 
     class Meta:
         model  = Order
@@ -47,10 +60,10 @@ class OrderSerializer(serializers.ModelSerializer):
             'amount_gnf', 'commission_gnf', 'seller_payout_gnf', 'status',
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
             'meet_location', 'delivery_address', 'delivery_fee_gnf',
-            'delivery_distance_km', 'delivery_weight_kg',
+            'delivery_distance_km', 'delivery_weight_kg', 'delivery_buyer_commune',
             'note',
             'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
-            'payments', 'delivery_assignment_detail',
+            'payments', 'delivery_assignment_detail', 'return_request',
             'created_at', 'updated_at',
         )
         read_only_fields = (
@@ -83,15 +96,34 @@ class OrderSerializer(serializers.ModelSerializer):
         delivery_mode = validated_data.get('delivery_mode', Order.DeliveryMode.MEETING_POINT)
         delivery_fee  = 0
         if delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
-            city = listing.city
-            try:
-                zone         = DeliveryZone.objects.get(city__iexact=city, is_active=True)
-                distance_km  = validated_data.get('delivery_distance_km', 0) or 0
-                weight_kg    = validated_data.get('delivery_weight_kg', 0) or 0
-                delivery_fee = zone.calculate_fee(distance_km, weight_kg)['fee_gnf']
-            except DeliveryZone.DoesNotExist:
-                pass
-            validated_data['delivery_fee_gnf'] = delivery_fee
+            city           = listing.city
+            buyer_commune  = (validated_data.get('delivery_buyer_commune') or '').strip()
+            seller_commune = (listing.quartier or '').strip()
+
+            # ── Priorité 1 : tarif inter-commune ─────────────────────────────
+            if buyer_commune and seller_commune:
+                try:
+                    rate = IntraCityZoneRate.objects.get(
+                        city__iexact=city,
+                        from_commune__iexact=seller_commune,
+                        to_commune__iexact=buyer_commune,
+                        is_active=True,
+                    )
+                    delivery_fee = rate.fee_gnf
+                    validated_data['delivery_fee_gnf'] = delivery_fee
+                except IntraCityZoneRate.DoesNotExist:
+                    pass
+
+            # ── Priorité 2 : calcul distance + poids ─────────────────────────
+            if delivery_fee == 0:
+                try:
+                    zone         = DeliveryZone.objects.get(city__iexact=city, is_active=True)
+                    distance_km  = validated_data.get('delivery_distance_km', 0) or 0
+                    weight_kg    = validated_data.get('delivery_weight_kg', 0) or 0
+                    delivery_fee = zone.calculate_fee(distance_km, weight_kg)['fee_gnf']
+                except DeliveryZone.DoesNotExist:
+                    pass
+                validated_data['delivery_fee_gnf'] = delivery_fee
 
         validated_data['amount_gnf'] = listing.price_gnf + delivery_fee
         return super().create(validated_data)

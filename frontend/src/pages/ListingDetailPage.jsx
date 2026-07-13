@@ -2,6 +2,16 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI, deliveryAPI } from '../services/api'
+
+// ── Haversine distance (km) ────────────────────────────────────────────────────
+function haversineKm(lat1, lon1, lat2, lon2) {
+    const R    = 6371
+    const dLat = (lat2 - lat1) * Math.PI / 180
+    const dLon = (lon2 - lon1) * Math.PI / 180
+    const a    = Math.sin(dLat / 2) ** 2 +
+                 Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLon / 2) ** 2
+    return +(R * 2 * Math.asin(Math.sqrt(a))).toFixed(1)
+}
 import useAuthStore from '../store/authStore'
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed'
 import Logo from '../components/Logo'
@@ -314,6 +324,9 @@ function OrderModal({ listing, onClose, onSuccess }) {
     const [deliveryAddress, setDeliveryAddress] = useState('')
     const [distanceKm, setDistanceKm]       = useState('')
     const [weightKg, setWeightKg]           = useState(listing.weight_kg ? String(listing.weight_kg) : '')
+    const [buyerCommune, setBuyerCommune]   = useState('')
+    const [geoLoading, setGeoLoading]       = useState(false)
+    const [geoError, setGeoError]           = useState('')
     const [provider, setProvider]           = useState('orange_money')
     const [phone, setPhone]                 = useState('')
     const [error, setError]                 = useState('')
@@ -340,6 +353,41 @@ function OrderModal({ listing, onClose, onSuccess }) {
         enabled:  deliveryMode === 'home_delivery',
     })
 
+    const { data: zoneRates = [] } = useQuery({
+        queryKey: ['zone-rates', listing.city],
+        queryFn:  () => deliveryAPI.getZoneRates(listing.city).then(r => r.data?.results || r.data || []),
+        enabled:  deliveryMode === 'home_delivery',
+    })
+
+    // Communes disponibles depuis les tarifs + commune vendeur
+    const sellerCommune   = listing.quartier || ''
+    const availableComm   = [...new Set(zoneRates.filter(r => r.from_commune === sellerCommune).map(r => r.to_commune))]
+    const communeRate     = buyerCommune
+        ? zoneRates.find(r => r.from_commune === sellerCommune && r.to_commune === buyerCommune)
+        : null
+
+    // Géolocalisation navigateur
+    const handleGeolocate = () => {
+        if (!navigator.geolocation) { setGeoError("Géolocalisation non supportée par ce navigateur."); return }
+        setGeoLoading(true); setGeoError('')
+        navigator.geolocation.getCurrentPosition(
+            (pos) => {
+                const { latitude: bLat, longitude: bLon } = pos.coords
+                if (listing.latitude && listing.longitude) {
+                    const km = haversineKm(listing.latitude, listing.longitude, bLat, bLon)
+                    // Coefficient routier ×1.3 pour approximer la distance réelle
+                    setDistanceKm(String(+(km * 1.3).toFixed(1)))
+                    setGeoError('')
+                } else {
+                    setGeoError("Ce vendeur n'a pas renseigné ses coordonnées — saisissez la distance manuellement.")
+                }
+                setGeoLoading(false)
+            },
+            () => { setGeoError("Position refusée. Saisissez la distance manuellement."); setGeoLoading(false) },
+            { timeout: 8000 }
+        )
+    }
+
     const createOrder = useMutation({
         mutationFn: (data) => ordersAPI.create(data),
         onError: (err) => setError(err.response?.data?.detail || 'Erreur lors de la commande.'),
@@ -353,16 +401,21 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
     const finalMeetLocation = meetLocation || customLocation
 
-    // ── Calcul du tarif de livraison (distance + poids) ───────────────────────
+    // ── Calcul du tarif de livraison ──────────────────────────────────────────
+    // Priorité : tarif inter-commune > distance+poids > base
     const calcDeliveryFee = () => {
-        if (deliveryMode !== 'home_delivery' || !deliveryZone) return { fee: 0, distCharge: 0, weightCharge: 0 }
+        if (deliveryMode !== 'home_delivery') return { fee: 0, distCharge: 0, weightCharge: 0, source: null }
+        if (communeRate) {
+            return { fee: communeRate.fee_gnf, distCharge: 0, weightCharge: 0, source: 'commune' }
+        }
+        if (!deliveryZone) return { fee: 0, distCharge: 0, weightCharge: 0, source: null }
         const dist   = parseFloat(distanceKm) || 0
         const weight = parseFloat(weightKg) || 0
         const distCharge   = Math.max(0, dist - (deliveryZone.free_km_radius || 0)) * (deliveryZone.price_per_km_gnf || 0)
         const weightCharge = Math.max(0, weight - parseFloat(deliveryZone.free_weight_kg || 0)) * (deliveryZone.price_per_kg_gnf || 0)
-        return { fee: Math.round(deliveryZone.fee_gnf + distCharge + weightCharge), distCharge: Math.round(distCharge), weightCharge: Math.round(weightCharge) }
+        return { fee: Math.round(deliveryZone.fee_gnf + distCharge + weightCharge), distCharge: Math.round(distCharge), weightCharge: Math.round(weightCharge), source: 'distance' }
     }
-    const { fee: deliveryFee, distCharge, weightCharge } = calcDeliveryFee()
+    const { fee: deliveryFee, distCharge, weightCharge, source: feeSource } = calcDeliveryFee()
     const hasDynamicPricing = deliveryZone && (deliveryZone.price_per_km_gnf > 0 || deliveryZone.price_per_kg_gnf > 0)
     const totalAmount       = listing.price_gnf + deliveryFee
 
@@ -383,8 +436,9 @@ function OrderModal({ listing, onClose, onSuccess }) {
                 delivery_address: deliveryMode === 'home_delivery'  ? deliveryAddress   : '',
             }
             if (deliveryMode === 'home_delivery') {
-                if (distanceKm) orderPayload.delivery_distance_km = parseFloat(distanceKm)
-                if (weightKg)   orderPayload.delivery_weight_kg   = parseFloat(weightKg)
+                if (distanceKm)   orderPayload.delivery_distance_km    = parseFloat(distanceKm)
+                if (weightKg)     orderPayload.delivery_weight_kg      = parseFloat(weightKg)
+                if (buyerCommune) orderPayload.delivery_buyer_commune  = buyerCommune
             }
             const order = await createOrder.mutateAsync(orderPayload)
             await pay.mutateAsync({ id: order.data.id, data: { provider, phone_number: phone } })
@@ -489,54 +543,92 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             <div className="space-y-3">
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">🏠 Adresse de livraison</label>
 
-                                {deliveryZone ? (
+                                {/* Bannière tarif */}
+                                {(deliveryZone || communeRate) ? (
                                     <div className="bg-green-50 border border-green-200 rounded-xl p-3">
                                         <div className="flex items-center justify-between mb-1">
-                                            <p className="text-xs font-bold text-green-800">Livraison disponible à {deliveryZone.city}</p>
+                                            <p className="text-xs font-bold text-green-800">
+                                                Livraison disponible à {listing.city}
+                                                {feeSource === 'commune' && communeRate && (
+                                                    <span className="ml-1 text-green-600">· ~{communeRate.estimated_hours}h</span>
+                                                )}
+                                                {feeSource === 'distance' && deliveryZone && (
+                                                    <span className="ml-1 text-green-600">· ~{deliveryZone.estimated_days}j</span>
+                                                )}
+                                            </p>
                                             <span className="bg-green-600 text-white text-xs font-black px-3 py-1 rounded-full">
                                                 {new Intl.NumberFormat('fr-GN').format(deliveryFee)} GNF
                                             </span>
                                         </div>
-                                        <p className="text-xs text-green-700">
-                                            Délai estimé : {deliveryZone.estimated_days} jour{deliveryZone.estimated_days > 1 ? 's' : ''} ouvrable{deliveryZone.estimated_days > 1 ? 's' : ''}
-                                        </p>
-                                        {hasDynamicPricing && (
-                                            <p className="text-xs text-green-600 mt-1 opacity-80">
-                                                Tarif de base {new Intl.NumberFormat('fr-GN').format(deliveryZone.fee_gnf)} GNF
-                                                {deliveryZone.price_per_km_gnf > 0 && ` · +${new Intl.NumberFormat('fr-GN').format(deliveryZone.price_per_km_gnf)} GNF/km (après ${deliveryZone.free_km_radius} km)`}
-                                                {deliveryZone.price_per_kg_gnf > 0 && ` · +${new Intl.NumberFormat('fr-GN').format(deliveryZone.price_per_kg_gnf)} GNF/kg (après ${deliveryZone.free_weight_kg} kg)`}
+                                        {feeSource === 'commune' && (
+                                            <p className="text-xs text-green-600 opacity-80">Tarif fixe {sellerCommune} → {buyerCommune}</p>
+                                        )}
+                                        {feeSource === 'distance' && hasDynamicPricing && (
+                                            <p className="text-xs text-green-600 opacity-80">
+                                                Base {new Intl.NumberFormat('fr-GN').format(deliveryZone.fee_gnf)} GNF
+                                                {deliveryZone.price_per_km_gnf > 0 && ` · +${new Intl.NumberFormat('fr-GN').format(deliveryZone.price_per_km_gnf)} GNF/km`}
+                                                {deliveryZone.price_per_kg_gnf > 0 && ` · +${new Intl.NumberFormat('fr-GN').format(deliveryZone.price_per_kg_gnf)} GNF/kg`}
                                             </p>
                                         )}
                                     </div>
                                 ) : (
                                     <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                                        ⚠️ Aucun tarif de livraison configuré pour {listing.city}. Contactez le vendeur pour convenir de la livraison.
+                                        ⚠️ Aucun tarif configuré pour {listing.city}. Contactez le vendeur.
                                     </div>
                                 )}
 
-                                {/* Distance et poids */}
-                                {deliveryZone && hasDynamicPricing && (
-                                    <div className="grid grid-cols-2 gap-3">
-                                        <div>
-                                            <label className="block text-xs text-gray-500 mb-1">📍 Distance (km)</label>
-                                            <input
-                                                type="number" min="0" step="0.1"
-                                                placeholder="Ex : 8"
-                                                value={distanceKm}
-                                                onChange={e => setDistanceKm(e.target.value)}
-                                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
-                                            />
+                                {/* Option 3 : sélecteur commune (si des tarifs inter-communes existent) */}
+                                {availableComm.length > 0 && (
+                                    <div>
+                                        <label className="block text-xs text-gray-500 mb-1">🗺️ Votre commune</label>
+                                        <select
+                                            value={buyerCommune}
+                                            onChange={e => { setBuyerCommune(e.target.value); setDistanceKm('') }}
+                                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
+                                        >
+                                            <option value="">— Choisir votre commune —</option>
+                                            {availableComm.map(c => <option key={c} value={c}>{c}</option>)}
+                                        </select>
+                                    </div>
+                                )}
+
+                                {/* Option 1 : GPS + distance manuelle (si pas de tarif commune ou commune non sélectionnée) */}
+                                {!communeRate && deliveryZone && hasDynamicPricing && (
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2">
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-500 mb-1">📍 Distance (km)</label>
+                                                <input
+                                                    type="number" min="0" step="0.1"
+                                                    placeholder="Ex : 8"
+                                                    value={distanceKm}
+                                                    onChange={e => setDistanceKm(e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
+                                                />
+                                            </div>
+                                            <div className="flex-1">
+                                                <label className="block text-xs text-gray-500 mb-1">⚖️ Poids (kg)</label>
+                                                <input
+                                                    type="number" min="0" step="0.1"
+                                                    placeholder="Ex : 2.5"
+                                                    value={weightKg}
+                                                    onChange={e => setWeightKg(e.target.value)}
+                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
+                                                />
+                                            </div>
                                         </div>
-                                        <div>
-                                            <label className="block text-xs text-gray-500 mb-1">⚖️ Poids (kg)</label>
-                                            <input
-                                                type="number" min="0" step="0.1"
-                                                placeholder="Ex : 2.5"
-                                                value={weightKg}
-                                                onChange={e => setWeightKg(e.target.value)}
-                                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
-                                            />
-                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={handleGeolocate}
+                                            disabled={geoLoading}
+                                            className="w-full flex items-center justify-center gap-2 border border-green-300 text-green-700 text-xs font-semibold py-2 rounded-xl hover:bg-green-50 transition disabled:opacity-50"
+                                        >
+                                            {geoLoading ? '⏳ Localisation…' : '📍 Détecter ma position (auto)'}
+                                        </button>
+                                        {geoError && <p className="text-xs text-amber-600">{geoError}</p>}
+                                        {distanceKm && !geoError && (
+                                            <p className="text-xs text-green-600">✅ Distance : {distanceKm} km (approximation routière)</p>
+                                        )}
                                     </div>
                                 )}
 

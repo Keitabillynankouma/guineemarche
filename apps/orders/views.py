@@ -11,8 +11,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment
-from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment, IntraCityZoneRate, ReturnRequest
+from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer, IntraCityZoneRateSerializer
 from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card
 from core.permissions import IsAdmin
 
@@ -135,6 +135,50 @@ class AdminDeliveryZoneView(APIView):
         return Response(serializer.data, status=201)
 
 
+class IntraCityZoneRateListView(generics.ListAPIView):
+    """Public : tarifs inter-communes pour une ville donnée."""
+    permission_classes = [permissions.AllowAny]
+    serializer_class   = IntraCityZoneRateSerializer
+
+    def get_queryset(self):
+        city = self.request.query_params.get('city', '')
+        return IntraCityZoneRate.objects.filter(city__iexact=city, is_active=True)
+
+
+class AdminIntraCityZoneRateView(APIView):
+    """Admin : CRUD sur les tarifs inter-communes."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        city = request.query_params.get('city', '')
+        qs   = IntraCityZoneRate.objects.all()
+        if city:
+            qs = qs.filter(city__iexact=city)
+        return Response(IntraCityZoneRateSerializer(qs, many=True).data)
+
+    def post(self, request):
+        s = IntraCityZoneRateSerializer(data=request.data)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.data, status=201)
+
+
+class AdminIntraCityZoneRateDetailView(APIView):
+    """Admin : modifier ou supprimer un tarif inter-commune."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        obj = get_object_or_404(IntraCityZoneRate, pk=pk)
+        s   = IntraCityZoneRateSerializer(obj, data=request.data, partial=True)
+        s.is_valid(raise_exception=True)
+        s.save()
+        return Response(s.data)
+
+    def delete(self, request, pk):
+        get_object_or_404(IntraCityZoneRate, pk=pk).delete()
+        return Response(status=204)
+
+
 class DeliveryFeeEstimateView(APIView):
     """
     POST /orders/delivery-fee/
@@ -144,13 +188,37 @@ class DeliveryFeeEstimateView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        city        = (request.data.get('city') or '').strip()
-        distance_km = request.data.get('distance_km', 0)
-        weight_kg   = request.data.get('weight_kg', 0)
+        city           = (request.data.get('city')           or '').strip()
+        from_commune   = (request.data.get('from_commune')   or '').strip()
+        to_commune     = (request.data.get('to_commune')     or '').strip()
+        distance_km    = request.data.get('distance_km', 0)
+        weight_kg      = request.data.get('weight_kg', 0)
 
         if not city:
             return Response({'error': 'Le champ city est obligatoire.'}, status=400)
 
+        # Priorité 1 : tarif inter-commune
+        if from_commune and to_commune:
+            try:
+                rate = IntraCityZoneRate.objects.get(
+                    city__iexact=city,
+                    from_commune__iexact=from_commune,
+                    to_commune__iexact=to_commune,
+                    is_active=True,
+                )
+                return Response({
+                    'fee_gnf':         rate.fee_gnf,
+                    'base_fee_gnf':    rate.fee_gnf,
+                    'distance_charge': 0,
+                    'weight_charge':   0,
+                    'source':          'commune',
+                    'city':            city,
+                    'estimated_hours': rate.estimated_hours,
+                })
+            except IntraCityZoneRate.DoesNotExist:
+                pass
+
+        # Priorité 2 : calcul distance + poids
         try:
             zone = DeliveryZone.objects.get(city__iexact=city, is_active=True)
         except DeliveryZone.DoesNotExist:
@@ -159,6 +227,7 @@ class DeliveryFeeEstimateView(APIView):
         breakdown = zone.calculate_fee(distance_km, weight_kg)
         return Response({
             **breakdown,
+            'source':         'distance',
             'city':           zone.city,
             'estimated_days': zone.estimated_days,
         })
@@ -1182,3 +1251,135 @@ class AdminOrderListView(APIView):
         } for o in qs[:300]]
 
         return Response(data)
+
+
+# ── Retours ────────────────────────────────────────────────────────────────────
+
+class CreateReturnView(APIView):
+    """
+    POST /orders/<pk>/return/
+    L'acheteur dépose une demande de retour sur une commande terminée.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        order = get_object_or_404(Order, pk=pk, buyer=request.user)
+
+        if order.status != Order.Status.COMPLETED:
+            return Response({'error': "Seules les commandes terminées peuvent faire l'objet d'un retour."}, status=400)
+
+        if hasattr(order, 'return_request'):
+            return Response({'error': 'Une demande de retour existe déjà pour cette commande.'}, status=400)
+
+        reason      = request.data.get('reason', '').strip()
+        description = request.data.get('description', '').strip()
+
+        valid_reasons = [r[0] for r in ReturnRequest.Reason.choices]
+        if reason not in valid_reasons:
+            return Response({'error': f"Raison invalide. Choisir parmi : {', '.join(valid_reasons)}"}, status=400)
+
+        rr = ReturnRequest.objects.create(order=order, reason=reason, description=description)
+
+        # Notifier le vendeur
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='↩️ Demande de retour',
+                body=f'L\'acheteur demande un retour pour « {order.listing.title} ».',
+                data={'order_id': str(order.id)},
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'id':          str(rr.id),
+            'status':      rr.status,
+            'reason':      rr.reason,
+            'description': rr.description,
+            'created_at':  rr.created_at.isoformat(),
+        }, status=201)
+
+
+class AdminReturnListView(APIView):
+    """Admin : liste toutes les demandes de retour."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Q
+        qs = ReturnRequest.objects.select_related(
+            'order', 'order__listing', 'order__buyer', 'order__seller'
+        ).order_by('-created_at')
+
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        search = request.query_params.get('search')
+        if search:
+            qs = qs.filter(
+                Q(order__listing__title__icontains=search) |
+                Q(order__buyer__full_name__icontains=search)
+            )
+
+        data = [{
+            'id':             str(r.id),
+            'order_id':       str(r.order.id),
+            'listing_title':  r.order.listing.title if r.order.listing else '—',
+            'buyer_name':     r.order.buyer.full_name,
+            'buyer_phone':    str(r.order.buyer.phone_number or ''),
+            'seller_name':    r.order.seller.full_name,
+            'amount_gnf':     r.order.amount_gnf,
+            'reason':         r.reason,
+            'description':    r.description,
+            'status':         r.status,
+            'admin_note':     r.admin_note,
+            'created_at':     r.created_at.isoformat(),
+            'resolved_at':    r.resolved_at.isoformat() if r.resolved_at else None,
+        } for r in qs[:300]]
+
+        return Response(data)
+
+
+class AdminReturnUpdateView(APIView):
+    """Admin : approuver, refuser ou marquer comme complété un retour."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        from django.utils import timezone
+        rr         = get_object_or_404(ReturnRequest, pk=pk)
+        new_status = request.data.get('status', '').strip()
+        admin_note = request.data.get('admin_note', '').strip()
+
+        valid = [s[0] for s in ReturnRequest.Status.choices]
+        if new_status not in valid:
+            return Response({'error': f"Statut invalide. Choisir parmi : {', '.join(valid)}"}, status=400)
+
+        rr.status = new_status
+        if admin_note:
+            rr.admin_note = admin_note
+        if new_status in ('approved', 'rejected', 'completed'):
+            rr.resolved_at = timezone.now()
+        rr.save(update_fields=['status', 'admin_note', 'resolved_at', 'updated_at'])
+
+        # Notifier l'acheteur
+        try:
+            from apps.notifications.models import Notification
+            labels = {'approved': 'Retour approuvé ✅', 'rejected': 'Retour refusé ❌', 'completed': 'Retour effectué 📦'}
+            Notification.send(
+                user=rr.order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title=labels.get(new_status, 'Mise à jour retour'),
+                body=admin_note or f'Votre demande de retour pour « {rr.order.listing.title} » a été mise à jour.',
+                data={'order_id': str(rr.order.id)},
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'id':          str(rr.id),
+            'status':      rr.status,
+            'admin_note':  rr.admin_note,
+            'resolved_at': rr.resolved_at.isoformat() if rr.resolved_at else None,
+        })

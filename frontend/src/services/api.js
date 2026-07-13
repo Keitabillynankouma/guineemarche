@@ -51,7 +51,8 @@ export const authAPI = {
 }
 
 export const deliveryAPI = {
-  estimateFee: (data) => api.post('/orders/delivery-fee/', data),
+  estimateFee:  (data) => api.post('/orders/delivery-fee/', data),
+  getZoneRates: (city) => api.get('/orders/zone-rates/', { params: { city } }),
 }
 
 export const listingsAPI = {
@@ -108,6 +109,8 @@ export const ordersAPI = {
   getLivreurs:         ()        => api.get('/orders/admin/livreurs/'),
   getAllAssignments:    (params)  => api.get('/orders/admin/assignments/', { params }),
   assignLivreur:       (orderId, livreurId) => api.post(`/orders/admin/orders/${orderId}/assign/`, { livreur_id: livreurId }),
+  // Retours
+  createReturn:        (id, data) => api.post(`/orders/${id}/return/`, data),
 }
 
 export const reviewsAPI = {

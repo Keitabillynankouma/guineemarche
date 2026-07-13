@@ -59,6 +59,22 @@ const adminAPI = {
   getLivreurs:      ()       => api.get('/orders/admin/livreurs/'),
   reassignDelivery: (id, data) => api.post(`/orders/admin/assignments/${id}/reassign/`, data),
 
+  // Zones de livraison
+  getDeliveryZones:    ()          => api.get('/orders/admin/delivery-zones/'),
+  createDeliveryZone:  (data)      => api.post('/orders/admin/delivery-zones/', data),
+  updateDeliveryZone:  (id, data)  => api.patch(`/orders/admin/delivery-zones/${id}/`, data),
+  deleteDeliveryZone:  (id)        => api.delete(`/orders/admin/delivery-zones/${id}/`),
+
+  // Tarifs inter-communes
+  getZoneRates:    ()         => api.get('/orders/admin/zone-rates/'),
+  createZoneRate:  (data)     => api.post('/orders/admin/zone-rates/', data),
+  updateZoneRate:  (id, data) => api.patch(`/orders/admin/zone-rates/${id}/`, data),
+  deleteZoneRate:  (id)       => api.delete(`/orders/admin/zone-rates/${id}/`),
+
+  // Retours
+  getReturns:    (params)      => api.get('/orders/admin/returns/', { params }),
+  updateReturn:  (id, data)    => api.patch(`/orders/admin/returns/${id}/`, data),
+
   // Utilisateurs
   getUsers:   (params)      => api.get('/accounts/admin/users/', { params }),
   updateUser: (id, data)    => api.patch(`/accounts/admin/users/${id}/`, data),
@@ -1752,20 +1768,386 @@ function TabUsers() {
   )
 }
 
+// ── Onglet : Configuration livraison ──────────────────────────────────────────
+
+const COMMUNES_GN = ['Kaloum','Dixinn','Matam','Ratoma','Matoto']
+
+function TabDeliveryConfig() {
+  const qc = useQueryClient()
+
+  // ── Zones de livraison ────────────────────────────────────────────────────
+  const ZONE_EMPTY = { city:'', fee_gnf:'', estimated_days:1, free_km_radius:0, price_per_km_gnf:0, free_weight_kg:0, price_per_kg_gnf:0 }
+  const [zoneForm, setZoneForm]     = useState(ZONE_EMPTY)
+  const [zoneEditId, setZoneEditId] = useState(null)
+  const [showZoneForm, setShowZoneForm] = useState(false)
+
+  const { data: zonesRaw = [] } = useQuery({
+    queryKey: ['admin-delivery-zones'],
+    queryFn:  () => adminAPI.getDeliveryZones().then(r => r.data?.results ?? r.data ?? []),
+  })
+  const zones = Array.isArray(zonesRaw) ? zonesRaw : []
+
+  const saveZone = useMutation({
+    mutationFn: (d) => zoneEditId ? adminAPI.updateDeliveryZone(zoneEditId, d) : adminAPI.createDeliveryZone(d),
+    onSuccess: () => { qc.invalidateQueries(['admin-delivery-zones']); setZoneForm(ZONE_EMPTY); setZoneEditId(null); setShowZoneForm(false) },
+  })
+  const deleteZone = useMutation({
+    mutationFn: (id) => adminAPI.deleteDeliveryZone(id),
+    onSuccess: () => qc.invalidateQueries(['admin-delivery-zones']),
+  })
+  const toggleZone = useMutation({
+    mutationFn: ({ id, is_active }) => adminAPI.updateDeliveryZone(id, { is_active }),
+    onSuccess: () => qc.invalidateQueries(['admin-delivery-zones']),
+  })
+
+  const startEditZone = (z) => {
+    setZoneForm({ city: z.city, fee_gnf: z.fee_gnf, estimated_days: z.estimated_days, free_km_radius: z.free_km_radius, price_per_km_gnf: z.price_per_km_gnf, free_weight_kg: z.free_weight_kg, price_per_kg_gnf: z.price_per_kg_gnf })
+    setZoneEditId(z.id); setShowZoneForm(true)
+  }
+
+  // ── Tarifs inter-communes ─────────────────────────────────────────────────
+  const RATE_EMPTY = { city:'Conakry', from_commune:'', to_commune:'', fee_gnf:'', estimated_hours:2 }
+  const [rateForm, setRateForm]     = useState(RATE_EMPTY)
+  const [rateEditId, setRateEditId] = useState(null)
+  const [showRateForm, setShowRateForm] = useState(false)
+
+  const { data: ratesRaw = [] } = useQuery({
+    queryKey: ['admin-zone-rates'],
+    queryFn:  () => adminAPI.getZoneRates().then(r => r.data?.results ?? r.data ?? []),
+  })
+  const rates = Array.isArray(ratesRaw) ? ratesRaw : []
+
+  const saveRate = useMutation({
+    mutationFn: (d) => rateEditId ? adminAPI.updateZoneRate(rateEditId, d) : adminAPI.createZoneRate(d),
+    onSuccess: () => { qc.invalidateQueries(['admin-zone-rates']); setRateForm(RATE_EMPTY); setRateEditId(null); setShowRateForm(false) },
+  })
+  const deleteRate = useMutation({
+    mutationFn: (id) => adminAPI.deleteZoneRate(id),
+    onSuccess: () => qc.invalidateQueries(['admin-zone-rates']),
+  })
+
+  const startEditRate = (r) => {
+    setRateForm({ city: r.city, from_commune: r.from_commune, to_commune: r.to_commune, fee_gnf: r.fee_gnf, estimated_hours: r.estimated_hours })
+    setRateEditId(r.id); setShowRateForm(true)
+  }
+
+  const inp = "w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+  const lbl = "block text-xs font-medium text-gray-600 mb-1"
+
+  return (
+    <div className="space-y-8">
+
+      {/* ── Section : Zones de livraison ── */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">🌍 Zones de livraison</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Tarifs de base par ville (distance + poids en option)</p>
+          </div>
+          <button onClick={() => { setZoneEditId(null); setZoneForm(ZONE_EMPTY); setShowZoneForm(s => !s) }}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
+            {showZoneForm && !zoneEditId ? 'Annuler' : '+ Ajouter'}
+          </button>
+        </div>
+
+        {showZoneForm && (
+          <form onSubmit={e => { e.preventDefault(); saveZone.mutate({ ...zoneForm, fee_gnf: +zoneForm.fee_gnf, estimated_days: +zoneForm.estimated_days, free_km_radius: +zoneForm.free_km_radius, price_per_km_gnf: +zoneForm.price_per_km_gnf, free_weight_kg: +zoneForm.free_weight_kg, price_per_kg_gnf: +zoneForm.price_per_kg_gnf }) }}
+            className="bg-gray-50 rounded-xl p-4 mb-5 space-y-3 border border-gray-200">
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={lbl}>Ville</label><input className={inp} value={zoneForm.city} onChange={e => setZoneForm({...zoneForm, city: e.target.value})} placeholder="Ex: Conakry" required /></div>
+              <div><label className={lbl}>Tarif de base (GNF)</label><input type="number" className={inp} value={zoneForm.fee_gnf} onChange={e => setZoneForm({...zoneForm, fee_gnf: e.target.value})} placeholder="50000" required /></div>
+              <div><label className={lbl}>Délai estimé (jours)</label><input type="number" min="1" className={inp} value={zoneForm.estimated_days} onChange={e => setZoneForm({...zoneForm, estimated_days: e.target.value})} /></div>
+              <div><label className={lbl}>Km gratuits inclus</label><input type="number" min="0" className={inp} value={zoneForm.free_km_radius} onChange={e => setZoneForm({...zoneForm, free_km_radius: e.target.value})} /></div>
+              <div><label className={lbl}>Prix / km sup. (GNF)</label><input type="number" min="0" className={inp} value={zoneForm.price_per_km_gnf} onChange={e => setZoneForm({...zoneForm, price_per_km_gnf: e.target.value})} /></div>
+              <div><label className={lbl}>Poids gratuit (kg)</label><input type="number" min="0" step="0.1" className={inp} value={zoneForm.free_weight_kg} onChange={e => setZoneForm({...zoneForm, free_weight_kg: e.target.value})} /></div>
+              <div><label className={lbl}>Prix / kg sup. (GNF)</label><input type="number" min="0" className={inp} value={zoneForm.price_per_kg_gnf} onChange={e => setZoneForm({...zoneForm, price_per_kg_gnf: e.target.value})} /></div>
+            </div>
+            <button type="submit" disabled={saveZone.isPending} className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
+              {saveZone.isPending ? 'Enregistrement…' : zoneEditId ? 'Modifier' : 'Créer'}
+            </button>
+          </form>
+        )}
+
+        <div className="space-y-3">
+          {zones.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Aucune zone configurée.</p>}
+          {zones.map(z => (
+            <div key={z.id} className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${z.is_active ? 'border-gray-200' : 'border-gray-100 opacity-60'}`}>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-bold text-gray-800">{z.city}</p>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${z.is_active ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>{z.is_active ? 'Actif' : 'Inactif'}</span>
+                </div>
+                <p className="text-sm text-gray-600 mt-0.5">Base : {fmt(z.fee_gnf)} · {z.estimated_days}j</p>
+                {(z.price_per_km_gnf > 0 || z.price_per_kg_gnf > 0) && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {z.price_per_km_gnf > 0 && `+${fmt(z.price_per_km_gnf)}/km (après ${z.free_km_radius}km)`}
+                    {z.price_per_km_gnf > 0 && z.price_per_kg_gnf > 0 && ' · '}
+                    {z.price_per_kg_gnf > 0 && `+${fmt(z.price_per_kg_gnf)}/kg (après ${z.free_weight_kg}kg)`}
+                  </p>
+                )}
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <button onClick={() => toggleZone.mutate({ id: z.id, is_active: !z.is_active })}
+                  className={`text-xs px-3 py-1.5 rounded-lg transition border font-medium ${z.is_active ? 'border-gray-300 text-gray-600 hover:bg-gray-50' : 'border-green-300 text-green-700 hover:bg-green-50'}`}>
+                  {z.is_active ? 'Désactiver' : 'Activer'}
+                </button>
+                <button onClick={() => startEditZone(z)} className="text-xs px-3 py-1.5 rounded-lg border border-blue-200 text-blue-600 hover:bg-blue-50 transition">✏️</button>
+                <button onClick={() => window.confirm('Supprimer cette zone ?') && deleteZone.mutate(z.id)} className="text-xs px-3 py-1.5 rounded-lg border border-red-200 text-red-500 hover:bg-red-50 transition">🗑️</button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── Section : Tarifs inter-communes ── */}
+      <div className="bg-white rounded-2xl shadow p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="text-lg font-bold text-gray-800">🗺️ Tarifs inter-communes</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Tarifs fixes entre communes (prioritaires sur la distance)</p>
+          </div>
+          <button onClick={() => { setRateEditId(null); setRateForm(RATE_EMPTY); setShowRateForm(s => !s) }}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
+            {showRateForm && !rateEditId ? 'Annuler' : '+ Ajouter'}
+          </button>
+        </div>
+
+        {showRateForm && (
+          <form onSubmit={e => { e.preventDefault(); saveRate.mutate({ ...rateForm, fee_gnf: +rateForm.fee_gnf, estimated_hours: +rateForm.estimated_hours }) }}
+            className="bg-gray-50 rounded-xl p-4 mb-5 space-y-3 border border-gray-200">
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={lbl}>Ville</label><input className={inp} value={rateForm.city} onChange={e => setRateForm({...rateForm, city: e.target.value})} placeholder="Conakry" required /></div>
+              <div><label className={lbl}>Tarif (GNF)</label><input type="number" className={inp} value={rateForm.fee_gnf} onChange={e => setRateForm({...rateForm, fee_gnf: e.target.value})} required /></div>
+              <div>
+                <label className={lbl}>Commune vendeur</label>
+                <select className={inp} value={rateForm.from_commune} onChange={e => setRateForm({...rateForm, from_commune: e.target.value})} required>
+                  <option value="">— Choisir —</option>
+                  {COMMUNES_GN.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className={lbl}>Commune acheteur</label>
+                <select className={inp} value={rateForm.to_commune} onChange={e => setRateForm({...rateForm, to_commune: e.target.value})} required>
+                  <option value="">— Choisir —</option>
+                  {COMMUNES_GN.map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+              <div><label className={lbl}>Délai estimé (h)</label><input type="number" min="1" className={inp} value={rateForm.estimated_hours} onChange={e => setRateForm({...rateForm, estimated_hours: e.target.value})} /></div>
+            </div>
+            <button type="submit" disabled={saveRate.isPending} className="bg-green-600 text-white px-5 py-2 rounded-lg text-sm font-medium hover:bg-green-700 transition disabled:opacity-50">
+              {saveRate.isPending ? 'Enregistrement…' : rateEditId ? 'Modifier' : 'Créer'}
+            </button>
+          </form>
+        )}
+
+        {/* Grille groupée par ville */}
+        {rates.length === 0 && <p className="text-sm text-gray-400 text-center py-4">Aucun tarif inter-commune configuré.</p>}
+        {Object.entries(rates.reduce((acc, r) => { if (!acc[r.city]) acc[r.city] = []; acc[r.city].push(r); return acc }, {})).map(([city, cityRates]) => (
+          <div key={city} className="mb-4">
+            <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">{city}</p>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm border-collapse">
+                <thead><tr className="bg-gray-50 text-xs text-gray-500">
+                  <th className="px-3 py-2 text-left">Vendeur</th>
+                  <th className="px-3 py-2 text-left">Acheteur</th>
+                  <th className="px-3 py-2 text-right">Tarif</th>
+                  <th className="px-3 py-2 text-right">Délai</th>
+                  <th className="px-3 py-2"></th>
+                </tr></thead>
+                <tbody>
+                  {cityRates.map(r => (
+                    <tr key={r.id} className="border-t border-gray-100 hover:bg-gray-50">
+                      <td className="px-3 py-2 font-medium text-gray-700">{r.from_commune}</td>
+                      <td className="px-3 py-2 text-gray-600">{r.to_commune}</td>
+                      <td className="px-3 py-2 text-right font-bold text-green-700">{fmt(r.fee_gnf)}</td>
+                      <td className="px-3 py-2 text-right text-gray-400 text-xs">~{r.estimated_hours}h</td>
+                      <td className="px-3 py-2 text-right">
+                        <button onClick={() => startEditRate(r)} className="text-xs text-blue-600 hover:underline mr-2">Modifier</button>
+                        <button onClick={() => window.confirm('Supprimer ce tarif ?') && deleteRate.mutate(r.id)} className="text-xs text-red-500 hover:underline">Suppr.</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+
+// ── Onglet : Gestion des retours ───────────────────────────────────────────────
+
+const RETURN_STATUS = {
+  pending:   { label: 'En attente',      color: 'bg-yellow-100 text-yellow-700', icon: '⏳' },
+  approved:  { label: 'Approuvé',        color: 'bg-blue-100 text-blue-700',     icon: '✅' },
+  rejected:  { label: 'Refusé',          color: 'bg-red-100 text-red-600',       icon: '❌' },
+  completed: { label: 'Retour effectué', color: 'bg-green-100 text-green-700',   icon: '📦' },
+}
+const RETURN_REASONS = {
+  defective:        'Article défectueux',
+  not_as_described: 'Ne correspond pas à la description',
+  wrong_item:       'Mauvais article reçu',
+  changed_mind:     "Changement d'avis",
+  other:            'Autre',
+}
+
+function TabReturns() {
+  const qc = useQueryClient()
+  const [statusFilter, setStatusFilter] = useState('')
+  const [search, setSearch]             = useState('')
+  const [noteModal, setNoteModal]       = useState(null) // { id, currentNote }
+  const [noteText, setNoteText]         = useState('')
+
+  const { data = [], isLoading } = useQuery({
+    queryKey: ['admin-returns', statusFilter, search],
+    queryFn:  () => adminAPI.getReturns({ status: statusFilter || undefined, search: search || undefined }).then(r => r.data),
+  })
+  const returns = Array.isArray(data) ? data : (data?.results ?? [])
+
+  const updateMutation = useMutation({
+    mutationFn: ({ id, ...payload }) => adminAPI.updateReturn(id, payload),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-returns'])
+      setNoteModal(null)
+      setNoteText('')
+    },
+  })
+
+  const setStatus = (id, newStatus) => {
+    const note = noteModal?.id === id ? noteText : ''
+    updateMutation.mutate({ id, status: newStatus, ...(note ? { admin_note: note } : {}) })
+  }
+
+  const pending = returns.filter(r => r.status === 'pending').length
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h2 className="text-lg font-bold text-gray-800">↩️ Demandes de retour</h2>
+          {pending > 0 && <p className="text-xs text-amber-600 font-medium mt-0.5">{pending} en attente de traitement</p>}
+        </div>
+      </div>
+
+      {/* Filtres */}
+      <div className="bg-white rounded-2xl shadow p-4 flex flex-wrap gap-3">
+        <input
+          type="text" placeholder="🔍 Rechercher article, acheteur…"
+          value={search} onChange={e => setSearch(e.target.value)}
+          className="flex-1 min-w-[180px] border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+        />
+        <div className="flex gap-2 flex-wrap">
+          {['', 'pending', 'approved', 'rejected', 'completed'].map(s => (
+            <button key={s} onClick={() => setStatusFilter(s)}
+              className={`text-xs px-3 py-1.5 rounded-xl border transition font-medium ${statusFilter === s ? 'bg-green-600 text-white border-green-600' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>
+              {s === '' ? 'Tous' : RETURN_STATUS[s]?.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Liste */}
+      {isLoading && <p className="text-center text-gray-400 py-8">Chargement…</p>}
+      {!isLoading && returns.length === 0 && <p className="text-center text-gray-400 py-8">Aucune demande trouvée.</p>}
+
+      <div className="space-y-4">
+        {returns.map(r => {
+          const s = RETURN_STATUS[r.status] || RETURN_STATUS.pending
+          return (
+            <div key={r.id} className="bg-white rounded-2xl shadow p-5">
+              <div className="flex items-start justify-between gap-3 flex-wrap">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap mb-1">
+                    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1 rounded-full ${s.color}`}>{s.icon} {s.label}</span>
+                    <span className="text-xs text-gray-400">{new Date(r.created_at).toLocaleDateString('fr-FR')}</span>
+                  </div>
+                  <p className="font-semibold text-gray-800 truncate">{r.listing_title}</p>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Acheteur : <span className="font-medium text-gray-700">{r.buyer_name}</span>
+                    <span className="mx-1">·</span>
+                    Vendeur : <span className="font-medium text-gray-700">{r.seller_name}</span>
+                    <span className="mx-1">·</span>
+                    {fmt(r.amount_gnf)}
+                  </p>
+                  <div className="mt-2 bg-gray-50 rounded-xl p-3">
+                    <p className="text-xs font-medium text-gray-600 mb-0.5">Raison : {RETURN_REASONS[r.reason] || r.reason}</p>
+                    {r.description && <p className="text-xs text-gray-500 italic">« {r.description} »</p>}
+                  </div>
+                  {r.admin_note && (
+                    <p className="text-xs text-blue-600 mt-2 bg-blue-50 rounded-lg px-3 py-1.5">📝 Note admin : {r.admin_note}</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Actions */}
+              {r.status === 'pending' && (
+                <div className="mt-4 space-y-2">
+                  {noteModal?.id === r.id ? (
+                    <div className="space-y-2">
+                      <textarea rows={2} placeholder="Note admin (optionnel)…"
+                        value={noteText} onChange={e => setNoteText(e.target.value)}
+                        className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-green-400"
+                      />
+                      <div className="flex gap-2">
+                        <button onClick={() => setStatus(r.id, 'approved')} disabled={updateMutation.isPending}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2 rounded-xl transition disabled:opacity-50">
+                          ✅ Approuver
+                        </button>
+                        <button onClick={() => setStatus(r.id, 'rejected')} disabled={updateMutation.isPending}
+                          className="flex-1 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold py-2 rounded-xl transition disabled:opacity-50">
+                          ❌ Refuser
+                        </button>
+                        <button onClick={() => { setNoteModal(null); setNoteText('') }}
+                          className="px-4 border border-gray-200 text-gray-500 text-sm rounded-xl hover:bg-gray-50 transition">
+                          Annuler
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button onClick={() => { setNoteModal({ id: r.id }); setNoteText('') }}
+                      className="w-full border-2 border-dashed border-green-300 text-green-700 text-sm font-medium py-2.5 rounded-xl hover:bg-green-50 transition">
+                      Traiter cette demande →
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {r.status === 'approved' && (
+                <div className="mt-3">
+                  <button onClick={() => updateMutation.mutate({ id: r.id, status: 'completed' })} disabled={updateMutation.isPending}
+                    className="w-full bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-xl transition disabled:opacity-50">
+                    📦 Marquer comme retour effectué
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+
 // ── Page principale ───────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'overview',        label: '📊 Dashboard' },
-  { id: 'deliveries',      label: '🚚 Livraisons' },
-  { id: 'orders',          label: '📋 Commandes' },
-  { id: 'users',           label: '👥 Utilisateurs' },
-  { id: 'listings',        label: '📦 Annonces' },
-  { id: 'shops',           label: '🏪 Boutiques' },
-  { id: 'banners',         label: '📢 Publicités' },
-  { id: 'categories',      label: '🏷️ Catégories' },
-  { id: 'pickup-points',   label: '📍 Points retrait' },
-  { id: 'meeting-zones',   label: '🤝 Zones rencontre' },
-  { id: 'settings',        label: '⚙️ Paramètres' },
+  { id: 'overview',         label: '📊 Dashboard' },
+  { id: 'deliveries',       label: '🚚 Livraisons' },
+  { id: 'orders',           label: '📋 Commandes' },
+  { id: 'returns',          label: '↩️ Retours' },
+  { id: 'users',            label: '👥 Utilisateurs' },
+  { id: 'listings',         label: '📦 Annonces' },
+  { id: 'shops',            label: '🏪 Boutiques' },
+  { id: 'banners',          label: '📢 Publicités' },
+  { id: 'categories',       label: '🏷️ Catégories' },
+  { id: 'pickup-points',    label: '📍 Points retrait' },
+  { id: 'meeting-zones',    label: '🤝 Zones rencontre' },
+  { id: 'delivery-config',  label: '🌍 Config livraison' },
+  { id: 'settings',         label: '⚙️ Paramètres' },
 ]
 
 export default function AdminPage() {
@@ -1814,6 +2196,16 @@ export default function AdminPage() {
   })
   const pendingShopsCount = pendingShopsData ?? 0
 
+  const { data: pendingReturnsData } = useQuery({
+    queryKey: ['admin-returns-pending-count'],
+    queryFn:  () => adminAPI.getReturns({ status: 'pending' }).then(r => {
+      const d = r.data; return Array.isArray(d) ? d.length : (d?.results?.length ?? 0)
+    }),
+    enabled:       !!user && user.role === 'admin',
+    refetchInterval: 60000,
+  })
+  const pendingReturnsCount = pendingReturnsData ?? 0
+
   // Returns conditionnels APRÈS tous les hooks
   if (!isAuthenticated) return <Navigate to="/login" />
   if (!user) return (
@@ -1859,6 +2251,9 @@ export default function AdminPage() {
               {tab.id === 'shops' && pendingShopsCount > 0 && (
                 <span className="ml-1.5 bg-amber-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{pendingShopsCount}</span>
               )}
+              {tab.id === 'returns' && pendingReturnsCount > 0 && (
+                <span className="ml-1.5 bg-red-500 text-white text-xs rounded-full px-1.5 py-0.5 align-middle">{pendingReturnsCount}</span>
+              )}
             </button>
           ))}
         </div>
@@ -1872,9 +2267,11 @@ export default function AdminPage() {
         {activeTab === 'banners'       && <TabBanners />}
         {activeTab === 'categories'    && <TabCategories />}
         {activeTab === 'shops'         && <TabShops />}
-        {activeTab === 'pickup-points' && <TabPickupPoints />}
-        {activeTab === 'meeting-zones' && <TabMeetingZones />}
-        {activeTab === 'settings'      && <TabSettings />}
+        {activeTab === 'pickup-points'   && <TabPickupPoints />}
+        {activeTab === 'meeting-zones'   && <TabMeetingZones />}
+        {activeTab === 'delivery-config' && <TabDeliveryConfig />}
+        {activeTab === 'returns'         && <TabReturns />}
+        {activeTab === 'settings'        && <TabSettings />}
       </div>
     </div>
   )
