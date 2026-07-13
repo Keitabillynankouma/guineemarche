@@ -5,11 +5,20 @@ from apps.listings.models import Listing
 
 
 class DeliveryZone(BaseModel):
-    """Tarif fixe de livraison à domicile par ville."""
-    city           = models.CharField(max_length=100, unique=True, db_index=True)
-    fee_gnf        = models.BigIntegerField(default=0, help_text="Frais de livraison en GNF")
-    estimated_days = models.PositiveSmallIntegerField(default=1, help_text="Délai estimé en jours ouvrables")
-    is_active      = models.BooleanField(default=True)
+    """Tarif de livraison à domicile par ville — base + surcharge distance + surcharge poids."""
+    city              = models.CharField(max_length=100, unique=True, db_index=True)
+    fee_gnf           = models.BigIntegerField(default=0,   help_text="Frais de base en GNF (inclut free_km_radius et free_weight_kg)")
+    estimated_days    = models.PositiveSmallIntegerField(default=1, help_text="Délai estimé en jours ouvrables")
+    is_active         = models.BooleanField(default=True)
+
+    # ── Tarification à la distance ────────────────────────────────────────────
+    free_km_radius    = models.PositiveSmallIntegerField(default=0,  help_text="Km inclus dans le tarif de base (0 = aucun)")
+    price_per_km_gnf  = models.BigIntegerField(default=0,            help_text="Surcharge par km supplémentaire en GNF (0 = pas de surcharge)")
+
+    # ── Tarification au poids ─────────────────────────────────────────────────
+    free_weight_kg    = models.DecimalField(max_digits=6, decimal_places=2, default=0,
+                                            help_text="Poids inclus dans le tarif de base en kg (0 = aucun)")
+    price_per_kg_gnf  = models.BigIntegerField(default=0,            help_text="Surcharge par kg supplémentaire en GNF (0 = pas de surcharge)")
 
     class Meta:
         verbose_name        = 'Zone de livraison'
@@ -18,6 +27,21 @@ class DeliveryZone(BaseModel):
 
     def __str__(self):
         return f"{self.city} — {self.fee_gnf:,} GNF ({self.estimated_days}j)"
+
+    def calculate_fee(self, distance_km=0, weight_kg=0):
+        """Calcule le tarif total selon distance et poids."""
+        distance_km = max(0.0, float(distance_km or 0))
+        weight_kg   = max(0.0, float(weight_kg   or 0))
+
+        dist_charge   = max(0.0, distance_km - float(self.free_km_radius))  * self.price_per_km_gnf
+        weight_charge = max(0.0, weight_kg   - float(self.free_weight_kg))  * self.price_per_kg_gnf
+
+        return {
+            'fee_gnf':         int(self.fee_gnf + dist_charge + weight_charge),
+            'base_fee_gnf':    int(self.fee_gnf),
+            'distance_charge': int(dist_charge),
+            'weight_charge':   int(weight_charge),
+        }
 
 
 class PickupPoint(BaseModel):
@@ -93,7 +117,11 @@ class Order(BaseModel):
     escrow_admin_hold  = models.BooleanField(default=False)             # admin a bloqué manuellement
     note               = models.TextField(blank=True)
     delivery_address   = models.CharField(max_length=400, blank=True, help_text="Adresse de livraison à domicile")
-    delivery_fee_gnf   = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
+    delivery_fee_gnf      = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
+    delivery_distance_km  = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
+                                                help_text="Distance de livraison en km (saisie par l'acheteur)")
+    delivery_weight_kg    = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
+                                                help_text="Poids du colis en kg (saisie par l'acheteur)")
 
     # Seuils escrow
     LARGE_AMOUNT_GNF  = 500_000   # montants ≥ 500 000 GNF → délai étendu + alerte admin

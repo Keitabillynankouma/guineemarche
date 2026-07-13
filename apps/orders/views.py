@@ -135,6 +135,35 @@ class AdminDeliveryZoneView(APIView):
         return Response(serializer.data, status=201)
 
 
+class DeliveryFeeEstimateView(APIView):
+    """
+    POST /orders/delivery-fee/
+    Body: { city, distance_km, weight_kg }
+    Retourne le tarif calculé selon la grille de la zone.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        city        = (request.data.get('city') or '').strip()
+        distance_km = request.data.get('distance_km', 0)
+        weight_kg   = request.data.get('weight_kg', 0)
+
+        if not city:
+            return Response({'error': 'Le champ city est obligatoire.'}, status=400)
+
+        try:
+            zone = DeliveryZone.objects.get(city__iexact=city, is_active=True)
+        except DeliveryZone.DoesNotExist:
+            return Response({'error': f'Aucune zone de livraison active pour : {city}'}, status=404)
+
+        breakdown = zone.calculate_fee(distance_km, weight_kg)
+        return Response({
+            **breakdown,
+            'city':           zone.city,
+            'estimated_days': zone.estimated_days,
+        })
+
+
 class AdminDeliveryZoneDetailView(APIView):
     """Admin : modifier ou supprimer une zone de livraison."""
     permission_classes = [IsAdmin]

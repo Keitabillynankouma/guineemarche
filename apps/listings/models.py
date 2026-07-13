@@ -70,6 +70,10 @@ class Listing(BaseModel):
     latitude    = models.FloatField(null=True, blank=True)
     longitude   = models.FloatField(null=True, blank=True)
 
+    # Poids (utilisé pour le calcul des frais de livraison)
+    weight_kg   = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
+                                      help_text="Poids en kg — utilisé pour calculer les frais de livraison")
+
     # Attributs dynamiques selon catégorie (ex: {"brand":"Toyota","year":"2020"})
     attributes  = models.JSONField(default=dict, blank=True)
 

@@ -50,6 +50,10 @@ export const authAPI = {
   deleteAccount: (data) => api.post('/accounts/delete/', data),
 }
 
+export const deliveryAPI = {
+  estimateFee: (data) => api.post('/orders/delivery-fee/', data),
+}
+
 export const listingsAPI = {
   getAll: (params) => api.get('/listings/', { params }),
   getOne: (id) => api.get(`/listings/${id}/`),

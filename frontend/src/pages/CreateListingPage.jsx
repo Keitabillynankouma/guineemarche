@@ -81,7 +81,8 @@ export default function CreateListingPage() {
     const [form, setForm] = useState({
         title: '', description: '', price_gnf: '',
         price_type: 'fixed', condition: 'good',
-        city: 'Conakry', quartier: '', category: ''
+        city: 'Conakry', quartier: '', category: '',
+        weight_kg: '',
     })
     const [files, setFiles]               = useState([])
     const [previews, setPreviews]         = useState([])
@@ -385,9 +386,25 @@ export default function CreateListingPage() {
                         </div>
                     </div>
 
-                    {/* ── Section 3 : Localisation ── */}
+                    {/* ── Section 2b : Poids ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="3" icon="📍" title="Localisation" subtitle="Où se trouve l'article ?" />
+                        <SectionHeader number="3" icon="⚖️" title="Poids du colis" subtitle="Optionnel — améliore le calcul des frais de livraison" />
+                        <div className="flex items-center gap-3">
+                            <input
+                                type="number" min="0" step="0.1"
+                                placeholder="Ex : 1.5"
+                                value={form.weight_kg}
+                                onChange={e => setForm({ ...form, weight_kg: e.target.value })}
+                                className={inputClass + ' max-w-[160px]'}
+                            />
+                            <span className="text-sm text-gray-500">kg</span>
+                        </div>
+                        <p className="text-xs text-gray-400 mt-2">Laissez vide si l'article est léger ou si vous ne connaissez pas le poids exact.</p>
+                    </div>
+
+                    {/* ── Section 4 : Localisation ── */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <SectionHeader number="4" icon="📍" title="Localisation" subtitle="Où se trouve l'article ?" />
 
                         <div className="grid grid-cols-2 gap-3">
                             <div>
@@ -416,7 +433,7 @@ export default function CreateListingPage() {
 
                     {/* ── Section 4 : Médias ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="4" icon="📷" title="Photos & Vidéo" subtitle="Les annonces avec photos obtiennent 5× plus de vues" />
+                        <SectionHeader number="5" icon="📷" title="Photos & Vidéo" subtitle="Les annonces avec photos obtiennent 5× plus de vues" />
 
                         <div className="space-y-5">
                             {/* Upload photos */}

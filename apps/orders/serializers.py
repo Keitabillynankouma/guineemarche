@@ -17,7 +17,11 @@ class MeetingZoneSerializer(serializers.ModelSerializer):
 class DeliveryZoneSerializer(serializers.ModelSerializer):
     class Meta:
         model  = DeliveryZone
-        fields = ('id', 'city', 'fee_gnf', 'estimated_days', 'is_active')
+        fields = (
+            'id', 'city', 'fee_gnf', 'estimated_days', 'is_active',
+            'free_km_radius', 'price_per_km_gnf',
+            'free_weight_kg', 'price_per_kg_gnf',
+        )
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -43,6 +47,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'amount_gnf', 'commission_gnf', 'seller_payout_gnf', 'status',
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
             'meet_location', 'delivery_address', 'delivery_fee_gnf',
+            'delivery_distance_km', 'delivery_weight_kg',
             'note',
             'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
             'payments', 'delivery_assignment_detail',
@@ -80,8 +85,10 @@ class OrderSerializer(serializers.ModelSerializer):
         if delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
             city = listing.city
             try:
-                zone = DeliveryZone.objects.get(city__iexact=city, is_active=True)
-                delivery_fee = zone.fee_gnf
+                zone         = DeliveryZone.objects.get(city__iexact=city, is_active=True)
+                distance_km  = validated_data.get('delivery_distance_km', 0) or 0
+                weight_kg    = validated_data.get('delivery_weight_kg', 0) or 0
+                delivery_fee = zone.calculate_fee(distance_km, weight_kg)['fee_gnf']
             except DeliveryZone.DoesNotExist:
                 pass
             validated_data['delivery_fee_gnf'] = delivery_fee
