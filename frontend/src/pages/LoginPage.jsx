@@ -70,7 +70,13 @@ export default function LoginPage() {
       else if (user?.role === 'admin') navigate('/admin')
       else navigate('/')
     } catch (err) {
-      setError(err.response?.data?.non_field_errors?.[0] || 'Identifiants incorrects.')
+      const data = err.response?.data
+      const msg = data?.non_field_errors?.[0]
+             || data?.detail
+             || data?.error
+             || (typeof data === 'string' ? data : null)
+             || 'Connexion impossible. Vérifiez vos identifiants.'
+      setError(msg)
     } finally {
       setLoading(false)
     }

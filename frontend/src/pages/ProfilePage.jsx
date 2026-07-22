@@ -618,27 +618,31 @@ export default function ProfilePage() {
                                     <p className="text-xs text-gray-400 mt-1">Pour recevoir commandes et paiements par email</p>
                                 </div>
 
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Ville</label>
-                                    <select
-                                        value={editForm.city}
-                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    >
-                                        {VILLES_EDIT.map(v => <option key={v}>{v}</option>)}
-                                    </select>
-                                </div>
+                                {user.phone_number && (
+                                  <>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">Ville</label>
+                                        <select
+                                            value={editForm.city}
+                                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        >
+                                            {VILLES_EDIT.map(v => <option key={v}>{v}</option>)}
+                                        </select>
+                                    </div>
 
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Quartier</label>
-                                    <input
-                                        type="text"
-                                        placeholder="Hamdallaye, Kipé…"
-                                        value={editForm.quartier}
-                                        onChange={(e) => setEditForm({ ...editForm, quartier: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    />
-                                </div>
+                                    <div>
+                                        <label className="block text-xs font-medium text-gray-600 mb-1">Quartier</label>
+                                        <input
+                                            type="text"
+                                            placeholder="Hamdallaye, Kipé…"
+                                            value={editForm.quartier}
+                                            onChange={(e) => setEditForm({ ...editForm, quartier: e.target.value })}
+                                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                        />
+                                    </div>
+                                  </>
+                                )}
 
                                 <button type="submit" disabled={editLoading}
                                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50 text-sm">

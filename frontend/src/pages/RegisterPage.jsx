@@ -200,8 +200,22 @@ export default function RegisterPage() {
       setStep(2)
     } catch (err) {
       const data = err.response?.data
-      const msg = typeof data === 'string' ? data : Object.values(data || {})[0]?.[0] || "Erreur lors de l'inscription."
-      setError(msg)
+      let msg = data?.error || data?.detail || data?.non_field_errors?.[0]
+      if (!msg && typeof data === 'object') {
+        // Champs spécifiques : phone_number, email, etc.
+        const fieldErrors = Object.entries(data || {})
+          .filter(([k]) => k !== 'non_field_errors')
+          .map(([k, v]) => {
+            const label = k === 'phone_number' ? 'Téléphone'
+              : k === 'email' ? 'Email'
+              : k === 'password' ? 'Mot de passe'
+              : k === 'full_name' ? 'Nom complet'
+              : k
+            return `${label} : ${Array.isArray(v) ? v[0] : v}`
+          })
+        msg = fieldErrors[0] || "Erreur lors de l'inscription."
+      }
+      setError(msg || "Erreur lors de l'inscription.")
     } finally { setLoading(false) }
   }
 
@@ -220,7 +234,8 @@ export default function RegisterPage() {
       localStorage.setItem('refresh_token', res.data.tokens.refresh)
       navigate('/')
     } catch (err) {
-      setError(err.response?.data?.non_field_errors?.[0] || 'Code invalide ou expiré.')
+      const data = err.response?.data
+      setError(data?.non_field_errors?.[0] || data?.error || data?.detail || 'Code invalide ou expiré. Vérifiez le code reçu ou demandez-en un nouveau.')
       setOtp('')
     } finally { setLoading(false) }
   }
@@ -305,9 +320,11 @@ export default function RegisterPage() {
                     <Input icon={<PhoneIcon />} label="Téléphone" placeholder="+224 620 00 00 01" value={form.phone_number} onChange={f('phone_number')} required />
                   )}
 
-                  <SelectField icon={<MapIcon />} label="Ville" value={form.city} onChange={f('city')}>
-                    {VILLES.map(v => <option key={v}>{v}</option>)}
-                  </SelectField>
+                  {mode === 'guinea' && (
+                    <SelectField icon={<MapIcon />} label="Ville" value={form.city} onChange={f('city')}>
+                      {VILLES.map(v => <option key={v}>{v}</option>)}
+                    </SelectField>
+                  )}
 
                   <div className="grid grid-cols-2 gap-3">
                     <Input

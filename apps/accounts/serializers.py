@@ -169,17 +169,21 @@ class LoginSerializer(serializers.Serializer):
         user = None
         if email:
             user = User.objects.filter(email__iexact=email).first()
+            if not user:
+                raise serializers.ValidationError("Aucun compte trouvé avec cette adresse email. Vérifiez l'adresse ou créez un compte.")
         elif phone:
             user = User.objects.filter(phone_number=phone).first()
+            if not user:
+                raise serializers.ValidationError("Aucun compte trouvé avec ce numéro de téléphone. Vérifiez le numéro ou créez un compte.")
 
-        if not user or not user.check_password(attrs['password']):
-            raise serializers.ValidationError("Identifiants incorrects.")
+        if not user.check_password(attrs['password']):
+            raise serializers.ValidationError("Mot de passe incorrect. Vérifiez votre saisie ou utilisez « Mot de passe oublié ».")
 
         if not user.is_active:
-            raise serializers.ValidationError("Ce compte est désactivé.")
+            raise serializers.ValidationError("Ce compte a été désactivé. Contactez le support si vous pensez que c'est une erreur.")
 
         if not user.is_verified:
-            raise serializers.ValidationError("Veuillez vérifier votre compte d'abord.")
+            raise serializers.ValidationError("Compte non vérifié. Vérifiez votre SMS ou email pour activer votre compte.")
 
         attrs['user'] = user
         return attrs
