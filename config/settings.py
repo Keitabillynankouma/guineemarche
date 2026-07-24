@@ -268,6 +268,14 @@ if SENTRY_DSN:
 # Définir dans les variables d'environnement Render
 ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
 
+# ── ChaChap Pay — agrégateur guinéen agréé BCRG ──────────────────────────────
+# Configurer dans Railway (ou .env local pour les tests) :
+CHACHAP_API_KEY     = env('CHACHAP_API_KEY', default='')
+# Clé HMAC séparée pour la signature des webhooks (≠ clé API)
+CHACHAP_HMAC_KEY    = env('CHACHAP_HMAC_KEY', default='')
+CHACHAP_WEBHOOK_URL = env('CHACHAP_WEBHOOK_URL',
+                          default='https://api.guimatrix.com/api/v1/orders/webhook/chachap/')
+
 # ── Paycard Guinée — agrégateur Mobile Money (Orange Money GN + MTN MoMo GN) ─
 # Configurer dans Railway quand tu reçois les clés Paycard :
 PAYCARD_API_KEY     = env('PAYCARD_API_KEY', default='')

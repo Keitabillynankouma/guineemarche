@@ -540,21 +540,28 @@ class InitiatePaymentView(APIView):
 def _verify_chachap_signature(request):
     """
     Vérifie la signature HMAC des webhooks ChaChap Pay.
-    Header: CCP-Signature (HMAC-SHA256 du body avec la clé API)
+    ChaChap utilise DEUX clés séparées :
+      - CHACHAP_API_KEY  : pour les appels API (initier un paiement)
+      - CHACHAP_HMAC_KEY : pour signer les webhooks entrants
+    Header: CCP-Signature (HMAC-SHA256 du body avec CHACHAP_HMAC_KEY)
     """
-    api_key    = getattr(settings, 'CHACHAP_API_KEY', '')
-    if not api_key:
+    hmac_key = getattr(settings, 'CHACHAP_HMAC_KEY', '') or getattr(settings, 'CHACHAP_API_KEY', '')
+    if not hmac_key:
         logger.error(
-            "[CHACHAP] CHACHAP_API_KEY non configuré — webhook rejeté (fail-closed). "
-            "Configurez cette variable dans Railway."
+            "[CHACHAP] CHACHAP_HMAC_KEY non configuré — webhook rejeté (fail-closed). "
+            "Configurez CHACHAP_HMAC_KEY dans Railway / .env"
         )
-        return False  # SÉCURITÉ : rejeter si clé non configurée
+        return False
     sig_header = request.headers.get('CCP-Signature', '')
     if not sig_header:
+        logger.warning("[CHACHAP] Webhook sans header CCP-Signature")
         return False
     body     = request.body
-    expected = hmac.new(api_key.encode(), body, hashlib.sha256).hexdigest()
-    return hmac.compare_digest(sig_header, expected)
+    expected = hmac.new(hmac_key.encode(), body, hashlib.sha256).hexdigest()
+    ok = hmac.compare_digest(sig_header, expected)
+    if not ok:
+        logger.warning("[CHACHAP] Signature invalide — reçue=%s attendue=%s", sig_header[:16], expected[:16])
+    return ok
 
 
 def _verify_orange_signature(request):
