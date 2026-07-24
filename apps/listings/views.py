@@ -112,10 +112,13 @@ class ListingListCreateView(generics.ListCreateAPIView):
                 from .moderation import moderate_listing
                 category_name = listing.category.name if listing.category else 'Non définie'
                 mod = moderate_listing(listing.title, listing.description, listing.price_gnf, category_name)
+                auto = SiteSettings.flag('auto_approve_listings', default=True) if site else True
                 if mod['decision'] == 'reject':
                     listing.status = Listing.Status.SUSPENDED
-                elif mod['decision'] != 'review':
-                    listing.status = Listing.Status.ACTIVE
+                elif mod['decision'] == 'review' and not auto:
+                    listing.status = Listing.Status.DRAFT  # en attente admin
+                else:
+                    listing.status = Listing.Status.ACTIVE  # approve OU review auto
                 listing.save(update_fields=['status'])
             except Exception as mod_err:
                 logger.error("Modération synchrone échouée: %s", mod_err, exc_info=True)
@@ -185,8 +188,22 @@ class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'error': 'Vous ne pouvez supprimer que vos propres annonces.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+        # Soft-delete : suspendre l'annonce
+        was_active = instance.status == Listing.Status.ACTIVE
         instance.status = Listing.Status.SUSPENDED
         instance.save(update_fields=['status'])
+
+        # Décrémenter le compteur d'annonces de l'abonnement si l'annonce était active
+        if was_active:
+            try:
+                from apps.accounts.models import Subscription
+                sub = Subscription.objects.filter(user=request.user).first()
+                if sub and sub.listings_used > 0:
+                    sub.listings_used -= 1
+                    sub.save(update_fields=['listings_used'])
+            except Exception:
+                pass
+
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 

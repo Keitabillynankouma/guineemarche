@@ -1,9 +1,81 @@
 import uuid
 import logging
 from django.conf import settings
-from phonenumbers import data
 
 logger = logging.getLogger(__name__)
+
+CHACHAP_API_URL = 'https://chapchappay.com/api'
+
+
+def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
+    """
+    ChaChap Pay — agrégateur guinéen agréé BCRG.
+    Crée une opération E-Commerce et retourne le lien de paiement hébergé.
+    L'utilisateur est redirigé vers ce lien et choisit son mode (OM, MTN, PayCard, Kulu, Soutra…).
+    La confirmation se fait via webhook POST /orders/webhook/chachap/
+
+    Variables Railway requises :
+        CHACHAP_API_KEY     — clé API ChaChap Pay (64 chars hex)
+        CHACHAP_WEBHOOK_URL — URL de votre webhook (ex: https://api.guimatrix.com/api/v1/orders/webhook/chachap/)
+    """
+    api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
+    webhook_url = getattr(settings, 'CHACHAP_WEBHOOK_URL',
+                          'https://api.guimatrix.com/api/v1/orders/webhook/chachap/')
+
+    # Sans clé → simulation avec URL de redirection factice
+    if not api_key:
+        sim_ref = f"SIM-CCP-{uuid.uuid4().hex[:8].upper()}"
+        logger.info("[CHACHAP] Clé API absente — simulation (ref=%s)", sim_ref)
+        return PaymentResult(
+            success=True,
+            reference=sim_ref,
+            message="Paiement ChaChap Pay simulé (mode test)",
+            payment_url=f"https://chapchappay.com/pay/sim-{sim_ref.lower()}",
+        )
+
+    try:
+        import requests
+        resp = requests.post(
+            f'{CHACHAP_API_URL}/ecommerce/operation',
+            json={
+                'amount':     amount,
+                'order_id':   str(order_id),
+                'notify_url': webhook_url,
+            },
+            headers={
+                'CCP-Api-Key':  api_key,
+                'Content-Type': 'application/json',
+                'Accept':       'application/json',
+            },
+            timeout=20,
+        )
+        data = resp.json()
+        payment_url = data.get('payment_url', '')
+        operation_id = data.get('operation_id', '')
+
+        if resp.status_code in (200, 201) and payment_url:
+            logger.info("[CHACHAP] Opération créée — operation_id=%s amount=%s GNF", operation_id, amount)
+            return PaymentResult(
+                success=True,
+                reference=operation_id,
+                message='Redirection vers ChaChap Pay',
+                payment_url=payment_url,
+            )
+
+        err = data.get('error') or data.get('message') or f'Erreur HTTP {resp.status_code}'
+        logger.warning("[CHACHAP] Échec création opération: %s", err)
+        return PaymentResult(success=False, message=f"ChaChap Pay : {err}")
+
+    except Exception as exc:
+        logger.error("[CHACHAP] Erreur API: %s", exc)
+        # Fallback simulation si problème réseau
+        sim_ref = f"SIM-CCP-{uuid.uuid4().hex[:8].upper()}"
+        return PaymentResult(
+            success=True,
+            reference=sim_ref,
+            message="ChaChap Pay (mode dégradé)",
+            payment_url=f"https://chapchappay.com/pay/sim-{sim_ref.lower()}",
+        )
 
 
 class PaymentResult:

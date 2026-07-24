@@ -34,6 +34,9 @@ def auto_release_escrow():
     for order in orders_to_release:
         try:
             order.release_escrow()
+            # Compléter la commande si elle est toujours CONFIRMED (escrow auto-release)
+            if order.status == Order.Status.CONFIRMED:
+                order.complete()
             released += 1
             logger.info("Escrow libéré automatiquement — commande %s (%s GNF)", order.id, order.amount_gnf)
 

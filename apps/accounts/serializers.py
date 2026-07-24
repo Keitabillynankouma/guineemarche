@@ -31,6 +31,11 @@ class RegisterSerializer(serializers.ModelSerializer):
         user.set_password(password)
         user.save()
 
+        # Créer profil + abonnement immédiatement (évite RelatedObjectDoesNotExist)
+        from apps.accounts.models import UserProfile, Subscription
+        UserProfile.objects.get_or_create(user=user)
+        Subscription.objects.get_or_create(user=user)
+
         # Générer OTP de vérification et envoyer par SMS
         code = generate_otp()
         OTPCode.objects.create(
@@ -71,6 +76,11 @@ class EmailRegisterSerializer(serializers.ModelSerializer):
         user = User(**validated_data)
         user.set_password(password)
         user.save()
+
+        # Créer profil + abonnement immédiatement (évite RelatedObjectDoesNotExist)
+        from apps.accounts.models import UserProfile, Subscription
+        UserProfile.objects.get_or_create(user=user)
+        Subscription.objects.get_or_create(user=user)
 
         # OTP envoyé par email (30 min — plus long que SMS)
         from core.utils import generate_otp, otp_expiry
@@ -233,7 +243,7 @@ class ShopSerializer(serializers.ModelSerializer):
     logo_url      = serializers.SerializerMethodField()
     listing_count = serializers.IntegerField(read_only=True)
     owner_name    = serializers.CharField(source='owner.full_name', read_only=True)
-    owner_phone   = serializers.CharField(source='owner.phone_number', read_only=True)
+    # owner_phone retiré délibérément — PII, accessible uniquement via AdminShopSerializer
 
     class Meta:
         model  = Shop
@@ -242,11 +252,11 @@ class ShopSerializer(serializers.ModelSerializer):
             'phone', 'whatsapp', 'address', 'city', 'website',
             'is_verified', 'is_featured', 'listing_count',
             'status', 'plan', 'plan_until',
-            'owner', 'owner_name', 'owner_phone', 'created_at',
+            'owner', 'owner_name', 'created_at',
         )
         read_only_fields = (
             'id', 'is_verified', 'is_featured', 'status', 'plan', 'plan_until',
-            'owner', 'owner_name', 'owner_phone', 'created_at',
+            'owner', 'owner_name', 'created_at',
         )
         extra_kwargs = {'logo': {'write_only': True, 'required': False}}
 
@@ -305,7 +315,9 @@ class UserSerializer(serializers.ModelSerializer):
             'role', 'city', 'quartier', 'is_verified', 'is_available',
             'created_at', 'profile', 'badges', 'subscription', 'shop'
         )
-        read_only_fields = ('id', 'phone_number', 'is_verified', 'created_at')
+        # SÉCURITÉ : role, is_staff, is_active, is_available ne peuvent pas être
+        # modifiés directement via PATCH /accounts/me/ (privilege escalation).
+        read_only_fields = ('id', 'phone_number', 'role', 'is_verified', 'is_available', 'created_at')
 
 
 class ChangePasswordSerializer(serializers.Serializer):

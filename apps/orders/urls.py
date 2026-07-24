@@ -23,14 +23,14 @@ urlpatterns = [
     path('zone-rates/',
         views.IntraCityZoneRateListView.as_view(),
         name='zone-rates'),
-    path('webhook/<str:provider>/',
+    # IMPORTANT : les routes spécifiques DOIVENT être AVANT la route générique
+    # sinon Django capture tout avec webhook/<str:provider>/ et les routes ci-dessous
+    # ne sont jamais atteintes.
+    path('webhook/chachap/',
         views.PaymentWebhookView.as_view(),
-        name='payment-webhook'),
-    # Paycard Guinée — URLs de callback
-    path('webhook/paycard/',
-        views.PaymentWebhookView.as_view(),
-        {'provider': 'paycard_payment'},
-        name='paycard-payment-webhook'),
+        {'provider': 'chachap'},
+        name='chachap-webhook'),
+    # Paycard Guinée — URLs de callback (doivent précéder la route générique)
     path('webhook/paycard/card/',
         views.PaymentWebhookView.as_view(),
         {'provider': 'paycard_card'},
@@ -39,6 +39,14 @@ urlpatterns = [
         views.PaymentWebhookView.as_view(),
         {'provider': 'paycard_refund'},
         name='paycard-refund-webhook'),
+    path('webhook/paycard/',
+        views.PaymentWebhookView.as_view(),
+        {'provider': 'paycard_payment'},
+        name='paycard-payment-webhook'),
+    # Route générique en dernier — capture les autres providers (orange, etc.)
+    path('webhook/<str:provider>/',
+        views.PaymentWebhookView.as_view(),
+        name='payment-webhook'),
     path('<uuid:pk>/',
         views.OrderDetailView.as_view(),
         name='order-detail'),
@@ -121,6 +129,23 @@ urlpatterns = [
     path('admin/assignments/<uuid:pk>/reassign/',
         views.AdminDeliveryReassignView.as_view(),
         name='admin-delivery-reassign'),
+
+    # Comptabilité
+    path('admin/accounting/summary/',
+        views.AdminAccountingSummaryView.as_view(),
+        name='admin-accounting-summary'),
+    path('admin/accounting/livreurs/',
+        views.AdminLivreurEarningsView.as_view(),
+        name='admin-accounting-livreurs'),
+    path('admin/accounting/livreur-payments/',
+        views.AdminLivreurPaymentListView.as_view(),
+        name='admin-accounting-livreur-payments'),
+    path('admin/accounting/mark-paid/',
+        views.AdminMarkLivreurPaidView.as_view(),
+        name='admin-accounting-mark-paid'),
+    path('admin/accounting/export/',
+        views.AdminAccountingExportView.as_view(),
+        name='admin-accounting-export'),
 
     # Retours
     path('<uuid:pk>/return/',

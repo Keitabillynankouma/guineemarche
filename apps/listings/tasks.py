@@ -62,19 +62,25 @@ def moderate_listing_task(self, listing_id):
                 logger.warning("SMS rejet échoué : %s", sms_err)
 
         elif decision == 'review':
-            listing.status = Listing.Status.DRAFT
-            listing.save(update_fields=['status'])
-            logger.info("Annonce %s EN RÉVISION : %s", listing_id, reason)
-
-            # Notifier le vendeur
-            Notification.send(
-                user=listing.seller,
-                type=Notification.Type.SYSTEM,
-                title='⏳ Annonce en cours de vérification',
-                body=f'Votre annonce "{listing.title}" est en cours de vérification par notre équipe. '
-                     f'Elle sera publiée ou refusée sous 24h.',
-                data={'listing_id': str(listing.id)},
-            )
+            # Auto-publication activée → publier immédiatement (l'admin peut suspendre manuellement)
+            from core.site_settings import SiteSettings
+            auto = SiteSettings.flag('auto_approve_listings', default=True)
+            if auto:
+                listing.status = Listing.Status.ACTIVE
+                listing.save(update_fields=['status'])
+                logger.info("Annonce %s AUTO-APPROUVÉE (review)", listing_id)
+            else:
+                listing.status = Listing.Status.DRAFT
+                listing.save(update_fields=['status'])
+                logger.info("Annonce %s EN RÉVISION : %s", listing_id, reason)
+                Notification.send(
+                    user=listing.seller,
+                    type=Notification.Type.SYSTEM,
+                    title='⏳ Annonce en cours de vérification',
+                    body=f'Votre annonce "{listing.title}" est en cours de vérification par notre équipe. '
+                         f'Elle sera publiée ou refusée sous 24h.',
+                    data={'listing_id': str(listing.id)},
+                )
 
         else:
             listing.status = Listing.Status.ACTIVE
@@ -83,12 +89,7 @@ def moderate_listing_task(self, listing_id):
 
     except Exception as exc:
         logger.error("Erreur modération tâche %s : %s", listing_id, exc)
-        # Fail-open : approuver l'annonce si la tâche échoue complètement
-        try:
-            from .models import Listing
-            Listing.objects.filter(id=listing_id, status=Listing.Status.DRAFT).update(
-                status=Listing.Status.ACTIVE
-            )
-        except Exception:
-            pass
+        # SÉCURITÉ : fail-closed — laisser en DRAFT (en attente admin) si la modération échoue.
+        # Ne jamais publier automatiquement en cas d'erreur, même si cela retarde les vendeurs.
+        # Le retry Celery va relancer la tâche automatiquement.
         raise self.retry(exc=exc)

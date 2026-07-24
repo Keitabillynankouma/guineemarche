@@ -349,22 +349,28 @@ export default function RegisterPage() {
                     <p className="text-xs text-green-600 -mt-2 ml-1">✓ Code appliqué — annonces gratuites offertes !</p>
                   )}
 
-                  {/* Checkbox CGU */}
+                  {/* Checkbox CGU — une seule coche pour tout accepter */}
                   <label className="flex items-start gap-3 cursor-pointer select-none group">
-                    <div
-                      onClick={() => setAcceptedTerms(v => !v)}
-                      className={`mt-0.5 w-5 h-5 rounded-md border-2 flex items-center justify-center flex-shrink-0 transition-all ${
+                    <div className="relative mt-0.5 flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={acceptedTerms}
+                        onChange={e => setAcceptedTerms(e.target.checked)}
+                        className="absolute opacity-0 w-5 h-5 cursor-pointer"
+                      />
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
                         acceptedTerms ? 'bg-green-600 border-green-600' : 'border-gray-300 group-hover:border-green-400'
-                      }`}
-                    >
-                      {acceptedTerms && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      }`}>
+                        {acceptedTerms && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      </div>
                     </div>
-                    <input type="checkbox" className="sr-only" checked={acceptedTerms} onChange={e => setAcceptedTerms(e.target.checked)} />
                     <span className="text-xs text-gray-500 leading-relaxed">
                       J'accepte les{' '}
-                      <a href="/terms" target="_blank" className="text-green-600 font-medium hover:underline">Conditions d'utilisation</a>
+                      <a href="/terms" target="_blank" onClick={e => e.stopPropagation()} className="text-green-600 font-medium hover:underline">Conditions d'utilisation</a>
+                      {', '}la{' '}
+                      <a href="/privacy" target="_blank" onClick={e => e.stopPropagation()} className="text-green-600 font-medium hover:underline">Politique de confidentialité</a>
                       {' '}et la{' '}
-                      <a href="/terms" target="_blank" className="text-green-600 font-medium hover:underline">Politique de confidentialité</a>
+                      <a href="/terms#cgv" target="_blank" onClick={e => e.stopPropagation()} className="text-green-600 font-medium hover:underline">Politique de vente</a>
                     </span>
                   </label>
 

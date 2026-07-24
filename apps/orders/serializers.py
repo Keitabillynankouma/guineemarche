@@ -164,6 +164,8 @@ class CreatePaymentSerializer(serializers.Serializer):
     phone_number = serializers.CharField(required=False, allow_blank=True)
 
     def validate(self, attrs):
-        if attrs['provider'] != Payment.Provider.CASH and not attrs.get('phone_number'):
-            raise serializers.ValidationError("Le numéro de téléphone est requis pour le paiement mobile.")
+        # ChaChap Pay et espèces ne nécessitent pas de numéro de téléphone
+        no_phone_providers = (Payment.Provider.CASH, Payment.Provider.CHACHAP)
+        if attrs['provider'] not in no_phone_providers and not attrs.get('phone_number'):
+            raise serializers.ValidationError("Le numéro de téléphone est requis pour ce mode de paiement.")
         return attrs

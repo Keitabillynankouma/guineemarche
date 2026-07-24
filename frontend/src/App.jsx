@@ -26,9 +26,20 @@ import LivreurDashboard from './pages/LivreurDashboard'
 
 const queryClient = new QueryClient()
 
+const ADMIN_ROLES = ['admin', 'super_admin', 'admin_delivery', 'admin_marketing', 'admin_accounting']
+
 function PrivateRoute({ children }) {
   const token = localStorage.getItem('access_token')
   return token ? children : <Navigate to="/login" />
+}
+
+function AdminRoute({ children }) {
+  const token = localStorage.getItem('access_token')
+  const user  = useAuthStore((s) => s.user)
+  if (!token) return <Navigate to="/login" />
+  // Si le token existe mais l'user n'est pas encore chargé, laisser passer (lazy load)
+  if (user && !ADMIN_ROLES.includes(user.role)) return <Navigate to="/" />
+  return children
 }
 
 // Bannière maintenance — affichée si l'admin l'active
@@ -148,7 +159,7 @@ function AppRoutes() {
         <Route path="/favorites" element={<PrivateRoute><FavoritesPage /></PrivateRoute>} />
         <Route path="/my-shop"   element={<PrivateRoute><MyShopPage /></PrivateRoute>} />
         <Route path="/shops/:id" element={<ShopPage />} />
-        <Route path="/admin"     element={<PrivateRoute><AdminPage /></PrivateRoute>} />
+        <Route path="/admin"     element={<AdminRoute><AdminPage /></AdminRoute>} />
         <Route path="/reviews/:userId" element={<ReviewsPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/livreur" element={<PrivateRoute><LivreurDashboard /></PrivateRoute>} />

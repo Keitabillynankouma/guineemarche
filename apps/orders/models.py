@@ -165,10 +165,14 @@ class Order(BaseModel):
         return self.status == self.Status.COMPLETED
 
     def confirm(self):
+        if self.status != self.Status.PENDING:
+            return  # Idempotent : ne rien faire si déjà confirmé/annulé/terminé
         self.status = self.Status.CONFIRMED
         self.save(update_fields=['status', 'updated_at'])
 
     def complete(self):
+        if self.status != self.Status.CONFIRMED:
+            return  # Seulement depuis CONFIRMED
         self.status = self.Status.COMPLETED
         self.save(update_fields=['status', 'updated_at'])
         # Marquer l'annonce comme vendue
@@ -181,6 +185,11 @@ class Order(BaseModel):
             pass
 
     def cancel(self):
+        if self.status not in (self.Status.PENDING, self.Status.CONFIRMED):
+            return  # Ne pas annuler si déjà terminé ou annulé
+        # Si des fonds sont en escrow, les rembourser automatiquement
+        if self.escrow_status == self.EscrowStatus.HELD:
+            self.refund_escrow()
         self.status = self.Status.CANCELLED
         self.save(update_fields=['status', 'updated_at'])
 
@@ -231,8 +240,13 @@ class Order(BaseModel):
 
     def release_escrow(self):
         from django.utils import timezone
-        self.commission_gnf    = int(self.amount_gnf * self.COMMISSION_PCT / 100)
-        self.seller_payout_gnf = self.amount_gnf - self.commission_gnf
+        from core.site_settings import SiteSettings
+        # Commission calculée uniquement sur le prix de l'article, pas sur les frais de livraison
+        commission_pct         = SiteSettings.flag('commission_pct', default=self.COMMISSION_PCT)
+        item_amount            = self.amount_gnf - (self.delivery_fee_gnf or 0)
+        self.commission_gnf    = int(item_amount * commission_pct / 100)
+        # Le vendeur reçoit : prix article - commission (les frais de livraison vont au livreur)
+        self.seller_payout_gnf = item_amount - self.commission_gnf
         self.escrow_status      = self.EscrowStatus.RELEASED
         self.escrow_released_at = timezone.now()
         self.save(update_fields=[
@@ -255,6 +269,7 @@ class Order(BaseModel):
 class Payment(BaseModel):
 
     class Provider(models.TextChoices):
+        CHACHAP      = 'chachap',      'ChaChap Pay'
         ORANGE_MONEY = 'orange_money', 'Orange Money'
         MTN_MOMO     = 'mtn_momo',     'MTN Mobile Money'
         CASH         = 'cash',         'Espèces (remise en main)'
@@ -315,6 +330,76 @@ class DeliveryAssignment(BaseModel):
         if not self.pickup_code:
             self.pickup_code = str(random.randint(100000, 999999))
         super().save(*args, **kwargs)
+
+
+# ── Paiements livreurs ────────────────────────────────────────────────────────
+
+class LivreurPayment(BaseModel):
+    """
+    Gain d'un livreur pour une livraison effectuée.
+    Créé automatiquement quand la livraison est confirmée (DeliveryAssignment.status = DELIVERED).
+
+    Split configurable dans SiteSettings.livreur_commission_pct (défaut 80 %).
+    → Si delivery_fee_gnf = 50 000 GNF et livreur_pct = 80 :
+        net_gnf           = 40 000 GNF  (reversé au livreur)
+        platform_cut_gnf  = 10 000 GNF  (garde la plateforme)
+    """
+
+    class Status(models.TextChoices):
+        PENDING = 'pending', 'À payer'
+        PAID    = 'paid',    'Payé'
+
+    LIVREUR_PCT_DEFAULT = 80  # part livreur par défaut si SiteSettings indisponible
+
+    assignment       = models.OneToOneField(
+        'DeliveryAssignment', on_delete=models.CASCADE, related_name='livreur_payment'
+    )
+    livreur          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='livreur_payments')
+    gross_gnf        = models.BigIntegerField(help_text="Frais de livraison bruts (delivery_fee_gnf)")
+    platform_cut_gnf = models.BigIntegerField(default=0, help_text="Part plateforme")
+    net_gnf          = models.BigIntegerField(help_text="Montant net à verser au livreur")
+    status           = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    paid_at          = models.DateTimeField(null=True, blank=True)
+    payment_ref      = models.CharField(max_length=150, blank=True, help_text="Référence virement/OM/MTN")
+    note             = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name        = 'Paiement livreur'
+        verbose_name_plural = 'Paiements livreurs'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f"{self.livreur.full_name} — {self.net_gnf:,} GNF ({self.status})"
+
+    @classmethod
+    def create_for_assignment(cls, assignment):
+        """
+        Crée (ou récupère) le paiement livreur pour une affectation.
+        Appelé quand la livraison est confirmée.
+        """
+        if cls.objects.filter(assignment=assignment).exists():
+            return  # déjà créé
+
+        delivery_fee = assignment.order.delivery_fee_gnf or 0
+        if delivery_fee <= 0:
+            return  # pas de frais = pas de paiement
+
+        try:
+            from core.site_settings import SiteSettings
+            pct = SiteSettings.flag('livreur_commission_pct', default=cls.LIVREUR_PCT_DEFAULT)
+        except Exception:
+            pct = cls.LIVREUR_PCT_DEFAULT
+
+        net          = int(delivery_fee * pct / 100)
+        platform_cut = delivery_fee - net
+
+        cls.objects.create(
+            assignment=assignment,
+            livreur=assignment.livreur,
+            gross_gnf=delivery_fee,
+            platform_cut_gnf=platform_cut,
+            net_gnf=net,
+        )
 
 
 # ── Demandes de retour ─────────────────────────────────────────────────────────

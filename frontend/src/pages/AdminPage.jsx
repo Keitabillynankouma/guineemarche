@@ -7,6 +7,13 @@ import api from '../services/api'
 // ── API ──────────────────────────────────────────────────────────────────────
 
 const adminAPI = {
+  // Comptabilité
+  getAccountingSummary:  () => api.get('/orders/admin/accounting/summary/'),
+  getLivreurEarnings:    () => api.get('/orders/admin/accounting/livreurs/'),
+  getLivreurPayments:    (params) => api.get('/orders/admin/accounting/livreur-payments/', { params }),
+  markLivreurPaid:       (data)   => api.post('/orders/admin/accounting/mark-paid/', data),
+  exportAccounting:      (type)   => api.get(`/orders/admin/accounting/export/?type=${type}`, { responseType: 'blob' }),
+
   // Ordres / litiges
   getStats:    () => api.get('/orders/admin/stats/'),
   getDisputes: () => api.get('/orders/admin/disputes/'),
@@ -2237,8 +2244,216 @@ function TabReturns() {
 
 // ── Page principale ───────────────────────────────────────────────────────────
 
-const TABS = [
+// ── Onglet Comptabilité ──────────────────────────────────────────────────────
+
+async function downloadAccountingCSV(type) {
+  const token = localStorage.getItem('access_token')
+  const res = await fetch(`/api/v1/orders/admin/accounting/export/?type=${type}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+  if (!res.ok) { alert('Erreur export'); return }
+  const blob = await res.blob()
+  const url  = URL.createObjectURL(blob)
+  const a    = document.createElement('a')
+  a.href     = url; a.download = `${type}_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+  URL.revokeObjectURL(url)
+}
+
+function TabAccounting() {
+  const qc = useQueryClient()
+  const [selectedLivreur, setSelectedLivreur] = useState(null)
+  const [payRef, setPayRef]   = useState('')
+  const [payNote, setPayNote] = useState('')
+  const [paying, setPaying]   = useState(false)
+  const [payMsg, setPayMsg]   = useState('')
+
+  const { data: summary, isLoading: sumLoading } = useQuery({
+    queryKey: ['accounting-summary'],
+    queryFn: () => adminAPI.getAccountingSummary().then(r => r.data),
+  })
+
+  const { data: livreurs = [], isLoading: livLoading } = useQuery({
+    queryKey: ['accounting-livreurs'],
+    queryFn: () => adminAPI.getLivreurEarnings().then(r => r.data),
+  })
+
+  const handleMarkPaid = async (livreurId) => {
+    if (!payRef.trim()) { setPayMsg('Entrez une référence de paiement (ex: OM-12345)'); return }
+    setPaying(true); setPayMsg('')
+    try {
+      const res = await adminAPI.markLivreurPaid({ livreur_id: livreurId, payment_ref: payRef, note: payNote })
+      setPayMsg(`✅ ${res.data.paid} paiement(s) marqué(s) payé(s) — réf: ${res.data.payment_ref}`)
+      setPayRef(''); setPayNote(''); setSelectedLivreur(null)
+      qc.invalidateQueries(['accounting-livreurs'])
+      qc.invalidateQueries(['accounting-summary'])
+    } catch (e) {
+      setPayMsg(`❌ ${e.response?.data?.error || 'Erreur'}`)
+    } finally { setPaying(false) }
+  }
+
+  const S = ({ v, color='text-gray-800' }) => (
+    <span className={`font-bold text-lg ${color}`}>{fmt(v || 0)}</span>
+  )
+
+  return (
+    <div className="space-y-8">
+      {/* Revenus */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-800">💰 Revenus plateforme</h2>
+          <div className="flex gap-2">
+            <button onClick={() => downloadAccountingCSV('commissions')}
+              className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-medium rounded-lg transition">
+              ⬇️ Commissions CSV
+            </button>
+            <button onClick={() => downloadAccountingCSV('livreurs')}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition">
+              ⬇️ Livreurs CSV
+            </button>
+          </div>
+        </div>
+
+        {sumLoading ? (
+          <p className="text-gray-400 text-sm">Chargement...</p>
+        ) : summary && (
+          <div className="space-y-4">
+            {[
+              { label: 'Ce mois', data: summary.month },
+              { label: 'Cette année', data: summary.year },
+              { label: 'Total', data: summary.all_time },
+            ].map(({ label, data }) => (
+              <div key={label}>
+                <p className="text-sm font-semibold text-gray-500 mb-2">{label}</p>
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="bg-green-50 border border-green-100 rounded-xl p-3">
+                    <p className="text-xs text-green-600 font-medium">Chiffre d'affaires</p>
+                    <S v={data.revenue} color="text-green-700" />
+                    <p className="text-xs text-green-500 mt-0.5">{data.orders} commandes</p>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-3">
+                    <p className="text-xs text-blue-600 font-medium">Commissions (4%)</p>
+                    <S v={data.commission} color="text-blue-700" />
+                  </div>
+                  <div className="bg-amber-50 border border-amber-100 rounded-xl p-3">
+                    <p className="text-xs text-amber-600 font-medium">Frais livraison</p>
+                    <S v={data.delivery} color="text-amber-700" />
+                  </div>
+                  <div className="bg-purple-50 border border-purple-100 rounded-xl p-3">
+                    <p className="text-xs text-purple-600 font-medium">Livreurs à payer</p>
+                    <S v={summary.livreurs_pending?.amount} color="text-purple-700" />
+                    <p className="text-xs text-purple-500 mt-0.5">{summary.livreurs_pending?.count} en attente</p>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Livreurs */}
+      <div>
+        <h2 className="text-lg font-bold text-gray-800 mb-4">🚚 Gains livreurs</h2>
+        {payMsg && (
+          <div className={`mb-3 p-3 rounded-xl text-sm ${payMsg.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+            {payMsg}
+          </div>
+        )}
+        {livLoading ? (
+          <p className="text-gray-400 text-sm">Chargement...</p>
+        ) : (
+          <div className="space-y-3">
+            {livreurs.length === 0 && (
+              <p className="text-gray-400 text-sm text-center py-6">Aucun livreur enregistré.</p>
+            )}
+            {livreurs.map(lv => (
+              <div key={lv.id} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-semibold text-gray-800">{lv.full_name}</span>
+                      <span className="text-xs text-gray-400">{lv.phone_number}</span>
+                      <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">{lv.deliveries} livraisons</span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-3 mt-2">
+                      <div>
+                        <p className="text-xs text-gray-400">Brut total</p>
+                        <p className="text-sm font-semibold text-gray-700">{fmt(lv.total_gross)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">Déjà payé</p>
+                        <p className="text-sm font-semibold text-green-600">{fmt(lv.paid_amount)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-400">À payer</p>
+                        <p className={`text-sm font-bold ${lv.pending_amount > 0 ? 'text-red-600' : 'text-gray-400'}`}>{fmt(lv.pending_amount)}</p>
+                      </div>
+                    </div>
+                  </div>
+                  {lv.pending_amount > 0 && (
+                    <button
+                      onClick={() => setSelectedLivreur(selectedLivreur === lv.id ? null : lv.id)}
+                      className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold rounded-lg transition flex-shrink-0"
+                    >
+                      💳 Payer
+                    </button>
+                  )}
+                </div>
+
+                {selectedLivreur === lv.id && (
+                  <div className="mt-3 pt-3 border-t border-gray-100 space-y-2">
+                    <p className="text-xs text-gray-500 font-medium">
+                      Payer <strong>{fmt(lv.pending_amount)}</strong> à {lv.full_name}
+                    </p>
+                    <input
+                      type="text" placeholder="Référence (ex: OM-224620… ou VIREMENT-001)"
+                      value={payRef} onChange={e => setPayRef(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                    <input
+                      type="text" placeholder="Note (optionnel)"
+                      value={payNote} onChange={e => setPayNote(e.target.value)}
+                      className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+                    />
+                    <button
+                      onClick={() => handleMarkPaid(lv.id)} disabled={paying}
+                      className="w-full py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold rounded-xl transition disabled:opacity-50"
+                    >
+                      {paying ? 'Traitement...' : `✅ Confirmer le paiement de ${fmt(lv.pending_amount)}`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Rôles admin et leurs accès ───────────────────────────────────────────────
+const ADMIN_ROLES = ['admin', 'super_admin', 'admin_delivery', 'admin_marketing', 'admin_accounting']
+
+const ROLE_META = {
+  admin:            { label: 'Admin',            color: 'bg-red-100 text-red-700' },
+  super_admin:      { label: 'Super Admin',       color: 'bg-purple-100 text-purple-700' },
+  admin_delivery:   { label: 'Admin Livraison',   color: 'bg-amber-100 text-amber-700' },
+  admin_marketing:  { label: 'Admin Marketing',   color: 'bg-blue-100 text-blue-700' },
+  admin_accounting: { label: 'Admin Comptable',   color: 'bg-green-100 text-green-700' },
+}
+
+// Onglets accessibles par rôle (null = tous)
+const TABS_BY_ROLE = {
+  admin:            null,
+  super_admin:      null,
+  admin_delivery:   ['deliveries', 'pickup-points', 'meeting-zones', 'delivery-config'],
+  admin_marketing:  ['listings', 'shops', 'banners', 'categories', 'users'],
+  admin_accounting: ['accounting', 'overview', 'orders', 'returns', 'settings'],
+}
+
+const ALL_TABS = [
   { id: 'overview',         label: '📊 Dashboard' },
+  { id: 'accounting',       label: '💰 Comptabilité' },
   { id: 'deliveries',       label: '🚚 Livraisons' },
   { id: 'orders',           label: '📋 Commandes' },
   { id: 'returns',          label: '↩️ Retours' },
@@ -2252,6 +2467,12 @@ const TABS = [
   { id: 'delivery-config',  label: '🌍 Config livraison' },
   { id: 'settings',         label: '⚙️ Paramètres' },
 ]
+
+function getVisibleTabs(role) {
+  const allowed = TABS_BY_ROLE[role]
+  if (!allowed) return ALL_TABS
+  return ALL_TABS.filter(t => allowed.includes(t.id))
+}
 
 export default function AdminPage() {
   const user            = useAuthStore(s => s.user)
@@ -2269,13 +2490,13 @@ export default function AdminPage() {
   const { data: stats } = useQuery({
     queryKey: ['admin-stats'],
     queryFn:  () => adminAPI.getStats().then(r => r.data),
-    enabled:  !!user && user.role === 'admin',
+    enabled:  !!user && ADMIN_ROLES.includes(user?.role),
   })
 
   const { data: disputesData, isLoading: disputesLoading } = useQuery({
     queryKey: ['admin-disputes'],
     queryFn:  () => adminAPI.getDisputes().then(r => r.data),
-    enabled:  !!user && user.role === 'admin',
+    enabled:  !!user && ADMIN_ROLES.includes(user?.role),
   })
 
   const disputes = Array.isArray(disputesData) ? disputesData : (disputesData?.results ?? [])
@@ -2294,7 +2515,7 @@ export default function AdminPage() {
       const d = r.data
       return Array.isArray(d) ? d.length : (d?.count ?? d?.results?.length ?? 0)
     }),
-    enabled:       !!user && user.role === 'admin',
+    enabled:       !!user && ADMIN_ROLES.includes(user?.role),
     refetchInterval: 60000,
   })
   const pendingShopsCount = pendingShopsData ?? 0
@@ -2304,7 +2525,7 @@ export default function AdminPage() {
     queryFn:  () => adminAPI.getReturns({ status: 'pending' }).then(r => {
       const d = r.data; return Array.isArray(d) ? d.length : (d?.results?.length ?? 0)
     }),
-    enabled:       !!user && user.role === 'admin',
+    enabled:       !!user && ADMIN_ROLES.includes(user?.role),
     refetchInterval: 60000,
   })
   const pendingReturnsCount = pendingReturnsData ?? 0
@@ -2316,7 +2537,12 @@ export default function AdminPage() {
       <div className="text-green-600">Chargement...</div>
     </div>
   )
-  if (user.role !== 'admin') return <Navigate to="/" />
+  if (!ADMIN_ROLES.includes(user.role)) return <Navigate to="/" />
+
+  const roleMeta  = ROLE_META[user.role] || ROLE_META['admin']
+  const visibleTabs = getVisibleTabs(user.role)
+  // S'assurer que l'onglet actif est dans les tabs visibles
+  const safeTab = visibleTabs.find(t => t.id === activeTab) ? activeTab : visibleTabs[0]?.id
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -2327,19 +2553,22 @@ export default function AdminPage() {
             <span className="text-gray-400">/</span>
             <span className="text-gray-600 font-medium">Administration</span>
           </div>
-          <span className="text-xs bg-red-100 text-red-600 px-2 py-1 rounded-full font-medium">Admin</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-gray-500 hidden sm:block">{user.full_name}</span>
+            <span className={`text-xs px-2 py-1 rounded-full font-medium ${roleMeta.color}`}>{roleMeta.label}</span>
+          </div>
         </div>
       </nav>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
-        {/* Onglets */}
+        {/* Onglets filtrés par rôle */}
         <div className="bg-white rounded-2xl shadow p-1.5 flex gap-1 overflow-x-auto">
-          {TABS.map(tab => (
+          {visibleTabs.map(tab => (
             <button
               key={tab.id}
               onClick={() => setActiveTab(tab.id)}
               className={`flex-1 min-w-max text-sm font-medium px-4 py-2.5 rounded-xl transition whitespace-nowrap ${
-                activeTab === tab.id
+                safeTab === tab.id
                   ? 'bg-green-600 text-white shadow-sm'
                   : 'text-gray-600 hover:bg-gray-100'
               }`}
@@ -2361,20 +2590,21 @@ export default function AdminPage() {
           ))}
         </div>
 
-        {/* Contenu */}
-        {activeTab === 'overview'      && <TabOverview stats={stats} disputes={disputes} isLoading={disputesLoading} resolveMutation={resolveMutation} />}
-        {activeTab === 'deliveries'    && <TabDeliveries />}
-        {activeTab === 'orders'        && <TabOrders />}
-        {activeTab === 'users'         && <TabUsers />}
-        {activeTab === 'listings'      && <TabListings />}
-        {activeTab === 'banners'       && <TabBanners />}
-        {activeTab === 'categories'    && <TabCategories />}
-        {activeTab === 'shops'         && <TabShops />}
-        {activeTab === 'pickup-points'   && <TabPickupPoints />}
-        {activeTab === 'meeting-zones'   && <TabMeetingZones />}
-        {activeTab === 'delivery-config' && <TabDeliveryConfig />}
-        {activeTab === 'returns'         && <TabReturns />}
-        {activeTab === 'settings'        && <TabSettings />}
+        {/* Contenu — rendu selon l'onglet actif (safeTab) */}
+        {safeTab === 'accounting'    && <TabAccounting />}
+        {safeTab === 'overview'      && <TabOverview stats={stats} disputes={disputes} isLoading={disputesLoading} resolveMutation={resolveMutation} />}
+        {safeTab === 'deliveries'    && <TabDeliveries />}
+        {safeTab === 'orders'        && <TabOrders />}
+        {safeTab === 'users'         && <TabUsers />}
+        {safeTab === 'listings'      && <TabListings />}
+        {safeTab === 'banners'       && <TabBanners />}
+        {safeTab === 'categories'    && <TabCategories />}
+        {safeTab === 'shops'         && <TabShops />}
+        {safeTab === 'pickup-points'   && <TabPickupPoints />}
+        {safeTab === 'meeting-zones'   && <TabMeetingZones />}
+        {safeTab === 'delivery-config' && <TabDeliveryConfig />}
+        {safeTab === 'returns'         && <TabReturns />}
+        {safeTab === 'settings'        && <TabSettings />}
       </div>
     </div>
   )

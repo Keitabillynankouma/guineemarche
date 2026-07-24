@@ -40,6 +40,17 @@ class SiteSettings(models.Model):
         verbose_name="Validation boutique par admin",
         help_text="Les nouvelles boutiques doivent être approuvées avant d'être visibles.",
     )
+    auto_approve_listings = models.BooleanField(
+        default=True,
+        verbose_name="Auto-publication des annonces",
+        help_text="Si activé, les annonces douteuses (review) sont publiées immédiatement. "
+                  "Seules les annonces clairement interdites sont bloquées.",
+    )
+    livreur_commission_pct = models.PositiveSmallIntegerField(
+        default=80,
+        verbose_name="Part livreur (%)",
+        help_text="Pourcentage des frais de livraison reversé au livreur (ex: 80 = le livreur garde 80%).",
+    )
 
     # ── Contact ───────────────────────────────────────────────────────────────
     whatsapp_contact = models.CharField(
@@ -76,14 +87,23 @@ class SiteSettings(models.Model):
         # Forcer pk=1 (singleton)
         self.pk = 1
         super().save(*args, **kwargs)
+        # Invalider le cache à chaque sauvegarde pour que le prochain appel
+        # lise les valeurs fraîches depuis la DB.
+        from django.core.cache import cache
+        cache.delete('site_settings_singleton')
 
     def delete(self, *args, **kwargs):
         pass  # Indestructible
 
     @classmethod
     def get(cls):
-        """Retourne l'instance unique, la crée si inexistante."""
-        obj, _ = cls.objects.get_or_create(pk=1)
+        """Retourne l'instance unique depuis le cache (60s) ou la DB."""
+        from django.core.cache import cache
+        _CACHE_KEY = 'site_settings_singleton'
+        obj = cache.get(_CACHE_KEY)
+        if obj is None:
+            obj, _ = cls.objects.get_or_create(pk=1)
+            cache.set(_CACHE_KEY, obj, timeout=60)
         return obj
 
     @classmethod

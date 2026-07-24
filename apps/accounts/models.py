@@ -24,15 +24,20 @@ class UserManager(BaseUserManager):
 class User(AbstractBaseUser, PermissionsMixin, BaseModel):
 
     class Role(models.TextChoices):
-        BUYER    = 'buyer',    'Acheteur'
-        SELLER   = 'seller',   'Vendeur'
-        ADMIN    = 'admin',    'Administrateur'
-        LIVREUR  = 'livreur',  'Livreur'
+        BUYER             = 'buyer',             'Acheteur'
+        SELLER            = 'seller',            'Vendeur'
+        ADMIN             = 'admin',             'Administrateur'
+        LIVREUR           = 'livreur',           'Livreur'
+        # ── Sous-rôles admin ──────────────────────────────────────────────
+        SUPER_ADMIN       = 'super_admin',       'Super Administrateur'
+        ADMIN_DELIVERY    = 'admin_delivery',    'Admin Livraison'
+        ADMIN_MARKETING   = 'admin_marketing',   'Admin Marketing'
+        ADMIN_ACCOUNTING  = 'admin_accounting',  'Admin Comptabilité'
 
     phone_number = PhoneNumberField(unique=True, null=True, blank=True, region='GN')
     email        = models.EmailField(unique=True, null=True, blank=True)
     full_name    = models.CharField(max_length=150)
-    role         = models.CharField(max_length=10, choices=Role.choices, default=Role.BUYER)
+    role         = models.CharField(max_length=20, choices=Role.choices, default=Role.BUYER)
 
     # Localisation guinéenne
     city         = models.CharField(max_length=100, default='Conakry')
@@ -75,9 +80,31 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     def is_seller(self):
         return self.role == self.Role.SELLER
 
+    # Rôles considérés comme "admin" pour les permissions backend
+    ADMIN_ROLES = (
+        Role.ADMIN, Role.SUPER_ADMIN,
+        Role.ADMIN_DELIVERY, Role.ADMIN_MARKETING, Role.ADMIN_ACCOUNTING,
+    )
+
     @property
     def is_admin(self):
-        return self.role == self.Role.ADMIN
+        return self.role in self.ADMIN_ROLES
+
+    @property
+    def is_super_admin(self):
+        return self.role in (self.Role.SUPER_ADMIN, self.Role.ADMIN)
+
+    @property
+    def can_manage_deliveries(self):
+        return self.role in (self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.ADMIN_DELIVERY)
+
+    @property
+    def can_manage_marketing(self):
+        return self.role in (self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.ADMIN_MARKETING)
+
+    @property
+    def can_manage_accounting(self):
+        return self.role in (self.Role.SUPER_ADMIN, self.Role.ADMIN, self.Role.ADMIN_ACCOUNTING)
 
 
 class AdminUser(User):

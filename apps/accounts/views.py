@@ -146,6 +146,14 @@ class VerifyOTPView(APIView):
             user.is_verified = True
             user.save(update_fields=['is_verified'])
 
+        # SÉCURITÉ : pour RESET_PASSWORD, ne pas retourner de tokens JWT complets.
+        # Le frontend utilise le ResetPasswordView directement avec le code SMS.
+        if otp.purpose == OTPCode.Purpose.RESET_PASSWORD:
+            return Response({
+                'message': 'Code vérifié. Vous pouvez maintenant réinitialiser votre mot de passe.',
+                'verified': True,
+            })
+
         tokens = get_tokens_for_user(user)
         return Response({
             'message': 'Vérification réussie.',
@@ -243,6 +251,9 @@ class ResendOTPView(APIView):
                 status=status.HTTP_404_NOT_FOUND
             )
 
+        # Invalider tous les OTPs précédents non utilisés pour ce purpose
+        OTPCode.objects.filter(user=user, purpose=purpose, is_used=False).update(is_used=True)
+
         code = generate_otp()
         OTPCode.objects.create(
             user=user,
@@ -283,6 +294,9 @@ class ForgotPasswordView(APIView):
                 user = User.objects.get(email=email)
             except User.DoesNotExist:
                 return Response({'message': 'Si cette adresse est enregistrée, vous recevrez un code par email.'})
+
+        # Invalider tous les OTPs de reset précédents non utilisés
+        OTPCode.objects.filter(user=user, purpose=OTPCode.Purpose.RESET_PASSWORD, is_used=False).update(is_used=True)
 
         code = generate_otp()
         OTPCode.objects.create(
@@ -454,10 +468,10 @@ class ShopListView(generics.ListAPIView):
 
 
 class ShopDetailView(generics.RetrieveAPIView):
-    """Détail d'une boutique."""
+    """Détail d'une boutique — uniquement les boutiques approuvées."""
     permission_classes = [permissions.AllowAny]
     serializer_class   = ShopSerializer
-    queryset           = Shop.objects.filter(is_active=True).select_related('owner')
+    queryset           = Shop.objects.filter(is_active=True, status=Shop.Status.APPROVED).select_related('owner')
 
 
 class MyShopView(APIView):
@@ -693,9 +707,13 @@ class DeleteAccountView(APIView):
             pass
 
         # Anonymisation PII + désactivation (soft delete)
-        user.full_name = 'Compte supprimé'
-        user.email     = None
-        user.is_active = False
-        user.save(update_fields=['full_name', 'email', 'is_active', 'updated_at'])
+        # RGPD : effacer TOUTES les données personnelles identifiantes
+        user.full_name    = 'Compte supprimé'
+        user.email        = None
+        user.phone_number = None   # PII principal — doit être effacé
+        user.city         = ''
+        user.quartier     = ''
+        user.is_active    = False
+        user.save(update_fields=['full_name', 'email', 'phone_number', 'city', 'quartier', 'is_active', 'updated_at'])
 
         return Response(status=204)

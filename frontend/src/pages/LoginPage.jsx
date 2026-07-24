@@ -66,8 +66,9 @@ export default function LoginPage() {
     setLoading(true)
     try {
       const user = await login(identifier, password)
+      const ADMIN_ROLES = ['admin', 'super_admin', 'admin_delivery', 'admin_marketing', 'admin_accounting']
       if (user?.role === 'livreur') navigate('/livreur')
-      else if (user?.role === 'admin') navigate('/admin')
+      else if (ADMIN_ROLES.includes(user?.role)) navigate('/admin')
       else navigate('/')
     } catch (err) {
       const data = err.response?.data

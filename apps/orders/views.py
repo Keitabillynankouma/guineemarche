@@ -11,9 +11,9 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment, IntraCityZoneRate, ReturnRequest
+from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment, IntraCityZoneRate, ReturnRequest, LivreurPayment
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer, IntraCityZoneRateSerializer
-from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card
+from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card, initiate_chachap
 from core.permissions import IsAdmin
 
 
@@ -456,7 +456,24 @@ class InitiatePaymentView(APIView):
             status=Payment.Status.PENDING,
         )
 
-        if provider == Payment.Provider.ORANGE_MONEY:
+        if provider == Payment.Provider.CHACHAP:
+            # ── ChaChap Pay (agrégateur) ──────────────────────────────────────
+            result = initiate_chachap(amount=order.amount_gnf, order_id=str(order.id))
+            if result.success and result.payment_url:
+                payment.external_ref = result.reference
+                payment.save(update_fields=['external_ref'])
+                return Response({
+                    'message':     result.message,
+                    'payment':     PaymentSerializer(payment).data,
+                    'payment_url': result.payment_url,
+                    'chachap':     True,
+                }, status=status.HTTP_201_CREATED)
+            else:
+                payment.status = Payment.Status.FAILED
+                payment.save(update_fields=['status'])
+                return Response({'error': result.message}, status=status.HTTP_502_BAD_GATEWAY)
+
+        elif provider == Payment.Provider.ORANGE_MONEY:
             # Paycard si configuré, sinon fallback direct Orange Money
             if getattr(settings, 'PAYCARD_API_KEY', ''):
                 result = initiate_paycard(phone_number, order.amount_gnf, str(order.id), 'ORANGE_GN')
@@ -520,6 +537,26 @@ class InitiatePaymentView(APIView):
         }, status=status.HTTP_201_CREATED)
 
 
+def _verify_chachap_signature(request):
+    """
+    Vérifie la signature HMAC des webhooks ChaChap Pay.
+    Header: CCP-Signature (HMAC-SHA256 du body avec la clé API)
+    """
+    api_key    = getattr(settings, 'CHACHAP_API_KEY', '')
+    if not api_key:
+        logger.error(
+            "[CHACHAP] CHACHAP_API_KEY non configuré — webhook rejeté (fail-closed). "
+            "Configurez cette variable dans Railway."
+        )
+        return False  # SÉCURITÉ : rejeter si clé non configurée
+    sig_header = request.headers.get('CCP-Signature', '')
+    if not sig_header:
+        return False
+    body     = request.body
+    expected = hmac.new(api_key.encode(), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(sig_header, expected)
+
+
 def _verify_orange_signature(request):
     """Vérifie la signature HMAC-SHA256 d'Orange Money."""
     secret = getattr(settings, 'ORANGE_WEBHOOK_SECRET', '')
@@ -545,8 +582,11 @@ def _verify_paycard_signature(request):
     """
     secret_key = getattr(settings, 'PAYCARD_SECRET_KEY', '')
     if not secret_key:
-        logger.warning("[PAYCARD] PAYCARD_SECRET_KEY non configuré — webhook non vérifié (mode test)")
-        return True  # En sandbox / avant config → on laisse passer
+        logger.error(
+            "[PAYCARD] PAYCARD_SECRET_KEY non configuré — webhook rejeté (fail-closed). "
+            "Configurez cette variable dans Railway."
+        )
+        return False  # SÉCURITÉ : rejeter si clé non configurée
 
     timestamp  = request.headers.get('X-Paycard-Timestamp', '')
     sig_header = request.headers.get('X-Paycard-Signature', '')
@@ -578,7 +618,17 @@ class PaymentWebhookView(APIView):
     def post(self, request, provider):
         data = request.data
 
-        if provider == 'orange':
+        if provider == 'chachap':
+            if not _verify_chachap_signature(request):
+                logger.warning("[CHACHAP] Webhook rejeté — signature invalide")
+                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
+            operation_id = data.get('operation_id', data.get('order_id', ''))
+            success      = data.get('status', '').lower() == 'success'
+            ref          = operation_id
+            logger.info("[CHACHAP] Webhook reçu — operation_id=%s status=%s method=%s",
+                        operation_id, data.get('status'), data.get('payment_method', ''))
+
+        elif provider == 'orange':
             if not _verify_orange_signature(request):
                 return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
             ref     = data.get('pay_token', '')
@@ -614,13 +664,17 @@ class PaymentWebhookView(APIView):
             return Response({'error': 'Fournisseur inconnu'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
-            payment = Payment.objects.get(external_ref=ref) if ref else None
-            if not payment:
+            payment = Payment.objects.filter(external_ref=ref).first() if ref else None
+            if not payment and ref:
                 payment = Payment.objects.filter(order__id=ref, status=Payment.Status.PENDING).first()
             if payment:
+                # Idempotence : ne pas re-traiter si déjà SUCCESS (webhook retry)
+                if payment.status == Payment.Status.SUCCESS and success:
+                    logger.info("[WEBHOOK] %s — paiement %s déjà confirmé (idempotent)", provider, ref)
+                    return Response({'status': 'ok'})
                 payment.status = Payment.Status.SUCCESS if success else Payment.Status.FAILED
                 payment.save(update_fields=['status'])
-                if success:
+                if success and payment.order.status == Order.Status.PENDING:
                     payment.order.confirm()
                     payment.order.set_escrow_schedule()
             else:
@@ -1026,6 +1080,13 @@ class LivreurConfirmDeliveryView(APIView):
         if assignment.status == DeliveryAssignment.Status.DELIVERED:
             return Response({'error': 'Cette livraison a déjà été confirmée.'}, status=400)
 
+        # Machine d'état : la livraison doit être EN_ROUTE avant d'être confirmée
+        if assignment.status != DeliveryAssignment.Status.EN_ROUTE:
+            return Response(
+                {'error': 'Vous devez d\'abord démarrer la livraison avant de la confirmer.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         code = str(request.data.get('verification_code', '')).strip()
         if code != assignment.verification_code:
             return Response({'error': 'Code de vérification incorrect.'}, status=status.HTTP_400_BAD_REQUEST)
@@ -1039,6 +1100,13 @@ class LivreurConfirmDeliveryView(APIView):
         order.complete()
         if order.escrow_status == Order.EscrowStatus.HELD:
             order.release_escrow()
+
+        # Créer automatiquement le paiement livreur
+        try:
+            from .models import LivreurPayment
+            LivreurPayment.create_for_assignment(assignment)
+        except Exception:
+            pass
 
         from apps.notifications.models import Notification
         Notification.send(
@@ -1383,3 +1451,232 @@ class AdminReturnUpdateView(APIView):
             'admin_note':  rr.admin_note,
             'resolved_at': rr.resolved_at.isoformat() if rr.resolved_at else None,
         })
+
+
+# ── COMPTABILITÉ ──────────────────────────────────────────────────────────────
+
+class AdminAccountingSummaryView(APIView):
+    """
+    Résumé financier de la plateforme.
+    Accessible : admin, super_admin, admin_accounting
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Sum, Count
+        from django.utils import timezone
+        from datetime import timedelta
+        from core.permissions import IsAdminAccounting
+
+        # Vérifier permission comptabilité
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé à l\'admin comptable.'}, status=403)
+
+        now   = timezone.now()
+        month_start = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        year_start  = now.replace(month=1, day=1, hour=0, minute=0, second=0, microsecond=0)
+
+        orders_qs = Order.objects.filter(status=Order.Status.COMPLETED)
+
+        def agg(qs):
+            return qs.aggregate(
+                total_revenue   = Sum('amount_gnf'),
+                total_commission= Sum('commission_gnf'),
+                total_payout    = Sum('seller_payout_gnf'),
+                total_delivery  = Sum('delivery_fee_gnf'),
+                count           = Count('id'),
+            )
+
+        month = agg(orders_qs.filter(updated_at__gte=month_start))
+        year  = agg(orders_qs.filter(updated_at__gte=year_start))
+        total = agg(orders_qs)
+
+        # Gains livreurs non payés
+        pending_livreur = LivreurPayment.objects.filter(status='pending').aggregate(
+            total=Sum('net_gnf'), count=Count('id')
+        )
+
+        # Frais livraison plateforme (non reversés aux livreurs)
+        platform_delivery = LivreurPayment.objects.filter(status='pending').aggregate(
+            total=Sum('platform_cut_gnf')
+        )
+
+        return Response({
+            'month': {
+                'revenue':    month['total_revenue']    or 0,
+                'commission': month['total_commission'] or 0,
+                'delivery':   month['total_delivery']   or 0,
+                'orders':     month['count']            or 0,
+            },
+            'year': {
+                'revenue':    year['total_revenue']    or 0,
+                'commission': year['total_commission'] or 0,
+                'delivery':   year['total_delivery']   or 0,
+                'orders':     year['count']            or 0,
+            },
+            'all_time': {
+                'revenue':    total['total_revenue']    or 0,
+                'commission': total['total_commission'] or 0,
+                'delivery':   total['total_delivery']   or 0,
+                'orders':     total['count']            or 0,
+            },
+            'livreurs_pending': {
+                'amount': pending_livreur['total'] or 0,
+                'count':  pending_livreur['count'] or 0,
+            },
+            'platform_delivery_cut': platform_delivery['total'] or 0,
+        })
+
+
+class AdminLivreurEarningsView(APIView):
+    """
+    Liste des gains par livreur — avec solde en attente.
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from django.db.models import Sum, Count, Q
+        from apps.accounts.models import User as AppUser
+
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé à l\'admin comptable.'}, status=403)
+
+        livreurs = AppUser.objects.filter(role='livreur').prefetch_related('livreur_payments')
+        result = []
+        for lv in livreurs:
+            payments = lv.livreur_payments.all()
+            agg = payments.aggregate(
+                total_gross   = Sum('gross_gnf'),
+                total_net     = Sum('net_gnf'),
+                total_pending = Sum('net_gnf', filter=Q(status='pending')),
+                total_paid    = Sum('net_gnf', filter=Q(status='paid')),
+                deliveries    = Count('id'),
+            )
+            result.append({
+                'id':             str(lv.id),
+                'full_name':      lv.full_name,
+                'phone_number':   str(lv.phone_number or ''),
+                'deliveries':     agg['deliveries']    or 0,
+                'total_gross':    agg['total_gross']   or 0,
+                'total_net':      agg['total_net']     or 0,
+                'pending_amount': agg['total_pending'] or 0,
+                'paid_amount':    agg['total_paid']    or 0,
+            })
+
+        result.sort(key=lambda x: x['pending_amount'], reverse=True)
+        return Response(result)
+
+
+class AdminLivreurPaymentListView(APIView):
+    """
+    Détail des paiements d'un livreur (par livreur_id).
+    """
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé à l\'admin comptable.'}, status=403)
+
+        livreur_id = request.query_params.get('livreur_id')
+        status_f   = request.query_params.get('status')
+        qs = LivreurPayment.objects.select_related('livreur', 'assignment__order__listing')
+        if livreur_id:
+            qs = qs.filter(livreur_id=livreur_id)
+        if status_f:
+            qs = qs.filter(status=status_f)
+
+        data = [{
+            'id':           str(p.id),
+            'livreur_id':   str(p.livreur.id),
+            'livreur_name': p.livreur.full_name,
+            'order_id':     str(p.assignment.order.id),
+            'listing_title':p.assignment.order.listing.title,
+            'gross_gnf':    p.gross_gnf,
+            'platform_cut': p.platform_cut_gnf,
+            'net_gnf':      p.net_gnf,
+            'status':       p.status,
+            'paid_at':      p.paid_at.isoformat() if p.paid_at else None,
+            'payment_ref':  p.payment_ref,
+            'created_at':   p.created_at.isoformat(),
+        } for p in qs[:200]]
+        return Response(data)
+
+
+class AdminMarkLivreurPaidView(APIView):
+    """
+    Marquer un ou plusieurs paiements livreur comme payés.
+    Body: { payment_ids: [...], payment_ref: "OM-XXXXX", note: "..." }
+    Ou:   { livreur_id: "uuid" }  → marque tous les pending de ce livreur
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from django.utils import timezone
+
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé à l\'admin comptable.'}, status=403)
+
+        payment_ids = request.data.get('payment_ids', [])
+        livreur_id  = request.data.get('livreur_id', '')
+        payment_ref = request.data.get('payment_ref', '').strip()
+        note        = request.data.get('note', '').strip()
+        now         = timezone.now()
+
+        qs = LivreurPayment.objects.filter(status='pending')
+        if payment_ids:
+            qs = qs.filter(id__in=payment_ids)
+        elif livreur_id:
+            qs = qs.filter(livreur_id=livreur_id)
+        else:
+            return Response({'error': 'Fournissez payment_ids ou livreur_id.'}, status=400)
+
+        count = qs.update(status='paid', paid_at=now, payment_ref=payment_ref, note=note)
+        return Response({'paid': count, 'payment_ref': payment_ref})
+
+
+class AdminAccountingExportView(APIView):
+    """Export CSV comptabilité (commissions + paiements livreurs)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        import csv
+        from django.http import HttpResponse
+        from django.utils import timezone
+
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé à l\'admin comptable.'}, status=403)
+
+        export_type = request.query_params.get('type', 'commissions')
+        response    = HttpResponse(content_type='text/csv; charset=utf-8')
+        response['Content-Disposition'] = f'attachment; filename="{export_type}_{timezone.now().date()}.csv"'
+        writer = csv.writer(response)
+
+        if export_type == 'livreurs':
+            writer.writerow(['Livreur', 'Téléphone', 'Date', 'Commande', 'Brut GNF', 'Part plateforme GNF', 'Net livreur GNF', 'Statut', 'Référence paiement'])
+            for p in LivreurPayment.objects.select_related('livreur', 'assignment__order').order_by('-created_at'):
+                writer.writerow([
+                    p.livreur.full_name,
+                    str(p.livreur.phone_number or ''),
+                    p.created_at.strftime('%Y-%m-%d'),
+                    str(p.assignment.order.id)[:8],
+                    p.gross_gnf,
+                    p.platform_cut_gnf,
+                    p.net_gnf,
+                    p.get_status_display(),
+                    p.payment_ref,
+                ])
+        else:  # commissions
+            writer.writerow(['Date', 'Commande', 'Vendeur', 'Acheteur', 'Montant GNF', 'Commission GNF', 'Payout vendeur GNF', 'Frais livraison GNF'])
+            for o in Order.objects.filter(status=Order.Status.COMPLETED).select_related('seller', 'buyer', 'listing').order_by('-updated_at'):
+                writer.writerow([
+                    o.updated_at.strftime('%Y-%m-%d'),
+                    str(o.id)[:8],
+                    o.seller.full_name,
+                    o.buyer.full_name,
+                    o.amount_gnf,
+                    o.commission_gnf,
+                    o.seller_payout_gnf,
+                    o.delivery_fee_gnf,
+                ])
+
+        return response

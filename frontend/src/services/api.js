@@ -16,14 +16,69 @@ api.interceptors.request.use((config) => {
   return config
 })
 
+let _isRefreshing = false
+let _refreshQueue = []
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
-    if (error.response?.status === 401) {
-      localStorage.removeItem('access_token')
-      localStorage.removeItem('refresh_token')
-      window.location.href = '/login'
+    const originalRequest = error.config
+
+    // Ne pas boucler sur les requêtes de refresh elles-mêmes
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      const refreshToken = localStorage.getItem('refresh_token')
+
+      if (!refreshToken) {
+        // Pas de refresh token → déconnecter directement
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        return Promise.reject(error)
+      }
+
+      if (_isRefreshing) {
+        // Mettre en attente jusqu'à ce que le refresh soit terminé
+        return new Promise((resolve, reject) => {
+          _refreshQueue.push({ resolve, reject })
+        })
+          .then((token) => {
+            originalRequest.headers.Authorization = `Bearer ${token}`
+            return api(originalRequest)
+          })
+          .catch((err) => Promise.reject(err))
+      }
+
+      originalRequest._retry = true
+      _isRefreshing = true
+
+      try {
+        const response = await axios.post(
+          `${api.defaults.baseURL}/accounts/token/refresh/`,
+          { refresh: refreshToken }
+        )
+        const newAccessToken = response.data.access
+        localStorage.setItem('access_token', newAccessToken)
+        api.defaults.headers.common.Authorization = `Bearer ${newAccessToken}`
+
+        // Débloquer la file d'attente
+        _refreshQueue.forEach(({ resolve }) => resolve(newAccessToken))
+        _refreshQueue = []
+
+        originalRequest.headers.Authorization = `Bearer ${newAccessToken}`
+        return api(originalRequest)
+      } catch (refreshError) {
+        // Refresh échoué → déconnecter
+        _refreshQueue.forEach(({ reject }) => reject(refreshError))
+        _refreshQueue = []
+        localStorage.removeItem('access_token')
+        localStorage.removeItem('refresh_token')
+        window.location.href = '/login'
+        return Promise.reject(refreshError)
+      } finally {
+        _isRefreshing = false
+      }
     }
+
     return Promise.reject(error)
   }
 )
@@ -59,7 +114,7 @@ export const listingsAPI = {
   getAll: (params) => api.get('/listings/', { params }),
   getOne: (id) => api.get(`/listings/${id}/`),
   create: (data) => api.post('/listings/', data),
-  update: (id, data) => api.put(`/listings/${id}/`, data),
+  update: (id, data) => api.patch(`/listings/${id}/`, data),
   delete: (id) => api.delete(`/listings/${id}/`),
   myListings: () => api.get('/listings/my/'),
   boost: (id, data) => api.post(`/listings/${id}/boost/`, data),

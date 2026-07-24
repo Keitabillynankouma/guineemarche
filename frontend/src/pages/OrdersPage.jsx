@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersAPI, reviewsAPI } from '../services/api'
@@ -22,7 +22,7 @@ function fmt(n) { return new Intl.NumberFormat('fr-GN').format(n) + ' GNF' }
 // ── Countdown escrow ─────────────────────────────────────────────────────────
 function EscrowCountdown({ releaseAt, adminHold }) {
     const [now, setNow] = useState(() => Date.now())
-    useState(() => {
+    useEffect(() => {
         const t = setInterval(() => setNow(Date.now()), 60_000)
         return () => clearInterval(t)
     }, [])
@@ -132,43 +132,34 @@ function EscrowInfoModal({ onConfirm }) {
 
 // ── Modal paiement ──────────────────────────────────────────────────────────
 const PROVIDERS = [
-    { value: 'orange_money', label: 'Orange Money',         emoji: '🟠', desc: 'Mobile Money Guinea' },
-    { value: 'mtn_momo',     label: 'MTN Mobile Money',     emoji: '🟡', desc: 'Mobile Money Guinea' },
-    { value: 'card',         label: 'Carte Visa / Mastercard', emoji: '💳', desc: 'Paiement international sécurisé', badge: 'Paycard' },
-    { value: 'cash',         label: 'Espèces (remise en main)', emoji: '💵', desc: 'Paiement à la livraison' },
+    {
+        value: 'chachap',
+        label: 'ChaChap Pay',
+        emoji: '🔐',
+        desc: 'Orange Money · MTN · PayCard · Kulu · Soutra Money',
+        badge: 'Recommandé',
+    },
+    { value: 'cash', label: 'Espèces (remise en main)', emoji: '💵', desc: 'Paiement à la livraison / en personne' },
 ]
 
 function PayModal({ order, onClose, onPaid }) {
-    const [provider, setProvider] = useState('orange_money')
-    const [phone, setPhone]       = useState('')
+    const [provider, setProvider] = useState('chachap')
     const [error, setError]       = useState('')
     const [loading, setLoading]   = useState(false)
-    const [cardPending, setCardPending] = useState(false)   // attente confirmation Visa
     const [showEscrowInfo, setShowEscrowInfo] = useState(false)
     const [escrowAcknowledged, setEscrowAcknowledged] = useState(
         () => localStorage.getItem('gm_escrow_acknowledged') === '1'
     )
 
-    const needsPhone = !['cash', 'card'].includes(provider)
-
     const handlePay = async () => {
-        if (needsPhone && !phone.trim()) {
-            setError('Entrez votre numéro Mobile Money.')
-            return
-        }
         setError('')
         setLoading(true)
         try {
-            const res = await ordersAPI.pay(order.id, {
-                provider,
-                phone_number: needsPhone ? phone : '',
-            })
+            const res = await ordersAPI.pay(order.id, { provider })
 
-            // Paiement carte Visa → redirection vers page Paycard
-            if (res.data?.card && res.data?.payment_url) {
-                setCardPending(true)
-                setLoading(false)
-                window.open(res.data.payment_url, '_blank', 'noopener,noreferrer')
+            // ChaChap Pay → redirection vers page hébergée
+            if (res.data?.chachap && res.data?.payment_url) {
+                window.location.href = res.data.payment_url
                 return
             }
 
@@ -176,44 +167,16 @@ function PayModal({ order, onClose, onPaid }) {
             onClose()
         } catch (e) {
             setError(e.response?.data?.error || e.response?.data?.detail || 'Erreur de paiement')
-        } finally { setLoading(false) }
+            setLoading(false)
+        }
     }
 
     const handlePayClick = () => {
-        if (['orange_money', 'mtn_momo'].includes(provider) && !escrowAcknowledged) {
+        if (provider === 'chachap' && !escrowAcknowledged) {
             setShowEscrowInfo(true)
         } else {
             handlePay()
         }
-    }
-
-    // Écran d'attente après redirection carte Visa
-    if (cardPending) {
-        return (
-            <div className="fixed inset-0 bg-black/50 z-40 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl w-full max-w-md p-6 text-center space-y-4">
-                    <div className="text-4xl">💳</div>
-                    <h2 className="font-bold text-gray-800 text-lg">Paiement Visa en cours</h2>
-                    <p className="text-sm text-gray-600">
-                        La page de paiement Paycard s'est ouverte dans un nouvel onglet.<br />
-                        Entrez vos données de carte et validez. Votre commande sera confirmée automatiquement.
-                    </p>
-                    <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700">
-                        ℹ️ Vous pouvez fermer ce dialogue. Votre commande s'actualisera une fois le paiement reçu.
-                    </div>
-                    <div className="flex gap-3">
-                        <button onClick={onClose}
-                            className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm hover:bg-gray-50 transition">
-                            Fermer
-                        </button>
-                        <button onClick={() => { onPaid(); onClose(); }}
-                            className="flex-1 py-3 rounded-xl bg-green-600 text-white text-sm font-semibold">
-                            J'ai payé ✓
-                        </button>
-                    </div>
-                </div>
-            </div>
-        )
     }
 
     return (
@@ -246,7 +209,7 @@ function PayModal({ order, onClose, onPaid }) {
                                 <div className={`font-medium ${provider === opt.value ? 'text-green-700' : 'text-gray-700'}`}>
                                     {opt.label}
                                     {opt.badge && (
-                                        <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">
+                                        <span className="ml-2 text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full">
                                             {opt.badge}
                                         </span>
                                     )}
@@ -258,18 +221,10 @@ function PayModal({ order, onClose, onPaid }) {
                     ))}
                 </div>
 
-                {needsPhone && (
-                    <input
-                        type="tel" placeholder="224 6XX XXX XXX"
-                        value={phone} onChange={e => setPhone(e.target.value)}
-                        className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
-                    />
-                )}
-
-                {provider === 'card' && (
+                {provider === 'chachap' && (
                     <div className="bg-blue-50 rounded-xl p-3 text-xs text-blue-700 space-y-1">
-                        <p className="font-medium">💳 Paiement sécurisé Visa / Mastercard</p>
-                        <p>Vous serez redirigé vers la page sécurisée Paycard. Accepté depuis la Guinée et partout dans le monde.</p>
+                        <p className="font-medium">🔐 Paiement sécurisé agréé BCRG</p>
+                        <p>Vous serez redirigé vers ChaChap Pay pour choisir votre moyen de paiement (Orange Money, MTN, carte Visa…). Votre commande se confirme automatiquement à la réception.</p>
                     </div>
                 )}
 
@@ -282,7 +237,7 @@ function PayModal({ order, onClose, onPaid }) {
                     </button>
                     <button onClick={handlePayClick} disabled={loading}
                         className="flex-1 py-3 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-semibold transition disabled:opacity-50">
-                        {loading ? 'Traitement...' : provider === 'card' ? '💳 Payer par carte' : `Payer ${fmt(order.amount_gnf)}`}
+                        {loading ? 'Traitement...' : provider === 'chachap' ? `🔐 Payer ${fmt(order.amount_gnf)}` : '💵 Confirmer (espèces)'}
                     </button>
                 </div>
             </div>
