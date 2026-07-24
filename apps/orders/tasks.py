@@ -74,6 +74,51 @@ def auto_release_escrow():
 
 
 @shared_task
+def weekly_livreur_payouts():
+    """
+    Tâche hebdomadaire (chaque lundi à 07h00) :
+    Génère les récapitulatifs de virement pour tous les livreurs ayant des paiements en attente
+    depuis la semaine écoulée, et notifie l'admin comptable.
+    """
+    from .models import LivreurWeeklyPayout
+    from datetime import date, timedelta
+
+    # Lundi de la semaine qui vient de se terminer (semaine passée = lundi précédent)
+    today      = date.today()
+    last_monday = today - timedelta(days=today.weekday() + 7)  # lundi semaine précédente
+
+    count = LivreurWeeklyPayout.generate_for_week(last_monday)
+    logger.info("weekly_livreur_payouts : %d récapitulatif(s) générés pour semaine du %s", count, last_monday)
+
+    if count > 0:
+        # Notifier les admins comptables
+        try:
+            from apps.notifications.models import Notification
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            admins = User.objects.filter(
+                role__in=['admin', 'super_admin', 'admin_accounting'],
+                is_active=True,
+            )
+            pending_payouts = LivreurWeeklyPayout.objects.filter(
+                week_start=last_monday, status=LivreurWeeklyPayout.Status.PENDING
+            )
+            total_gnf = sum(p.net_gnf for p in pending_payouts)
+            for admin in admins:
+                Notification.send(
+                    user=admin,
+                    type=Notification.Type.SYSTEM,
+                    title='💸 Virements livreurs à effectuer',
+                    body=f'{count} livreur(s) à payer cette semaine — Total : {total_gnf:,} GNF.',
+                    data={'week_start': str(last_monday)},
+                )
+        except Exception as e:
+            logger.warning("Notification weekly payouts échouée : %s", e)
+
+    return count
+
+
+@shared_task
 def notify_pending_escrow():
     """
     Tâche périodique (toutes les 12h) :

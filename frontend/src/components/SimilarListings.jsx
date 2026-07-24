@@ -85,11 +85,7 @@ export default function SimilarListings({ listingId }) {
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-3xl text-gray-300">📦</div>
               )}
-              {listing.is_boosted && (
-                <span className="absolute top-2 left-2 bg-amber-400 text-amber-900 text-xs font-bold px-2 py-0.5 rounded-full">
-                  ⚡ Boost
-                </span>
-              )}
+              {/* Badge boost masqué côté acheteur */}
             </div>
 
             {/* Infos */}

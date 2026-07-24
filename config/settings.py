@@ -350,5 +350,10 @@ CELERY_BEAT_SCHEDULE = {
         'task':     'core.security_agent.run_security_scan',
         'schedule': crontab(hour=7, minute=0),   # 07h00 chaque matin
     },
+    # Virements livreurs hebdomadaires — chaque lundi à 07h00
+    'weekly-livreur-payouts': {
+        'task':     'apps.orders.tasks.weekly_livreur_payouts',
+        'schedule': crontab(hour=7, minute=0, day_of_week=1),  # lundi 07h00
+    },
 }
 

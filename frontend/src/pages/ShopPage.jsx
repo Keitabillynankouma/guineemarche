@@ -199,11 +199,7 @@ export default function ShopPage() {
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 : <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
                                             }
-                                            {l.is_boosted && (
-                                                <span className="absolute top-2 left-2 bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
-                                                    ⭐ Boost
-                                                </span>
-                                            )}
+                                            {/* Badge boost masqué côté acheteur */}
                                         </div>
                                         <div className="p-3">
                                             <p className="font-bold text-sm text-gray-900 truncate leading-snug">{l.title}</p>

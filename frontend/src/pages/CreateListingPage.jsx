@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { listingsAPI, authAPI } from '../services/api'
 import { useQuery } from '@tanstack/react-query'
+import { VILLES, getCommunesByVille } from '../constants/communes'
 
 function AttributeField({ attr, value, onChange }) {
     const base = "w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 focus:bg-white transition-all"
@@ -32,8 +33,7 @@ function AttributeField({ attr, value, onChange }) {
     )
 }
 
-const QUARTIERS = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
-const VILLES    = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré']
+// VILLES et communes par ville importés depuis ../constants/communes
 
 async function compressImage(file) {
     return new Promise((resolve) => {
@@ -411,21 +411,21 @@ export default function CreateListingPage() {
                                 <label className={labelClass}>Ville</label>
                                 <select
                                     value={form.city}
-                                    onChange={e => setForm({ ...form, city: e.target.value })}
+                                    onChange={e => setForm({ ...form, city: e.target.value, quartier: '' })}
                                     className={inputClass}
                                 >
                                     {VILLES.map(v => <option key={v}>{v}</option>)}
                                 </select>
                             </div>
                             <div>
-                                <label className={labelClass}>Quartier</label>
+                                <label className={labelClass}>Commune / Quartier</label>
                                 <select
                                     value={form.quartier}
                                     onChange={e => setForm({ ...form, quartier: e.target.value })}
                                     className={inputClass}
                                 >
                                     <option value="">Choisir…</option>
-                                    {QUARTIERS.map(q => <option key={q}>{q}</option>)}
+                                    {getCommunesByVille(form.city).map(q => <option key={q}>{q}</option>)}
                                 </select>
                             </div>
                         </div>

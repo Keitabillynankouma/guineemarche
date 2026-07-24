@@ -51,6 +51,8 @@ class OrderSerializer(serializers.ModelSerializer):
     pickup_point_detail = PickupPointSerializer(source='pickup_point', read_only=True)
     delivery_assignment_detail = serializers.SerializerMethodField()
     return_request = ReturnRequestSerializer(read_only=True)
+    # Prix négocié — uniquement pour les annonces à prix libre (price_type='negotiable')
+    negotiated_price = serializers.IntegerField(write_only=True, required=False, min_value=1)
 
     class Meta:
         model  = Order
@@ -61,7 +63,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
             'meet_location', 'delivery_address', 'delivery_fee_gnf',
             'delivery_distance_km', 'delivery_weight_kg', 'delivery_buyer_commune',
-            'note',
+            'note', 'negotiated_price',
             'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
             'payments', 'delivery_assignment_detail', 'return_request',
             'created_at', 'updated_at',
@@ -92,7 +94,14 @@ class OrderSerializer(serializers.ModelSerializer):
         listing = validated_data['listing']
         validated_data['seller'] = listing.seller
 
-        # Calcul du montant total : prix annonce + frais de livraison à domicile
+        # Prix négocié : on pop le champ (pas un champ du modèle) et on l'utilise si l'annonce est à débattre
+        negotiated_price = validated_data.pop('negotiated_price', None)
+        if negotiated_price and listing.price_type == 'negotiable':
+            article_price = negotiated_price
+        else:
+            article_price = listing.price_gnf
+
+        # Calcul du montant total : prix article + frais de livraison à domicile
         delivery_mode = validated_data.get('delivery_mode', Order.DeliveryMode.MEETING_POINT)
         delivery_fee  = 0
         if delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
@@ -125,7 +134,7 @@ class OrderSerializer(serializers.ModelSerializer):
                     pass
                 validated_data['delivery_fee_gnf'] = delivery_fee
 
-        validated_data['amount_gnf'] = listing.price_gnf + delivery_fee
+        validated_data['amount_gnf'] = article_price + delivery_fee
         return super().create(validated_data)
 
 

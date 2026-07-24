@@ -1680,3 +1680,177 @@ class AdminAccountingExportView(APIView):
                 ])
 
         return response
+
+
+# ── Amendes & virements hebdomadaires livreurs ────────────────────────────────
+
+class AdminLivreurFineListView(APIView):
+    """GET /orders/admin/accounting/fines/ — liste toutes les amendes."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from .models import LivreurFine
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        qs = LivreurFine.objects.select_related('livreur', 'order').order_by('-created_at')
+        livreur_id = request.query_params.get('livreur_id')
+        status_f   = request.query_params.get('status')
+        if livreur_id: qs = qs.filter(livreur_id=livreur_id)
+        if status_f:   qs = qs.filter(status=status_f)
+
+        data = [{
+            'id':          str(f.id),
+            'livreur_id':  str(f.livreur.id),
+            'livreur':     f.livreur.full_name,
+            'amount_gnf':  f.amount_gnf,
+            'reason':      f.reason,
+            'description': f.description,
+            'status':      f.status,
+            'order_id':    str(f.order.id) if f.order else None,
+            'created_at':  f.created_at.isoformat(),
+            'deducted_at': f.deducted_at.isoformat() if f.deducted_at else None,
+        } for f in qs[:200]]
+        return Response(data)
+
+
+class AdminCreateLivreurFineView(APIView):
+    """POST /orders/admin/accounting/fines/create/ — infliger une amende."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from .models import LivreurFine
+        from django.contrib.auth import get_user_model
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        User        = get_user_model()
+        livreur_id  = request.data.get('livreur_id', '')
+        amount_gnf  = request.data.get('amount_gnf', 0)
+        reason      = request.data.get('reason', LivreurFine.Reason.OTHER)
+        description = request.data.get('description', '')
+        order_id    = request.data.get('order_id')
+
+        if not livreur_id or not amount_gnf:
+            return Response({'error': 'livreur_id et amount_gnf requis.'}, status=400)
+
+        livreur = get_object_or_404(User, pk=livreur_id, role='livreur')
+        fine = LivreurFine.objects.create(
+            livreur=livreur,
+            amount_gnf=int(amount_gnf),
+            reason=reason,
+            description=description,
+            order_id=order_id or None,
+        )
+        return Response({
+            'id':         str(fine.id),
+            'livreur':    livreur.full_name,
+            'amount_gnf': fine.amount_gnf,
+            'reason':     fine.reason,
+            'status':     fine.status,
+        }, status=201)
+
+
+class AdminUpdateLivreurFineView(APIView):
+    """PATCH /orders/admin/accounting/fines/<pk>/ — annuler ou marquer déduite."""
+    permission_classes = [IsAdmin]
+
+    def patch(self, request, pk):
+        from .models import LivreurFine
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        fine   = get_object_or_404(LivreurFine, pk=pk)
+        status = request.data.get('status', '').strip()
+        if status not in ['pending', 'deducted', 'waived']:
+            return Response({'error': 'Statut invalide.'}, status=400)
+        fine.status = status
+        if status == 'deducted':
+            from django.utils import timezone as tz
+            fine.deducted_at = tz.now()
+        fine.admin_note = request.data.get('admin_note', fine.admin_note)
+        fine.save()
+        return Response({'id': str(fine.id), 'status': fine.status})
+
+
+class AdminWeeklyPayoutsView(APIView):
+    """GET /orders/admin/accounting/weekly-payouts/ — virements hebdomadaires."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from .models import LivreurWeeklyPayout
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        qs = LivreurWeeklyPayout.objects.select_related('livreur').order_by('-week_start')
+        status_f   = request.query_params.get('status')
+        livreur_id = request.query_params.get('livreur_id')
+        if status_f:   qs = qs.filter(status=status_f)
+        if livreur_id: qs = qs.filter(livreur_id=livreur_id)
+
+        data = [{
+            'id':               str(p.id),
+            'livreur_id':       str(p.livreur.id),
+            'livreur':          p.livreur.full_name,
+            'livreur_phone':    str(p.livreur.phone_number or ''),
+            'week_start':       str(p.week_start),
+            'week_end':         str(p.week_end),
+            'deliveries_count': p.deliveries_count,
+            'gross_gnf':        p.gross_gnf,
+            'fines_gnf':        p.fines_gnf,
+            'net_gnf':          p.net_gnf,
+            'status':           p.status,
+            'paid_at':          p.paid_at.isoformat() if p.paid_at else None,
+            'payment_ref':      p.payment_ref,
+            'payment_method':   p.payment_method,
+        } for p in qs[:200]]
+        return Response(data)
+
+
+class AdminMarkWeeklyPayoutPaidView(APIView):
+    """POST /orders/admin/accounting/weekly-payouts/mark-paid/ — marquer payé."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from .models import LivreurWeeklyPayout
+        from django.utils import timezone
+        if not (request.user.can_manage_accounting or request.user.is_super_admin):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        payout_ids     = request.data.get('payout_ids', [])
+        payment_ref    = request.data.get('payment_ref', '').strip()
+        payment_method = request.data.get('payment_method', '').strip()
+        note           = request.data.get('note', '').strip()
+
+        if not payout_ids:
+            return Response({'error': 'payout_ids requis.'}, status=400)
+
+        qs    = LivreurWeeklyPayout.objects.filter(id__in=payout_ids, status='pending')
+        count = qs.update(
+            status='paid', paid_at=timezone.now(),
+            payment_ref=payment_ref,
+            payment_method=payment_method,
+            note=note,
+        )
+        return Response({'paid': count, 'payment_ref': payment_ref})
+
+
+class AdminGenerateWeeklyPayoutsView(APIView):
+    """POST /orders/admin/accounting/weekly-payouts/generate/ — générer manuellement."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        from .models import LivreurWeeklyPayout
+        from datetime import date, timedelta
+        if not (request.user.is_super_admin or request.user.can_manage_accounting):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        week_start_str = request.data.get('week_start')
+        if week_start_str:
+            week_start = date.fromisoformat(week_start_str)
+        else:
+            today      = date.today()
+            week_start = today - timedelta(days=today.weekday())
+
+        count = LivreurWeeklyPayout.generate_for_week(week_start)
+        return Response({'generated': count, 'week_start': str(week_start)})

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI, deliveryAPI } from '../services/api'
+import { COMMUNES_PAR_VILLE } from '../constants/communes'
 
 // ── Haversine distance (km) ────────────────────────────────────────────────────
 function haversineKm(lat1, lon1, lat2, lon2) {
@@ -330,6 +331,7 @@ function OrderModal({ listing, onClose, onSuccess }) {
     const [provider, setProvider]           = useState('orange_money')
     const [phone, setPhone]                 = useState('')
     const [error, setError]                 = useState('')
+    const [negotiatedPrice, setNegotiatedPrice] = useState(listing.price_type === 'negotiable' ? String(listing.price_gnf) : '')
     const queryClient = useQueryClient()
 
     const { data: pickupPoints = [] } = useQuery({
@@ -359,9 +361,13 @@ function OrderModal({ listing, onClose, onSuccess }) {
         enabled:  deliveryMode === 'home_delivery',
     })
 
-    // Communes disponibles depuis les tarifs + commune vendeur
+    // Communes disponibles : toutes les communes de la ville du vendeur (+ eventuels tarifs inter-communes)
     const sellerCommune   = listing.quartier || ''
-    const availableComm   = [...new Set(zoneRates.filter(r => r.from_commune === sellerCommune).map(r => r.to_commune))]
+    const sellerCity      = listing.city || 'Conakry'
+    // Afficher toutes les communes de la ville du vendeur + celles des tarifs inter-communes
+    const communesDeVille = COMMUNES_PAR_VILLE[sellerCity] || []
+    const communesTarifs  = zoneRates.filter(r => r.from_commune === sellerCommune).map(r => r.to_commune)
+    const availableComm   = [...new Set([...communesDeVille, ...communesTarifs])]
     const communeRate     = buyerCommune
         ? zoneRates.find(r => r.from_commune === sellerCommune && r.to_commune === buyerCommune)
         : null
@@ -417,7 +423,8 @@ function OrderModal({ listing, onClose, onSuccess }) {
     }
     const { fee: deliveryFee, distCharge, weightCharge, source: feeSource } = calcDeliveryFee()
     const hasDynamicPricing = deliveryZone && (deliveryZone.price_per_km_gnf > 0 || deliveryZone.price_per_kg_gnf > 0)
-    const totalAmount       = listing.price_gnf + deliveryFee
+    const articlePrice  = listing.price_type === 'negotiable' ? (parseInt(negotiatedPrice) || listing.price_gnf) : listing.price_gnf
+    const totalAmount   = articlePrice + deliveryFee
 
     const handleOrder = async (e) => {
         e.preventDefault(); setError('')
@@ -427,6 +434,10 @@ function OrderModal({ listing, onClose, onSuccess }) {
         if (deliveryMode === 'home_delivery' && !deliveryAddress.trim()) {
             setError('Veuillez saisir votre adresse de livraison.'); return
         }
+        if (listing.price_type === 'negotiable') {
+            const np = parseInt(negotiatedPrice)
+            if (!np || np <= 0) { setError('Entrez un prix négocié valide.'); return }
+        }
         try {
             const orderPayload = {
                 listing:          listing.id,
@@ -434,6 +445,9 @@ function OrderModal({ listing, onClose, onSuccess }) {
                 meet_location:    deliveryMode === 'meeting_point'  ? finalMeetLocation : '',
                 pickup_point:     deliveryMode === 'pickup_point'   ? pickupPoint       : null,
                 delivery_address: deliveryMode === 'home_delivery'  ? deliveryAddress   : '',
+            }
+            if (listing.price_type === 'negotiable' && negotiatedPrice) {
+                orderPayload.negotiated_price = parseInt(negotiatedPrice)
             }
             if (deliveryMode === 'home_delivery') {
                 if (distanceKm)   orderPayload.delivery_distance_km    = parseFloat(distanceKm)
@@ -452,9 +466,12 @@ function OrderModal({ listing, onClose, onSuccess }) {
     ]
 
     const PROVIDERS = [
-        { value: 'orange_money', label: '🟠 Orange Money', color: 'border-orange-400 bg-orange-50' },
-        { value: 'mtn_momo',     label: '🟡 MTN MoMo',     color: 'border-yellow-400 bg-yellow-50' },
-        { value: 'cash',         label: '💵 Espèces',       color: 'border-gray-300 bg-gray-50' },
+        { value: 'orange_money', label: '🟠 Orange Money', color: 'border-orange-400 bg-orange-50',   phonePlaceholder: 'Numéro Orange (ex: 622 XX XX XX)' },
+        { value: 'mtn_momo',     label: '🟡 MTN MoMo',     color: 'border-yellow-400 bg-yellow-50',   phonePlaceholder: 'Numéro MTN (ex: 624 XX XX XX)' },
+        { value: 'paycard',      label: '💳 PayCard',       color: 'border-blue-400 bg-blue-50',       phonePlaceholder: 'Numéro PayCard' },
+        { value: 'kulu',         label: '🔵 Kulu',          color: 'border-indigo-400 bg-indigo-50',   phonePlaceholder: 'Numéro Kulu' },
+        { value: 'soutra',       label: '🟢 Soutra Money',  color: 'border-emerald-400 bg-emerald-50', phonePlaceholder: 'Numéro Soutra' },
+        { value: 'cash',         label: '💵 Espèces',       color: 'border-gray-300 bg-gray-50',       phonePlaceholder: '' },
     ]
 
     return (
@@ -481,6 +498,25 @@ function OrderModal({ listing, onClose, onSuccess }) {
                     )}
 
                     <form onSubmit={handleOrder} className="space-y-5">
+
+                        {/* Prix négocié */}
+                        {listing.price_type === 'negotiable' && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                                <label className="block text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">
+                                    🤝 Prix négocié (GNF)
+                                </label>
+                                <p className="text-xs text-amber-600 mb-2">
+                                    Prix affiché : <strong>{new Intl.NumberFormat('fr-GN').format(listing.price_gnf)} GNF</strong> — entrez le prix convenu avec le vendeur.
+                                </p>
+                                <input
+                                    type="number" min="1" step="1000"
+                                    value={negotiatedPrice}
+                                    onChange={e => setNegotiatedPrice(e.target.value)}
+                                    className="w-full border border-amber-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white font-semibold"
+                                    placeholder="Ex: 250000"
+                                />
+                            </div>
+                        )}
 
                         {/* Mode livraison */}
                         <div>
@@ -647,8 +683,8 @@ function OrderModal({ listing, onClose, onSuccess }) {
                         {deliveryMode === 'home_delivery' && deliveryFee > 0 && (
                             <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
                                 <div className="flex justify-between text-gray-600">
-                                    <span>Prix article</span>
-                                    <span>{formatPrice(listing.price_gnf, listing.price_type)}</span>
+                                    <span>Prix article{listing.price_type === 'negotiable' ? ' (négocié)' : ''}</span>
+                                    <span>{new Intl.NumberFormat('fr-GN').format(articlePrice)} GNF</span>
                                 </div>
                                 <div className="flex justify-between text-gray-600">
                                     <span>Frais de base livraison</span>
@@ -679,14 +715,14 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             <div className="grid grid-cols-3 gap-2 mb-3">
                                 {PROVIDERS.map(p => (
                                     <button key={p.value} type="button" onClick={() => setProvider(p.value)}
-                                        className={`p-2.5 rounded-xl border-2 text-xs font-bold transition text-center ${provider === p.value ? p.color : 'border-gray-200 bg-white text-gray-600'}`}>
+                                        className={`p-2.5 rounded-xl border-2 text-xs font-bold transition text-center ${provider === p.value ? p.color + ' text-gray-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
                                         {p.label}
                                     </button>
                                 ))}
                             </div>
                             {provider !== 'cash' && (
                                 <input type="tel"
-                                    placeholder={provider === 'orange_money' ? '+224 6XX XX XX XX (Orange)' : '+224 6XX XX XX XX (MTN)'}
+                                    placeholder={PROVIDERS.find(p => p.value === provider)?.phonePlaceholder || 'Numéro de téléphone'}
                                     value={phone} onChange={e => setPhone(e.target.value)}
                                     className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" required />
                             )}
@@ -746,9 +782,7 @@ function SimilarCard({ listing }) {
                     ? <img src={cover.file} alt={listing.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
                     : <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
                 }
-                {listing.is_boosted && (
-                    <span className="absolute top-1.5 left-1.5 bg-amber-400 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">⚡</span>
-                )}
+                {/* Badge boost masqué côté acheteur */}
                 {isNew(listing.created_at) && (
                     <span className="absolute top-1.5 right-1.5 bg-green-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">Nouveau</span>
                 )}
@@ -921,7 +955,8 @@ export default function ListingDetailPage() {
                             )}
                             {/* Badges */}
                             <div className="absolute top-3 left-3 flex gap-2">
-                                {listing.is_boosted && (
+                                {/* Badge boost — visible seulement par le vendeur */}
+                                {listing.is_boosted && isSeller && (
                                     <span className="bg-amber-400 text-white text-xs font-bold px-2 py-1 rounded-full shadow">⚡ Boosté</span>
                                 )}
                                 {isNew(listing.created_at) && (
@@ -1078,13 +1113,32 @@ export default function ListingDetailPage() {
                                             </button>
                                         ))}
                                     </div>
-                                    <select value={boostProvider} onChange={e => setBoostProvider(e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400">
-                                        <option value="orange_money">🟠 Orange Money</option>
-                                        <option value="mtn_momo">🟡 MTN MoMo</option>
-                                    </select>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        {[
+                                            { value: 'orange_money', label: '🟠 Orange Money' },
+                                            { value: 'mtn_momo',     label: '🟡 MTN MoMo' },
+                                            { value: 'paycard',      label: '💳 PayCard' },
+                                            { value: 'kulu',         label: '🔵 Kulu' },
+                                            { value: 'soutra',       label: '🟢 Soutra' },
+                                        ].map(p => (
+                                            <button key={p.value} type="button"
+                                                onClick={() => setBoostProvider(p.value)}
+                                                className={`py-2 px-1 rounded-xl border-2 text-xs font-bold transition text-center
+                                                    ${boostProvider === p.value
+                                                        ? 'border-amber-500 bg-amber-50 text-amber-800'
+                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-amber-300'}`}>
+                                                {p.label}
+                                            </button>
+                                        ))}
+                                    </div>
                                     <input value={boostPhone} onChange={e => setBoostPhone(e.target.value)}
-                                        placeholder={boostProvider === 'mtn_momo' ? 'Numéro MTN (ex: 224 6XX XXX XXX)' : 'Numéro Orange Money (ex: 224 6XX XXX XXX)'}
+                                        placeholder={
+                                            boostProvider === 'orange_money' ? 'Numéro Orange (ex: 622 XX XX XX)' :
+                                            boostProvider === 'mtn_momo'     ? 'Numéro MTN (ex: 624 XX XX XX)' :
+                                            boostProvider === 'paycard'      ? 'Numéro PayCard' :
+                                            boostProvider === 'kulu'         ? 'Numéro Kulu' :
+                                            'Numéro Soutra Money'
+                                        }
                                         className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
                                     {boostMutation.isError && (
                                         <p className="text-sm text-red-500">{boostMutation.error?.response?.data?.error || 'Erreur de paiement'}</p>

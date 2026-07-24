@@ -13,6 +13,13 @@ const adminAPI = {
   getLivreurPayments:    (params) => api.get('/orders/admin/accounting/livreur-payments/', { params }),
   markLivreurPaid:       (data)   => api.post('/orders/admin/accounting/mark-paid/', data),
   exportAccounting:      (type)   => api.get(`/orders/admin/accounting/export/?type=${type}`, { responseType: 'blob' }),
+  // Amendes & virements hebdomadaires
+  getFines:              (params) => api.get('/orders/admin/accounting/fines/', { params }),
+  createFine:            (data)   => api.post('/orders/admin/accounting/fines/create/', data),
+  updateFine:            (id, data) => api.patch(`/orders/admin/accounting/fines/${id}/`, data),
+  getWeeklyPayouts:      (params) => api.get('/orders/admin/accounting/weekly-payouts/', { params }),
+  markWeeklyPaid:        (data)   => api.post('/orders/admin/accounting/weekly-payouts/mark-paid/', data),
+  generateWeeklyPayouts: (data)   => api.post('/orders/admin/accounting/weekly-payouts/generate/', data),
 
   // Ordres / litiges
   getStats:    () => api.get('/orders/admin/stats/'),
@@ -1671,8 +1678,26 @@ function TabUsers() {
     onSuccess:  () => qc.invalidateQueries(['admin-users']),
   })
 
-  const ROLE_COLORS = { admin: 'bg-red-100 text-red-700', seller: 'bg-blue-100 text-blue-700', buyer: 'bg-gray-100 text-gray-600', livreur: 'bg-amber-100 text-amber-700' }
-  const ROLE_LABELS = { admin: 'Admin', seller: 'Vendeur', buyer: 'Acheteur', livreur: 'Livreur' }
+  const ROLE_COLORS = {
+    admin:             'bg-red-100 text-red-700',
+    super_admin:       'bg-red-200 text-red-900',
+    seller:            'bg-blue-100 text-blue-700',
+    buyer:             'bg-gray-100 text-gray-600',
+    livreur:           'bg-amber-100 text-amber-700',
+    admin_delivery:    'bg-orange-100 text-orange-700',
+    admin_marketing:   'bg-purple-100 text-purple-700',
+    admin_accounting:  'bg-green-100 text-green-700',
+  }
+  const ROLE_LABELS = {
+    admin:             'Admin',
+    super_admin:       'Super Admin',
+    seller:            'Vendeur',
+    buyer:             'Acheteur',
+    livreur:           'Livreur',
+    admin_delivery:    'Admin Livraison',
+    admin_marketing:   'Admin Marketing',
+    admin_accounting:  'Admin Comptable',
+  }
 
   const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc }, {})
 
@@ -1705,7 +1730,13 @@ function TabUsers() {
           <option value="buyer">Acheteurs</option>
           <option value="seller">Vendeurs</option>
           <option value="livreur">Livreurs</option>
-          <option value="admin">Admins</option>
+          <optgroup label="Admins">
+            <option value="admin">Admin</option>
+            <option value="admin_delivery">Admin Livraison</option>
+            <option value="admin_marketing">Admin Marketing</option>
+            <option value="admin_accounting">Admin Comptable</option>
+            <option value="super_admin">Super Admin</option>
+          </optgroup>
         </select>
       </div>
 
@@ -1764,7 +1795,13 @@ function TabUsers() {
                   <option value="buyer">Acheteur</option>
                   <option value="seller">Vendeur</option>
                   <option value="livreur">Livreur</option>
-                  <option value="admin">Admin</option>
+                  <optgroup label="Admins">
+                    <option value="admin">Admin</option>
+                    <option value="admin_delivery">Admin Livraison</option>
+                    <option value="admin_marketing">Admin Marketing</option>
+                    <option value="admin_accounting">Admin Comptable</option>
+                    <option value="super_admin">Super Admin</option>
+                  </optgroup>
                 </select>
               </div>
             </div>
@@ -2427,6 +2464,309 @@ function TabAccounting() {
           </div>
         )}
       </div>
+
+      {/* ── Virements hebdomadaires ── */}
+      <WeeklyPayoutsSection />
+
+      {/* ── Amendes livreurs ── */}
+      <FinesSection />
+    </div>
+  )
+}
+
+// ── Virements hebdomadaires livreurs ─────────────────────────────────────────
+const PAYMENT_METHODS = ['Orange Money', 'MTN MoMo', 'Virement bancaire', 'Espèces', 'Autre']
+
+function WeeklyPayoutsSection() {
+  const qc = useQueryClient()
+  const [selectedIds, setSelectedIds] = useState([])
+  const [payRef, setPayRef]       = useState('')
+  const [payMethod, setPayMethod] = useState('Orange Money')
+  const [statusFilter, setStatusFilter] = useState('pending')
+  const [msg, setMsg]   = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const { data: payouts = [], isLoading } = useQuery({
+    queryKey: ['weekly-payouts', statusFilter],
+    queryFn: () => adminAPI.getWeeklyPayouts({ status: statusFilter || undefined }).then(r => r.data),
+  })
+
+  const toggleSelect = (id) => setSelectedIds(prev =>
+    prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+  )
+
+  const handleMarkPaid = async () => {
+    if (!selectedIds.length) { setMsg('❌ Sélectionnez au moins un virement'); return }
+    if (!payRef.trim()) { setMsg('❌ Entrez une référence de paiement'); return }
+    setBusy(true); setMsg('')
+    try {
+      const res = await adminAPI.markWeeklyPaid({
+        payout_ids: selectedIds, payment_ref: payRef, payment_method: payMethod,
+      })
+      setMsg(`✅ ${res.data.paid} virement(s) marqué(s) payé(s) — réf: ${res.data.payment_ref}`)
+      setSelectedIds([]); setPayRef('')
+      qc.invalidateQueries(['weekly-payouts'])
+    } catch(e) {
+      setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`)
+    } finally { setBusy(false) }
+  }
+
+  const handleGenerate = async () => {
+    setBusy(true); setMsg('')
+    try {
+      const res = await adminAPI.generateWeeklyPayouts({})
+      setMsg(`✅ ${res.data.generated} virement(s) généré(s) pour semaine du ${res.data.week_start}`)
+      qc.invalidateQueries(['weekly-payouts'])
+    } catch(e) {
+      setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`)
+    } finally { setBusy(false) }
+  }
+
+  const totalSelected = payouts
+    .filter(p => selectedIds.includes(p.id))
+    .reduce((sum, p) => sum + p.net_gnf, 0)
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-800">📅 Virements hebdomadaires livreurs</h2>
+        <div className="flex gap-2">
+          <select
+            value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none"
+          >
+            <option value="">Tous</option>
+            <option value="pending">En attente</option>
+            <option value="paid">Versés</option>
+            <option value="on_hold">Bloqués</option>
+          </select>
+          <button onClick={handleGenerate} disabled={busy}
+            className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium rounded-lg transition disabled:opacity-50">
+            🔄 Générer semaine actuelle
+          </button>
+        </div>
+      </div>
+
+      {msg && (
+        <div className={`mb-3 p-3 rounded-xl text-sm ${msg.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+          {msg}
+        </div>
+      )}
+
+      {/* Barre de paiement groupé */}
+      {selectedIds.length > 0 && (
+        <div className="mb-4 p-4 bg-amber-50 border border-amber-200 rounded-2xl space-y-3">
+          <p className="text-sm font-semibold text-amber-800">
+            {selectedIds.length} virement(s) sélectionné(s) — Total: <strong>{fmt(totalSelected)}</strong>
+          </p>
+          <div className="flex gap-2">
+            <input type="text" placeholder="Référence paiement (ex: OM-449872)"
+              value={payRef} onChange={e => setPayRef(e.target.value)}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400"
+            />
+            <select value={payMethod} onChange={e => setPayMethod(e.target.value)}
+              className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none">
+              {PAYMENT_METHODS.map(m => <option key={m}>{m}</option>)}
+            </select>
+          </div>
+          <button onClick={handleMarkPaid} disabled={busy}
+            className="w-full py-2 bg-amber-600 hover:bg-amber-700 text-white text-sm font-semibold rounded-xl transition disabled:opacity-50">
+            {busy ? 'Traitement...' : `💸 Marquer payé — ${fmt(totalSelected)}`}
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p className="text-gray-400 text-sm">Chargement...</p>
+      ) : payouts.length === 0 ? (
+        <p className="text-gray-400 text-sm text-center py-6">Aucun virement pour ce filtre.</p>
+      ) : (
+        <div className="space-y-2">
+          {payouts.map(p => (
+            <div key={p.id}
+              className={`flex items-center gap-3 p-4 rounded-2xl border transition cursor-pointer
+                ${selectedIds.includes(p.id) ? 'border-amber-400 bg-amber-50' : 'border-gray-100 bg-white'}
+                ${p.status === 'pending' ? 'hover:border-amber-300' : ''}`}
+              onClick={() => p.status === 'pending' && toggleSelect(p.id)}
+            >
+              {p.status === 'pending' && (
+                <input type="checkbox" readOnly checked={selectedIds.includes(p.id)}
+                  className="w-4 h-4 accent-amber-500 flex-shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-gray-800 text-sm">{p.livreur}</span>
+                  <span className="text-xs text-gray-400">{p.livreur_phone}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium
+                    ${p.status === 'paid' ? 'bg-green-100 text-green-700' :
+                      p.status === 'pending' ? 'bg-amber-100 text-amber-700' :
+                      'bg-gray-100 text-gray-500'}`}>
+                    {p.status === 'paid' ? '✅ Versé' : p.status === 'pending' ? '⏳ En attente' : '🔒 Bloqué'}
+                  </span>
+                </div>
+                <div className="flex items-center gap-4 mt-1 text-xs text-gray-500">
+                  <span>Sem. du {p.week_start}</span>
+                  <span>{p.deliveries_count} livraisons</span>
+                  <span>Brut: {fmt(p.gross_gnf)}</span>
+                  {p.fines_gnf > 0 && <span className="text-red-500">Amendes: -{fmt(p.fines_gnf)}</span>}
+                </div>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-base font-bold text-gray-800">{fmt(p.net_gnf)}</p>
+                {p.payment_ref && <p className="text-xs text-green-600">{p.payment_ref}</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Amendes livreurs ─────────────────────────────────────────────────────────
+const FINE_REASONS = [
+  { value: 'late_delivery',   label: 'Retard de livraison' },
+  { value: 'damaged_package', label: 'Colis abîmé' },
+  { value: 'bad_behavior',    label: 'Mauvaise conduite' },
+  { value: 'fraud_attempt',   label: 'Tentative de fraude' },
+  { value: 'no_show',         label: 'Absence injustifiée' },
+  { value: 'other',           label: 'Autre' },
+]
+
+function FinesSection() {
+  const qc = useQueryClient()
+  const [statusFilter, setStatusFilter] = useState('')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm] = useState({ livreur_id: '', amount_gnf: '', reason: 'other', description: '' })
+  const [msg, setMsg]   = useState('')
+  const [busy, setBusy] = useState(false)
+
+  const { data: fines = [], isLoading } = useQuery({
+    queryKey: ['fines', statusFilter],
+    queryFn: () => adminAPI.getFines({ status: statusFilter || undefined }).then(r => r.data),
+  })
+
+  const handleCreate = async () => {
+    if (!form.livreur_id || !form.amount_gnf) { setMsg('❌ ID livreur et montant requis'); return }
+    setBusy(true); setMsg('')
+    try {
+      await adminAPI.createFine({ ...form, amount_gnf: Number(form.amount_gnf) })
+      setMsg('✅ Amende créée')
+      setShowForm(false); setForm({ livreur_id: '', amount_gnf: '', reason: 'other', description: '' })
+      qc.invalidateQueries(['fines'])
+    } catch(e) {
+      setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`)
+    } finally { setBusy(false) }
+  }
+
+  const handleUpdate = async (id, status, adminNote = '') => {
+    setBusy(true); setMsg('')
+    try {
+      await adminAPI.updateFine(id, { status, admin_note: adminNote })
+      setMsg(`✅ Amende ${status === 'waived' ? 'annulée' : 'mise à jour'}`)
+      qc.invalidateQueries(['fines'])
+    } catch(e) {
+      setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`)
+    } finally { setBusy(false) }
+  }
+
+  const STATUS_LABELS = { pending: '⏳ À déduire', deducted: '✅ Déduite', waived: '🚫 Annulée' }
+  const STATUS_COLORS = {
+    pending:  'bg-red-100 text-red-700',
+    deducted: 'bg-green-100 text-green-700',
+    waived:   'bg-gray-100 text-gray-500',
+  }
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-lg font-bold text-gray-800">⚠️ Amendes livreurs</h2>
+        <div className="flex gap-2">
+          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+            className="text-xs border border-gray-200 rounded-lg px-2 py-1.5 focus:outline-none">
+            <option value="">Toutes</option>
+            <option value="pending">À déduire</option>
+            <option value="deducted">Déduites</option>
+            <option value="waived">Annulées</option>
+          </select>
+          <button onClick={() => setShowForm(v => !v)}
+            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 text-white text-xs font-medium rounded-lg transition">
+            + Nouvelle amende
+          </button>
+        </div>
+      </div>
+
+      {msg && (
+        <div className={`mb-3 p-3 rounded-xl text-sm ${msg.startsWith('✅') ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-600'}`}>
+          {msg}
+        </div>
+      )}
+
+      {showForm && (
+        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-2xl space-y-3">
+          <p className="text-sm font-semibold text-red-800">Créer une amende</p>
+          <input type="text" placeholder="ID livreur (UUID)"
+            value={form.livreur_id} onChange={e => setForm({...form, livreur_id: e.target.value})}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+          <div className="flex gap-2">
+            <input type="number" placeholder="Montant GNF"
+              value={form.amount_gnf} onChange={e => setForm({...form, amount_gnf: e.target.value})}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-red-400" />
+            <select value={form.reason} onChange={e => setForm({...form, reason: e.target.value})}
+              className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none">
+              {FINE_REASONS.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
+            </select>
+          </div>
+          <textarea placeholder="Description (optionnel)" rows={2}
+            value={form.description} onChange={e => setForm({...form, description: e.target.value})}
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none resize-none" />
+          <button onClick={handleCreate} disabled={busy}
+            className="w-full py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition disabled:opacity-50">
+            {busy ? 'Création...' : '⚠️ Créer l\'amende'}
+          </button>
+        </div>
+      )}
+
+      {isLoading ? (
+        <p className="text-gray-400 text-sm">Chargement...</p>
+      ) : fines.length === 0 ? (
+        <p className="text-gray-400 text-sm text-center py-6">Aucune amende.</p>
+      ) : (
+        <div className="space-y-2">
+          {fines.map(f => (
+            <div key={f.id} className="flex items-start gap-3 p-4 bg-white border border-gray-100 rounded-2xl shadow-sm">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-gray-800 text-sm">{f.livreur}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[f.status]}`}>
+                    {STATUS_LABELS[f.status]}
+                  </span>
+                  <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded-full">
+                    {FINE_REASONS.find(r => r.value === f.reason)?.label || f.reason}
+                  </span>
+                </div>
+                {f.description && <p className="text-xs text-gray-500 mt-1">{f.description}</p>}
+                <p className="text-xs text-gray-400 mt-0.5">{new Date(f.created_at).toLocaleDateString('fr-GN')}</p>
+              </div>
+              <div className="text-right flex-shrink-0">
+                <p className="text-base font-bold text-red-600">-{fmt(f.amount_gnf)}</p>
+                {f.status === 'pending' && (
+                  <div className="flex gap-1 mt-1">
+                    <button onClick={() => handleUpdate(f.id, 'deducted')} disabled={busy}
+                      className="px-2 py-0.5 bg-green-600 text-white text-xs rounded-lg hover:bg-green-700 transition">
+                      Déduire
+                    </button>
+                    <button onClick={() => handleUpdate(f.id, 'waived')} disabled={busy}
+                      className="px-2 py-0.5 bg-gray-200 text-gray-600 text-xs rounded-lg hover:bg-gray-300 transition">
+                      Annuler
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

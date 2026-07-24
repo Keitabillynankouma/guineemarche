@@ -147,10 +147,10 @@ class Order(BaseModel):
     delivery_buyer_commune = models.CharField(max_length=100, blank=True,
                                               help_text="Commune de l'acheteur — déclenche la tarification inter-commune")
 
-    # Seuils escrow
-    LARGE_AMOUNT_GNF  = 500_000   # montants ≥ 500 000 GNF → délai étendu + alerte admin
-    ESCROW_DELAY_STD  = 6         # heures pour petits montants
-    ESCROW_DELAY_LARGE = 48       # heures pour gros montants
+    # Seuils escrow — configurables dans SiteSettings (escrow_delay_std_h, escrow_delay_large_h)
+    LARGE_AMOUNT_GNF   = 500_000  # montants ≥ 500 000 GNF → délai étendu + alerte admin
+    ESCROW_DELAY_STD   = 24       # heures pour petits montants (défaut 24h)
+    ESCROW_DELAY_LARGE = 72       # heures pour gros montants (défaut 72h)
 
     class Meta:
         verbose_name        = 'Commande'
@@ -201,8 +201,11 @@ class Order(BaseModel):
         """
         from django.utils import timezone
         from datetime import timedelta
+        from core.site_settings import SiteSettings
         is_large = self.amount_gnf >= self.LARGE_AMOUNT_GNF
-        delay    = self.ESCROW_DELAY_LARGE if is_large else self.ESCROW_DELAY_STD
+        delay_std   = SiteSettings.flag('escrow_delay_std_h',   default=self.ESCROW_DELAY_STD)
+        delay_large = SiteSettings.flag('escrow_delay_large_h', default=self.ESCROW_DELAY_LARGE)
+        delay    = delay_large if is_large else delay_std
         self.escrow_release_at = timezone.now() + timedelta(hours=delay)
         self.escrow_status     = self.EscrowStatus.HELD
         self.save(update_fields=['escrow_status', 'escrow_release_at', 'updated_at'])
@@ -400,6 +403,133 @@ class LivreurPayment(BaseModel):
             platform_cut_gnf=platform_cut,
             net_gnf=net,
         )
+
+
+# ── Amendes livreurs ──────────────────────────────────────────────────────────
+
+class LivreurFine(BaseModel):
+    """
+    Amende infligée à un livreur par l'admin (retard, colis abîmé, mauvaise conduite...).
+    Déduite du prochain virement hebdomadaire.
+    """
+
+    class Reason(models.TextChoices):
+        LATE_DELIVERY    = 'late_delivery',    'Retard de livraison'
+        DAMAGED_PACKAGE  = 'damaged_package',  'Colis abîmé'
+        BAD_BEHAVIOR     = 'bad_behavior',     'Mauvaise conduite'
+        FRAUD_ATTEMPT    = 'fraud_attempt',    'Tentative de fraude'
+        NO_SHOW          = 'no_show',          'Absence injustifiée'
+        OTHER            = 'other',            'Autre'
+
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'À déduire'
+        DEDUCTED = 'deducted', 'Déduite'
+        WAIVED   = 'waived',   'Annulée'
+
+    livreur    = models.ForeignKey(User, on_delete=models.CASCADE, related_name='fines')
+    amount_gnf = models.BigIntegerField(help_text="Montant de l'amende en GNF")
+    reason     = models.CharField(max_length=20, choices=Reason.choices, default=Reason.OTHER)
+    description = models.TextField(blank=True, help_text="Détail de l'amende")
+    status     = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    deducted_at = models.DateTimeField(null=True, blank=True)
+    order      = models.ForeignKey('Order', null=True, blank=True, on_delete=models.SET_NULL,
+                                   related_name='livreur_fines', help_text="Commande liée (optionnel)")
+    admin_note = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name        = 'Amende livreur'
+        verbose_name_plural = 'Amendes livreurs'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f"Amende {self.livreur.full_name} — {self.amount_gnf:,} GNF ({self.status})"
+
+
+# ── Virements hebdomadaires livreurs ──────────────────────────────────────────
+
+class LivreurWeeklyPayout(BaseModel):
+    """
+    Récapitulatif de virement hebdomadaire pour un livreur.
+    Créé chaque semaine par la tâche Celery weekly_livreur_payouts.
+    Regroupe tous les LivreurPayment PENDING de la semaine - les amendes PENDING.
+    """
+
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'En attente'
+        PAID     = 'paid',     'Versé'
+        PARTIAL  = 'partial',  'Versement partiel'
+        ON_HOLD  = 'on_hold',  'Bloqué'
+
+    livreur          = models.ForeignKey(User, on_delete=models.CASCADE, related_name='weekly_payouts')
+    week_start       = models.DateField(help_text="Lundi de la semaine (ISO)")
+    week_end         = models.DateField(help_text="Dimanche de la semaine (ISO)")
+    deliveries_count = models.PositiveIntegerField(default=0)
+    gross_gnf        = models.BigIntegerField(default=0, help_text="Total brut livraisons")
+    fines_gnf        = models.BigIntegerField(default=0, help_text="Total amendes déduites")
+    net_gnf          = models.BigIntegerField(default=0, help_text="Net à verser = brut - amendes")
+    status           = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    paid_at          = models.DateTimeField(null=True, blank=True)
+    payment_ref      = models.CharField(max_length=150, blank=True)
+    payment_method   = models.CharField(max_length=50, blank=True, help_text="Ex: orange_money, mtn, virement")
+    note             = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name        = 'Virement hebdomadaire livreur'
+        verbose_name_plural = 'Virements hebdomadaires livreurs'
+        ordering            = ['-week_start']
+        unique_together     = [('livreur', 'week_start')]
+
+    def __str__(self):
+        return f"{self.livreur.full_name} semaine du {self.week_start} — {self.net_gnf:,} GNF ({self.status})"
+
+    @classmethod
+    def generate_for_week(cls, week_start_date):
+        """
+        Génère les récapitulatifs de la semaine pour tous les livreurs ayant des paiements PENDING.
+        Appelé par la tâche Celery chaque lundi matin.
+        """
+        from datetime import timedelta
+        week_end = week_start_date + timedelta(days=6)
+
+        # Trouver tous les livreurs avec des paiements en attente créés dans la semaine
+        pending_payments = LivreurPayment.objects.filter(
+            status=LivreurPayment.Status.PENDING,
+            created_at__date__gte=week_start_date,
+            created_at__date__lte=week_end,
+        ).select_related('livreur')
+
+        livreurs_ids = pending_payments.values_list('livreur_id', flat=True).distinct()
+
+        for livreur_id in livreurs_ids:
+            payments = pending_payments.filter(livreur_id=livreur_id)
+            fines    = LivreurFine.objects.filter(
+                livreur_id=livreur_id,
+                status=LivreurFine.Status.PENDING,
+            )
+
+            gross_gnf    = sum(p.net_gnf for p in payments)
+            fines_gnf    = sum(f.amount_gnf for f in fines)
+            net_gnf      = max(0, gross_gnf - fines_gnf)
+
+            payout, created = cls.objects.get_or_create(
+                livreur_id=livreur_id,
+                week_start=week_start_date,
+                defaults={
+                    'week_end':         week_end,
+                    'deliveries_count': payments.count(),
+                    'gross_gnf':        gross_gnf,
+                    'fines_gnf':        fines_gnf,
+                    'net_gnf':          net_gnf,
+                }
+            )
+            if not created:
+                payout.deliveries_count = payments.count()
+                payout.gross_gnf  = gross_gnf
+                payout.fines_gnf  = fines_gnf
+                payout.net_gnf    = net_gnf
+                payout.save(update_fields=['deliveries_count', 'gross_gnf', 'fines_gnf', 'net_gnf', 'updated_at'])
+
+        return livreurs_ids.count()
 
 
 # ── Demandes de retour ─────────────────────────────────────────────────────────

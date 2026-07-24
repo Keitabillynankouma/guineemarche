@@ -147,6 +147,28 @@ urlpatterns = [
         views.AdminAccountingExportView.as_view(),
         name='admin-accounting-export'),
 
+    # Amendes livreurs
+    path('admin/accounting/fines/',
+        views.AdminLivreurFineListView.as_view(),
+        name='admin-fines-list'),
+    path('admin/accounting/fines/create/',
+        views.AdminCreateLivreurFineView.as_view(),
+        name='admin-fines-create'),
+    path('admin/accounting/fines/<uuid:pk>/',
+        views.AdminUpdateLivreurFineView.as_view(),
+        name='admin-fines-update'),
+
+    # Virements hebdomadaires livreurs
+    path('admin/accounting/weekly-payouts/',
+        views.AdminWeeklyPayoutsView.as_view(),
+        name='admin-weekly-payouts'),
+    path('admin/accounting/weekly-payouts/mark-paid/',
+        views.AdminMarkWeeklyPayoutPaidView.as_view(),
+        name='admin-weekly-payouts-mark-paid'),
+    path('admin/accounting/weekly-payouts/generate/',
+        views.AdminGenerateWeeklyPayoutsView.as_view(),
+        name='admin-weekly-payouts-generate'),
+
     # Retours
     path('<uuid:pk>/return/',
         views.CreateReturnView.as_view(),

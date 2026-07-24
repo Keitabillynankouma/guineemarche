@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate, Link, useSearchParams } from 'react-router-dom'
 import { authAPI } from '../services/api'
-
-const VILLES = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré', 'Siguiri', 'Mamou', 'Boké', 'Coyah']
+import { VILLES, getCommunesByVille } from '../constants/communes'
 
 // ── Input avec icône ───────────────────────────────────────────────────────────
 function Input({ icon, label, right, error, className = '', ...props }) {
@@ -169,7 +168,7 @@ export default function RegisterPage() {
   const [showPwd2, setShowPwd2] = useState(false)
 
   const [form, setForm] = useState({
-    full_name: '', city: 'Conakry', phone_number: '', email: '',
+    full_name: '', city: 'Conakry', quartier: '', phone_number: '', email: '',
     password: '', password2: '', referral_code: refCode,
   })
 
@@ -188,7 +187,8 @@ export default function RegisterPage() {
         await authAPI.register({
           phone_number: form.phone_number, email: form.email || undefined,
           full_name: form.full_name, password: form.password, password2: form.password2,
-          city: form.city, referral_code: form.referral_code,
+          city: form.city, quartier: form.quartier || undefined,
+          referral_code: form.referral_code,
         })
       } else {
         await authAPI.registerEmail({
@@ -321,9 +321,18 @@ export default function RegisterPage() {
                   )}
 
                   {mode === 'guinea' && (
-                    <SelectField icon={<MapIcon />} label="Ville" value={form.city} onChange={f('city')}>
-                      {VILLES.map(v => <option key={v}>{v}</option>)}
-                    </SelectField>
+                    <>
+                      <SelectField icon={<MapIcon />} label="Ville" value={form.city}
+                        onChange={e => setForm(prev => ({ ...prev, city: e.target.value, quartier: '' }))}>
+                        {VILLES.map(v => <option key={v}>{v}</option>)}
+                      </SelectField>
+                      {getCommunesByVille(form.city).length > 0 && (
+                        <SelectField icon={<MapIcon />} label="Commune / Quartier" value={form.quartier} onChange={f('quartier')}>
+                          <option value="">— Choisir votre commune —</option>
+                          {getCommunesByVille(form.city).map(c => <option key={c}>{c}</option>)}
+                        </SelectField>
+                      )}
+                    </>
                   )}
 
                   <div className="grid grid-cols-2 gap-3">
