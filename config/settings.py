@@ -2,31 +2,48 @@ from pathlib import Path
 import dj_database_url
 import os
 from datetime import timedelta
-import cloudinary
-from decouple import config as env
-import sentry_sdk
-from sentry_sdk.integrations.django import DjangoIntegration
-from sentry_sdk.integrations.redis import RedisIntegration
-from sentry_sdk.integrations.celery import CeleryIntegration
-from sentry_sdk.integrations.logging import LoggingIntegration
 import logging
+
+try:
+    import cloudinary
+except ImportError:
+    cloudinary = None
+
+from decouple import config as env
+
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.django import DjangoIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+    from sentry_sdk.integrations.celery import CeleryIntegration
+    from sentry_sdk.integrations.logging import LoggingIntegration
+    _SENTRY_AVAILABLE = True
+except ImportError:
+    _SENTRY_AVAILABLE = False
 
 
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
-DEBUG = os.environ.get('DEBUG', 'False') == 'True'
-
-# En prod, définir ALLOWED_HOSTS=guineemarche.onrender.com dans les variables Render
-_allowed_hosts_env = os.environ.get('ALLOWED_HOSTS', '')
-_base_hosts = ['guineemarche.onrender.com', 'www.guineemarche.com']
-ALLOWED_HOSTS = (
-    list({*_allowed_hosts_env.split(','), *_base_hosts})
-    if _allowed_hosts_env
-    else (['*'] if DEBUG else _base_hosts)
+SECRET_KEY = os.environ.get(
+    'SECRET_KEY',
+    env('SECRET_KEY', default='dev-secret-key-guimatrix-local-2024-xK9mP2nQ')
 )
+
+# DEBUG : true si variable d'env présente, sinon lire .env, sinon True en local
+_debug_env = os.environ.get('DEBUG') or env('DEBUG', default='True')
+DEBUG = str(_debug_env).lower() in ('true', '1', 'yes')
+
+# ALLOWED_HOSTS
+_allowed_hosts_env = os.environ.get('ALLOWED_HOSTS') or env('ALLOWED_HOSTS', default='')
+_base_hosts = ['guineemarche.onrender.com', 'www.guineemarche.com']
+if _allowed_hosts_env:
+    ALLOWED_HOSTS = list({h.strip() for h in _allowed_hosts_env.split(',') if h.strip()} | set(_base_hosts))
+elif DEBUG:
+    ALLOWED_HOSTS = ['*']
+else:
+    ALLOWED_HOSTS = _base_hosts
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 DJANGO_APPS = [
@@ -71,7 +88,7 @@ CLOUDINARY_STORAGE = {
 
 _USE_CLOUDINARY = bool(CLOUDINARY_STORAGE['CLOUD_NAME'])
 
-if _USE_CLOUDINARY:
+if _USE_CLOUDINARY and cloudinary:
     cloudinary.config(
         cloud_name=CLOUDINARY_STORAGE['CLOUD_NAME'],
         api_key=CLOUDINARY_STORAGE['API_KEY'],
@@ -230,7 +247,7 @@ ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
 # ── Sentry — monitoring erreurs + performance + sécurité ──────────────────────
 SENTRY_DSN = env('SENTRY_DSN', default='')
 
-if SENTRY_DSN:
+if SENTRY_DSN and _SENTRY_AVAILABLE:
     sentry_sdk.init(
         dsn=SENTRY_DSN,
         integrations=[
@@ -270,9 +287,10 @@ ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
 
 # ── ChaChap Pay — agrégateur guinéen agréé BCRG ──────────────────────────────
 # Configurer dans Railway (ou .env local pour les tests) :
-CHACHAP_API_KEY     = env('CHACHAP_API_KEY', default='')
+CHACHAP_API_KEY      = env('CHACHAP_API_KEY', default='')
 # Clé HMAC séparée pour la signature des webhooks (≠ clé API)
-CHACHAP_HMAC_KEY    = env('CHACHAP_HMAC_KEY', default='')
+# Accepte CHACHAP_HMAC_KEY ou CHACHAP_WEBHOOK_SECRET selon le nom choisi dans Railway
+CHACHAP_HMAC_KEY     = env('CHACHAP_HMAC_KEY', default='') or env('CHACHAP_WEBHOOK_SECRET', default='')
 CHACHAP_WEBHOOK_URL = env('CHACHAP_WEBHOOK_URL',
                           default='https://api.guimatrix.com/api/v1/orders/webhook/chachap/')
 

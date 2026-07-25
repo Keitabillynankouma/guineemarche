@@ -545,7 +545,10 @@ def _verify_chachap_signature(request):
       - CHACHAP_HMAC_KEY : pour signer les webhooks entrants
     Header: CCP-Signature (HMAC-SHA256 du body avec CHACHAP_HMAC_KEY)
     """
-    hmac_key = getattr(settings, 'CHACHAP_HMAC_KEY', '') or getattr(settings, 'CHACHAP_API_KEY', '')
+    # Accepte CHACHAP_HMAC_KEY ou CHACHAP_WEBHOOK_SECRET (noms Railway variés)
+    hmac_key = (getattr(settings, 'CHACHAP_HMAC_KEY', '')
+                or getattr(settings, 'CHACHAP_WEBHOOK_SECRET', '')
+                or getattr(settings, 'CHACHAP_API_KEY', ''))
     if not hmac_key:
         logger.error(
             "[CHACHAP] CHACHAP_HMAC_KEY non configuré — webhook rejeté (fail-closed). "
@@ -623,6 +626,13 @@ class PaymentWebhookView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request, provider):
+        # IMPORTANT: lire request.body AVANT request.data
+        # DRF peut consommer le stream HTTP ce qui rend request.body inaccessible
+        # ensuite (RawPostDataException). Le lire ici force Django à le cacher dans _body.
+        try:
+            _ = request.body  # noqa — force le cache Django
+        except Exception:
+            pass
         data = request.data
 
         if provider == 'chachap':

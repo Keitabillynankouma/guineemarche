@@ -24,13 +24,15 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
 
     # Sans clé → simulation avec URL de redirection factice
     if not api_key:
-        sim_ref = f"SIM-CCP-{uuid.uuid4().hex[:8].upper()}"
-        logger.info("[CHACHAP] Clé API absente — simulation (ref=%s)", sim_ref)
+        # En simulation, on utilise order_id comme référence pour que le webhook
+        # puisse retrouver le paiement via Payment.objects.filter(order__id=ref)
+        sim_ref = str(order_id)
+        logger.info("[CHACHAP] Clé API absente — simulation (ref=order_id=%s)", sim_ref)
         return PaymentResult(
             success=True,
             reference=sim_ref,
             message="Paiement ChaChap Pay simulé (mode test)",
-            payment_url=f"https://chapchappay.com/pay/sim-{sim_ref.lower()}",
+            payment_url=f"https://chapchappay.com/pay/sim-{uuid.uuid4().hex[:12]}",
         )
 
     try:
@@ -64,17 +66,27 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
 
         err = data.get('error') or data.get('message') or f'Erreur HTTP {resp.status_code}'
         logger.warning("[CHACHAP] Échec création opération: %s", err)
+        # En mode DEBUG (dev local), fallback simulation pour permettre les tests
+        # sans accès à l'URL API réelle. En production, on retourne l'erreur.
+        if getattr(settings, 'DEBUG', False):
+            logger.info("[CHACHAP] DEBUG → fallback simulation (ref=order_id)")
+            return PaymentResult(
+                success=True,
+                reference=str(order_id),
+                message="ChaChap Pay (simulation — API inaccessible en local)",
+                payment_url=f"https://chapchappay.com/pay/sim-{uuid.uuid4().hex[:12]}",
+            )
         return PaymentResult(success=False, message=f"ChaChap Pay : {err}")
 
     except Exception as exc:
         logger.error("[CHACHAP] Erreur API: %s", exc)
-        # Fallback simulation si problème réseau
-        sim_ref = f"SIM-CCP-{uuid.uuid4().hex[:8].upper()}"
+        # Fallback simulation si problème réseau — utilise order_id comme ref
+        # pour que le webhook puisse retrouver le paiement
         return PaymentResult(
             success=True,
-            reference=sim_ref,
-            message="ChaChap Pay (mode dégradé)",
-            payment_url=f"https://chapchappay.com/pay/sim-{sim_ref.lower()}",
+            reference=str(order_id),
+            message="ChaChap Pay (mode dégradé — réseau indisponible)",
+            payment_url=f"https://chapchappay.com/pay/sim-{uuid.uuid4().hex[:12]}",
         )
 
 
