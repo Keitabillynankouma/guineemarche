@@ -22,7 +22,12 @@ urlpatterns = [
     path('favorites/<uuid:pk>/', views.FavoriteDeleteView.as_view(),      name='favorite-delete'),
     path('report/',              views.ListingReportView.as_view(),        name='listing-report'),
 
-    # Admin
+    # Admin — boost espèces
+    path('admin/boost-payments/',                  views.AdminBoostPaymentListView.as_view(),   name='admin-boost-list'),
+    path('admin/boost-payments/<uuid:pk>/approve/', views.AdminBoostPaymentApproveView.as_view(), name='admin-boost-approve'),
+    path('admin/boost-payments/<uuid:pk>/reject/',  views.AdminBoostPaymentRejectView.as_view(),  name='admin-boost-reject'),
+
+    # Admin — annonces
     path('admin/listings/',                      views.AdminListingListView.as_view(),    name='admin-listing-list'),
     path('admin/listings/<uuid:pk>/',            views.AdminListingDetailView.as_view(),  name='admin-listing-detail'),
     path('admin/listings/<uuid:pk>/approve/',    views.AdminListingApproveView.as_view(), name='admin-listing-approve'),

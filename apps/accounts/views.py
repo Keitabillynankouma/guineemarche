@@ -203,6 +203,23 @@ class MeView(generics.RetrieveUpdateAPIView):
         return user
 
 
+class RegisterFCMTokenView(APIView):
+    """
+    PATCH /accounts/me/fcm-token/
+    Enregistre ou met à jour le token FCM de l'appareil courant.
+    Appelé par le frontend après avoir obtenu le token via Firebase SDK.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request):
+        token = str(request.data.get('fcm_token', '')).strip()
+        if not token:
+            return Response({'error': 'fcm_token requis.'}, status=400)
+        request.user.fcm_token = token
+        request.user.save(update_fields=['fcm_token'])
+        return Response({'message': 'Token FCM enregistré.'})
+
+
 class LivreurToggleAvailabilityView(APIView):
     """Livreur : bascule son propre statut disponible/indisponible."""
     permission_classes = [permissions.IsAuthenticated]

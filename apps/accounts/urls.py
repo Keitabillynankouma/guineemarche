@@ -22,6 +22,9 @@ urlpatterns = [
     path('shops/',             views.ShopListView.as_view(),      name='shop-list'),
     path('shops/<uuid:pk>/',   views.ShopDetailView.as_view(),    name='shop-detail'),
 
+    # Push notifications FCM
+    path('me/fcm-token/', views.RegisterFCMTokenView.as_view(), name='register-fcm-token'),
+
     # Livreur
     path('livreur/toggle-availability/', views.LivreurToggleAvailabilityView.as_view(), name='livreur-toggle-availability'),
 

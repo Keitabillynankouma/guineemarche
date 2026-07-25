@@ -171,8 +171,8 @@ class Order(BaseModel):
         self.save(update_fields=['status', 'updated_at'])
 
     def complete(self):
-        if self.status != self.Status.CONFIRMED:
-            return  # Seulement depuis CONFIRMED
+        if self.status not in (self.Status.CONFIRMED, self.Status.DISPUTED):
+            return  # Depuis CONFIRMED (livraison normale) ou DISPUTED (résolution admin)
         self.status = self.Status.COMPLETED
         self.save(update_fields=['status', 'updated_at'])
         # Marquer l'annonce comme vendue
@@ -314,9 +314,17 @@ class DeliveryAssignment(BaseModel):
     status            = models.CharField(max_length=12, choices=Status.choices, default=Status.ASSIGNED)
     verification_code = models.CharField(max_length=6, help_text="Code 6 chiffres que l'acheteur fournit au livreur à la réception")
     pickup_code       = models.CharField(max_length=6, blank=True, help_text="Code 6 chiffres que le livreur montre au vendeur pour récupérer le colis")
-    assigned_at       = models.DateTimeField(auto_now_add=True)
-    delivered_at      = models.DateTimeField(null=True, blank=True)
-    notes             = models.TextField(blank=True)
+    assigned_at          = models.DateTimeField(auto_now_add=True)
+    delivered_at         = models.DateTimeField(null=True, blank=True)
+    notes                = models.TextField(blank=True)
+
+    # ── Suivi GPS temps réel ──────────────────────────────────────────────────
+    current_lat          = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+                                               help_text='Latitude courante du livreur')
+    current_lng          = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True,
+                                               help_text='Longitude courante du livreur')
+    position_updated_at  = models.DateTimeField(null=True, blank=True,
+                                                help_text='Dernière mise à jour de position')
 
     class Meta:
         verbose_name        = 'Affectation livreur'
@@ -333,6 +341,34 @@ class DeliveryAssignment(BaseModel):
         if not self.pickup_code:
             self.pickup_code = str(random.randint(100000, 999999))
         super().save(*args, **kwargs)
+
+
+# ── Historique positions GPS livreur ─────────────────────────────────────────
+
+class DeliveryPositionHistory(BaseModel):
+    """
+    Historique des positions GPS d'un livreur pendant une livraison.
+    Chaque appel à l'endpoint position/ crée une entrée ici + met à jour
+    current_lat/lng sur DeliveryAssignment (position courante).
+    Permet de tracer l'itinéraire complet sur une carte.
+    """
+    assignment  = models.ForeignKey(
+        DeliveryAssignment,
+        on_delete=models.CASCADE,
+        related_name='position_history',
+    )
+    lat         = models.DecimalField(max_digits=9, decimal_places=6)
+    lng         = models.DecimalField(max_digits=9, decimal_places=6)
+    recorded_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = 'Position livreur'
+        verbose_name_plural = 'Positions livreurs'
+        ordering            = ['-recorded_at']
+        # Conserver seulement les 500 dernières positions par assignation (géré en vue)
+
+    def __str__(self):
+        return f"{self.assignment} @ {self.lat},{self.lng}"
 
 
 # ── Paiements livreurs ────────────────────────────────────────────────────────

@@ -59,6 +59,14 @@ urlpatterns = [
     path('<uuid:pk>/dispute/',
         views.DisputeView.as_view(),
         name='order-dispute'),
+    path('<uuid:pk>/return/',
+        views.CreateReturnView.as_view(),
+        name='create-return'),
+    # IMPORTANT : cette route générique DOIT être après toutes les routes spécifiques
+    # sinon elle capture /return/, /dispute/, /confirm-receipt/ avant elles
+    path('<uuid:pk>/tracking/',
+        views.DeliveryTrackingView.as_view(),
+        name='delivery-tracking'),
     path('<uuid:pk>/<str:action>/',
         views.OrderUpdateStatusView.as_view(),
         name='order-status'),
@@ -73,6 +81,9 @@ urlpatterns = [
     path('livreur/assignments/<uuid:pk>/confirm/',
         views.LivreurConfirmDeliveryView.as_view(),
         name='livreur-confirm-delivery'),
+    path('livreur/assignments/<uuid:pk>/position/',
+        views.LivreurUpdatePositionView.as_view(),
+        name='livreur-update-position'),
 
     # Admin
     path('admin/pickup-points/',
@@ -170,9 +181,6 @@ urlpatterns = [
         name='admin-weekly-payouts-generate'),
 
     # Retours
-    path('<uuid:pk>/return/',
-        views.CreateReturnView.as_view(),
-        name='create-return'),
     path('admin/returns/',
         views.AdminReturnListView.as_view(),
         name='admin-returns'),

@@ -351,6 +351,10 @@ class ListingReportView(generics.CreateAPIView):
     serializer_class   = ListingReportSerializer
 
     def perform_create(self, serializer):
+        from rest_framework.exceptions import ValidationError as DRFValidationError
+        listing = serializer.validated_data.get('listing')
+        if ListingReport.objects.filter(reporter=self.request.user, listing=listing).exists():
+            raise DRFValidationError({'detail': 'Vous avez déjà signalé cette annonce.'})
         serializer.save(reporter=self.request.user)
 
 
@@ -396,64 +400,158 @@ class BannerClickView(APIView):
 
 BOOST_PRICES = {3: 5_000, 7: 10_000, 14: 18_000, 30: 30_000}   # jours → GNF
 
+def _apply_boost(listing, days):
+    """Active le boost sur l'annonce (prolonge si déjà en cours)."""
+    from datetime import timedelta
+    listing.is_boosted = True
+    now  = timezone.now()
+    base = listing.expires_at if (listing.expires_at and listing.expires_at > now) else now
+    listing.expires_at = base + timedelta(days=days)
+    listing.save(update_fields=['is_boosted', 'expires_at', 'updated_at'])
+
+
 class BoostListingView(APIView):
     """
     POST /listings/{id}/boost/
-    Body: { days: 3|7|14|30, provider: 'orange_money'|'cash', phone: '...' }
-    → Initie le paiement Orange Money, et si succès active le boost immédiatement.
+    Body: { days: 3|7|14|30 }
+
+    Tous les boosts passent par ChaChap Pay.
+    Retourne un payment_url → frontend redirige l'utilisateur.
+    ChaChap Pay envoie le webhook qui active le boost.
     """
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request, pk):
-        from apps.orders.payment_service import initiate_orange_money
+        from apps.orders.payment_service import initiate_chachap
         from apps.orders.models import Payment
+        from .models import BoostPayment
 
         listing = get_object_or_404(Listing, pk=pk, seller=request.user)
-        days     = int(request.data.get('days', 7))
-        provider = request.data.get('provider', Payment.Provider.CASH)
-        phone    = request.data.get('phone', '')
+        try:
+            days = int(request.data.get('days', 7))
+        except (TypeError, ValueError):
+            return Response({'error': 'Le champ days doit être un entier.'}, status=400)
 
         if days not in BOOST_PRICES:
-            return Response({'error': 'Durée invalide. Choisissez 3, 7, 14 ou 30 jours.'}, status=400)
+            return Response(
+                {'error': f'Durée invalide. Choisissez parmi : {list(BOOST_PRICES)}.'},
+                status=400,
+            )
 
         amount = BOOST_PRICES[days]
 
-        # Initier le paiement
-        if provider == Payment.Provider.ORANGE_MONEY:
-            result = initiate_orange_money(phone, amount, f'boost-{listing.id}')
-        else:
-            result = type('R', (), {'success': True, 'reference': '', 'message': 'Boost activé (espèces)'})()
+        # ── Initier le paiement via ChaChap Pay ──────────────────────────────
+        result = initiate_chachap(amount=amount, order_id=f'boost-{listing.id}')
+        if not result.success or not result.payment_url:
+            return Response(
+                {'error': result.message or 'Erreur ChaChap Pay.'},
+                status=status.HTTP_502_BAD_GATEWAY,
+            )
 
-        if not result.success:
-            return Response({'error': result.message}, status=502)
+        # Créer BoostPayment en attente — activé par le webhook ChaChap
+        bp = BoostPayment.objects.create(
+            listing=listing, days=days, amount=amount,
+            provider=Payment.Provider.CHACHAP,
+            status=BoostPayment.Status.PENDING,
+            ext_ref=result.reference or '',
+        )
 
-        # Activer le boost automatiquement
-        listing.is_boosted = True
-        now = timezone.now()
-        # Si déjà boosted, prolonger
-        base = listing.expires_at if (listing.expires_at and listing.expires_at > now) else now
-        from datetime import timedelta
-        listing.expires_at = base + timedelta(days=days)
-        listing.save(update_fields=['is_boosted', 'expires_at', 'updated_at'])
+        return Response({
+            'message':          f'Redirigez vers ChaChap Pay pour finaliser le boost {days} jours.',
+            'pending':          True,
+            'boost_payment_id': str(bp.id),
+            'payment_url':      result.payment_url,
+            'amount':           amount,
+            'is_boosted':       False,
+        }, status=status.HTTP_201_CREATED)
+
+
+class AdminBoostPaymentListView(APIView):
+    """Admin : liste les demandes de boost (en attente ou toutes)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from .models import BoostPayment
+        qs = BoostPayment.objects.select_related('listing__seller')
+        status_filter = request.query_params.get('status', 'pending')
+        if status_filter != 'all':
+            qs = qs.filter(status=status_filter)
+        items = [
+            {
+                'id':            str(bp.id),
+                'listing_id':    str(bp.listing_id),
+                'listing_title': bp.listing.title,
+                'seller':        bp.listing.seller.full_name,
+                'days':          bp.days,
+                'amount':        bp.amount,
+                'provider':      bp.provider,
+                'status':        bp.status,
+                'created_at':    bp.created_at,
+            }
+            for bp in qs
+        ]
+        return Response(items)
+
+
+class AdminBoostPaymentApproveView(APIView):
+    """Admin : approuver une demande de boost espèces → active le boost."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from .models import BoostPayment
+        from apps.notifications.models import Notification
+        bp = get_object_or_404(BoostPayment, pk=pk, status=BoostPayment.Status.PENDING)
+
+        _apply_boost(bp.listing, bp.days)
+        bp.status     = BoostPayment.Status.APPROVED
+        bp.admin_note = request.data.get('note', '')
+        bp.save(update_fields=['status', 'admin_note', 'updated_at'])
 
         try:
-            from apps.notifications.models import Notification
             Notification.send(
-                user=request.user,
+                user=bp.listing.seller,
                 type=Notification.Type.ORDER_UPDATE,
-                title='⚡ Annonce boostée !',
-                body=f'Votre annonce « {listing.title} » est maintenant mise en avant pour {days} jours.',
-                data={'listing_id': str(listing.id)},
+                title='⚡ Boost activé !',
+                body=f'Votre paiement de {bp.amount:,} GNF a été confirmé. '
+                     f'« {bp.listing.title} » est boostée pour {bp.days} jours.',
+                data={'listing_id': str(bp.listing_id)},
             )
         except Exception:
             pass
 
         return Response({
-            'message':    f'Boost activé pour {days} jours.',
-            'is_boosted': listing.is_boosted,
-            'expires_at': listing.expires_at,
-            'listing':    ListingSerializer(listing, context={'request': request}).data,
+            'message':    f'Boost activé pour {bp.days} jours.',
+            'is_boosted': True,
+            'expires_at': bp.listing.expires_at,
         })
+
+
+class AdminBoostPaymentRejectView(APIView):
+    """Admin : rejeter une demande de boost espèces."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from .models import BoostPayment
+        from apps.notifications.models import Notification
+        bp = get_object_or_404(BoostPayment, pk=pk, status=BoostPayment.Status.PENDING)
+
+        bp.status     = BoostPayment.Status.REJECTED
+        bp.admin_note = request.data.get('reason', '')
+        bp.save(update_fields=['status', 'admin_note', 'updated_at'])
+
+        try:
+            Notification.send(
+                user=bp.listing.seller,
+                type=Notification.Type.SYSTEM,
+                title='❌ Demande de boost rejetée',
+                body=f'Votre demande de boost pour « {bp.listing.title} » a été rejetée. '
+                     + (f'Motif : {bp.admin_note}' if bp.admin_note else ''),
+                data={'listing_id': str(bp.listing_id)},
+            )
+        except Exception:
+            pass
+
+        return Response({'message': 'Demande de boost rejetée.'})
 
 
 # ── Vues Admin ────────────────────────────────────────────────────────────────

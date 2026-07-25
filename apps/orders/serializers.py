@@ -169,12 +169,13 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
 
 
 class CreatePaymentSerializer(serializers.Serializer):
-    provider     = serializers.ChoiceField(choices=Payment.Provider.choices)
-    phone_number = serializers.CharField(required=False, allow_blank=True)
+    # Seul ChaChap Pay est accepté — agrégateur unique de paiement
+    provider = serializers.ChoiceField(
+        choices=[(Payment.Provider.CHACHAP, 'ChaChap Pay')],
+        default=Payment.Provider.CHACHAP,
+    )
 
     def validate(self, attrs):
-        # ChaChap Pay et espèces ne nécessitent pas de numéro de téléphone
-        no_phone_providers = (Payment.Provider.CASH, Payment.Provider.CHACHAP)
-        if attrs['provider'] not in no_phone_providers and not attrs.get('phone_number'):
-            raise serializers.ValidationError("Le numéro de téléphone est requis pour ce mode de paiement.")
+        if attrs.get('provider') != Payment.Provider.CHACHAP:
+            raise serializers.ValidationError("Seul ChaChap Pay est accepté pour les paiements.")
         return attrs

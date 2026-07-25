@@ -1,6 +1,7 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.throttling import AnonRateThrottle
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -9,11 +10,17 @@ import hashlib
 import hmac
 import logging
 
+
+class WebhookRateThrottle(AnonRateThrottle):
+    """Max 60 appels/minute par IP sur les webhooks (protection bruteforce)."""
+    scope = 'webhook'
+    rate  = '60/minute'
+
 logger = logging.getLogger(__name__)
 
 from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment, IntraCityZoneRate, ReturnRequest, LivreurPayment
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer, IntraCityZoneRateSerializer
-from .payment_service import initiate_orange_money, initiate_paycard, initiate_paycard_card, initiate_chachap
+from .payment_service import initiate_chachap
 from core.permissions import IsAdmin
 
 
@@ -344,6 +351,12 @@ class OrderUpdateStatusView(APIView):
             except Exception:
                 pass
         elif action == 'cancel' and user in [order.buyer, order.seller]:
+            # Bloquer l'annulation si escrow actif (fonds sécurisés) — doit passer par un litige
+            if order.escrow_status == Order.EscrowStatus.HELD:
+                return Response(
+                    {'error': "Impossible d'annuler : des fonds sont en escrow. Ouvrez un litige."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             order.cancel()
             other = order.seller if user == order.buyer else order.buyer
             Notification.send(
@@ -443,98 +456,35 @@ class InitiatePaymentView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        serializer = CreatePaymentSerializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-
-        provider     = serializer.validated_data['provider']
-        phone_number = serializer.validated_data.get('phone_number', '')
+        # ── Tous les paiements passent par ChaChap Pay ───────────────────────────
+        # Aucun paiement en espèces (cash) ni autre agrégateur n'est accepté.
+        provider = request.data.get('provider', Payment.Provider.CHACHAP)
+        if provider != Payment.Provider.CHACHAP:
+            return Response(
+                {'error': 'Seul ChaChap Pay est accepté pour les paiements.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         payment = Payment.objects.create(
-            order=order, provider=provider,
-            phone_number=phone_number,
+            order=order, provider=Payment.Provider.CHACHAP,
             amount_gnf=order.amount_gnf,
             status=Payment.Status.PENDING,
         )
 
-        if provider == Payment.Provider.CHACHAP:
-            # ── ChaChap Pay (agrégateur) ──────────────────────────────────────
-            result = initiate_chachap(amount=order.amount_gnf, order_id=str(order.id))
-            if result.success and result.payment_url:
-                payment.external_ref = result.reference
-                payment.save(update_fields=['external_ref'])
-                return Response({
-                    'message':     result.message,
-                    'payment':     PaymentSerializer(payment).data,
-                    'payment_url': result.payment_url,
-                    'chachap':     True,
-                }, status=status.HTTP_201_CREATED)
-            else:
-                payment.status = Payment.Status.FAILED
-                payment.save(update_fields=['status'])
-                return Response({'error': result.message}, status=status.HTTP_502_BAD_GATEWAY)
-
-        elif provider == Payment.Provider.ORANGE_MONEY:
-            # Paycard si configuré, sinon fallback direct Orange Money
-            if getattr(settings, 'PAYCARD_API_KEY', ''):
-                result = initiate_paycard(phone_number, order.amount_gnf, str(order.id), 'ORANGE_GN')
-            else:
-                result = initiate_orange_money(phone_number, order.amount_gnf, str(order.id))
-        elif provider == Payment.Provider.MTN_MOMO:
-            # Paycard si configuré, sinon fallback direct MTN MoMo
-            if getattr(settings, 'PAYCARD_API_KEY', ''):
-                result = initiate_paycard(phone_number, order.amount_gnf, str(order.id), 'MTN_GN')
-            else:
-                from .payment_service import initiate_mtn_momo
-                result = initiate_mtn_momo(phone_number, order.amount_gnf, str(order.id))
-        elif provider == Payment.Provider.CARD:
-            # Paiement par carte Visa/Mastercard via Paycard
-            result = initiate_paycard_card(
-                amount=order.amount_gnf,
-                order_id=str(order.id),
-                customer_email=getattr(request.user, 'email', ''),
-                customer_name=getattr(request.user, 'full_name', ''),
-            )
-            if result.success and result.payment_url:
-                # Pour les cartes : commande reste PENDING jusqu'au webhook Paycard
-                payment.external_ref = result.reference
-                payment.save(update_fields=['external_ref'])
-                return Response({
-                    'message':     result.message,
-                    'payment':     PaymentSerializer(payment).data,
-                    'payment_url': result.payment_url,   # Frontend redirige ici
-                    'card':        True,
-                }, status=status.HTTP_201_CREATED)
-            else:
-                payment.status = Payment.Status.FAILED
-                payment.save(update_fields=['status'])
-                return Response({'error': result.message}, status=status.HTTP_502_BAD_GATEWAY)
-        else:
-            result = type('R', (), {'success': True, 'reference': '', 'message': 'Paiement en espèces enregistré'})()
-
-        if result.success:
-            payment.status       = Payment.Status.SUCCESS
-            payment.external_ref = getattr(result, 'reference', '')
-            payment.save(update_fields=['status', 'external_ref'])
-            order.confirm()
-            # Planifier la libération escrow pour paiements mobiles
-            if provider in (Payment.Provider.ORANGE_MONEY, Payment.Provider.MTN_MOMO):
-                order.set_escrow_schedule()
-            # Email confirmation paiement (acheteur + vendeur)
-            try:
-                from core.email_notifications import send_payment_received
-                send_payment_received(order, payment)
-            except Exception:
-                pass
+        result = initiate_chachap(amount=order.amount_gnf, order_id=str(order.id))
+        if result.success and result.payment_url:
+            payment.external_ref = result.reference
+            payment.save(update_fields=['external_ref'])
+            return Response({
+                'message':     result.message,
+                'payment':     PaymentSerializer(payment).data,
+                'payment_url': result.payment_url,
+                'chachap':     True,
+            }, status=status.HTTP_201_CREATED)
         else:
             payment.status = Payment.Status.FAILED
             payment.save(update_fields=['status'])
-            return Response({'error': result.message}, status=status.HTTP_502_BAD_GATEWAY)
-
-        return Response({
-            'message':  result.message,
-            'payment':  PaymentSerializer(payment).data,
-            'escrow':   order.escrow_status,
-        }, status=status.HTTP_201_CREATED)
+            return Response({'error': result.message or 'Erreur ChaChap Pay.'}, status=status.HTTP_502_BAD_GATEWAY)
 
 
 def _verify_chachap_signature(request):
@@ -623,7 +573,8 @@ def _verify_paycard_signature(request):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class PaymentWebhookView(APIView):
-    permission_classes = [permissions.AllowAny]
+    permission_classes  = [permissions.AllowAny]
+    throttle_classes    = [WebhookRateThrottle]
 
     def post(self, request, provider):
         # IMPORTANT: lire request.body AVANT request.data
@@ -681,9 +632,16 @@ class PaymentWebhookView(APIView):
             return Response({'error': 'Fournisseur inconnu'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
+            import uuid as _uuid
             payment = Payment.objects.filter(external_ref=ref).first() if ref else None
             if not payment and ref:
-                payment = Payment.objects.filter(order__id=ref, status=Payment.Status.PENDING).first()
+                # order__id est un UUID — ne passer que si ref est un UUID valide
+                # (les refs boost comme "CCP-BOOST-xxx" ne sont pas des UUIDs)
+                try:
+                    _uuid.UUID(str(ref))
+                    payment = Payment.objects.filter(order__id=ref, status=Payment.Status.PENDING).first()
+                except (ValueError, AttributeError):
+                    pass  # ref non-UUID → ce sera un boost ref, géré dans le bloc else
             if payment:
                 # Idempotence : ne pas re-traiter si déjà SUCCESS (webhook retry)
                 if payment.status == Payment.Status.SUCCESS and success:
@@ -694,8 +652,71 @@ class PaymentWebhookView(APIView):
                 if success and payment.order.status == Order.Status.PENDING:
                     payment.order.confirm()
                     payment.order.set_escrow_schedule()
+                    # Emails transactionnels : commande confirmée + paiement reçu
+                    try:
+                        from core.email_notifications import (
+                            send_order_confirmed_buyer,
+                            send_payment_received,
+                        )
+                        send_order_confirmed_buyer(payment.order)
+                        send_payment_received(payment.order, payment)
+                    except Exception as _email_exc:
+                        logger.warning("[WEBHOOK] Email post-paiement : %s", _email_exc)
+                    # Notification in-app acheteur
+                    try:
+                        Notification.send(
+                            user=payment.order.buyer,
+                            type=Notification.Type.ORDER_UPDATE,
+                            title='✅ Paiement confirmé',
+                            body=f'Votre paiement pour « {payment.order.listing.title} » a été reçu.',
+                            data={'order_id': str(payment.order.id)},
+                        )
+                    except Exception:
+                        pass
             else:
-                logger.warning("[WEBHOOK] %s — paiement introuvable pour ref=%s", provider, ref)
+                # ── Boost payment ? ──────────────────────────────────────────
+                if ref and provider == 'chachap':
+                    try:
+                        from apps.listings.models import BoostPayment
+                        from apps.listings.views import _apply_boost
+                        boost = BoostPayment.objects.filter(
+                            ext_ref=ref, status=BoostPayment.Status.PENDING
+                        ).first()
+                        if boost:
+                            if success:
+                                boost.status = BoostPayment.Status.APPROVED
+                                boost.save(update_fields=['status'])
+                                _apply_boost(boost.listing, boost.days)
+                                logger.info("[CHACHAP] Boost %s activé — listing %s", boost.id, boost.listing.id)
+                                try:
+                                    from apps.notifications.models import Notification
+                                    Notification.send(
+                                        user=boost.listing.seller,
+                                        type=Notification.Type.ORDER_UPDATE,
+                                        title='⚡ Annonce boostée !',
+                                        body=f'Votre annonce « {boost.listing.title} » '
+                                             f'est mise en avant pour {boost.days} jours.',
+                                        data={'listing_id': str(boost.listing.id)},
+                                    )
+                                except Exception:
+                                    pass
+                                try:
+                                    from core.email_notifications import send_boost_activated
+                                    boost.refresh_from_db()
+                                    send_boost_activated(boost)
+                                except Exception as _be:
+                                    logger.warning("[WEBHOOK] Email boost: %s", _be)
+                            else:
+                                boost.status = BoostPayment.Status.REJECTED
+                                boost.admin_note = 'Paiement ChaChap échoué.'
+                                boost.save(update_fields=['status', 'admin_note'])
+                                logger.info("[CHACHAP] Boost %s rejeté — paiement échoué.", boost.id)
+                        else:
+                            logger.warning("[WEBHOOK] %s — paiement introuvable pour ref=%s", provider, ref)
+                    except Exception as exc:
+                        logger.error("[WEBHOOK] Boost activation error ref=%s : %s", ref, exc, exc_info=True)
+                else:
+                    logger.warning("[WEBHOOK] %s — paiement introuvable pour ref=%s", provider, ref)
         except Exception as exc:
             logger.error("[WEBHOOK] %s — erreur traitement paiement ref=%s : %s", provider, ref, exc, exc_info=True)
 
@@ -797,7 +818,9 @@ class AdminDisputeResolveView(APIView):
             )
         else:  # refund
             order.refund_escrow()
-            order.cancel()
+            # cancel() n'accepte pas le statut DISPUTED — mettre à jour directement
+            order.status = Order.Status.CANCELLED
+            order.save(update_fields=['status', 'updated_at'])
             Notification.send(
                 user=order.buyer,
                 type=Notification.Type.ORDER_UPDATE,
@@ -1144,6 +1167,105 @@ class LivreurConfirmDeliveryView(APIView):
         return Response(DeliveryAssignmentSerializer(assignment).data)
 
 
+class LivreurUpdatePositionView(APIView):
+    """
+    PATCH livreur/assignments/<pk>/position/
+    Livreur met à jour sa position GPS en temps réel.
+    - Enregistre lat/lng sur l'assignation (position courante)
+    - Ajoute une entrée dans DeliveryPositionHistory (itinéraire complet)
+    - Élagage automatique : conserve les 500 dernières positions
+    """
+    permission_classes = [IsLivreur]
+
+    def patch(self, request, pk):
+        from django.utils import timezone
+        from .models import DeliveryPositionHistory
+        assignment = get_object_or_404(
+            DeliveryAssignment, pk=pk, livreur=request.user,
+            status__in=[DeliveryAssignment.Status.ASSIGNED, DeliveryAssignment.Status.EN_ROUTE],
+        )
+        lat = request.data.get('lat')
+        lng = request.data.get('lng')
+        if lat is None or lng is None:
+            return Response({'error': 'lat et lng sont requis.'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            lat = float(lat)
+            lng = float(lng)
+        except (TypeError, ValueError):
+            return Response({'error': 'lat et lng doivent être des nombres.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not (-90 <= lat <= 90) or not (-180 <= lng <= 180):
+            return Response({'error': 'Coordonnées GPS invalides.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Mettre à jour la position courante
+        assignment.current_lat         = lat
+        assignment.current_lng         = lng
+        assignment.position_updated_at = timezone.now()
+        assignment.save(update_fields=['current_lat', 'current_lng', 'position_updated_at', 'updated_at'])
+
+        # Enregistrer dans l'historique
+        DeliveryPositionHistory.objects.create(assignment=assignment, lat=lat, lng=lng)
+
+        # Élaguer : garder seulement les 500 dernières positions
+        history_ids = list(
+            DeliveryPositionHistory.objects.filter(assignment=assignment)
+            .order_by('-recorded_at')
+            .values_list('id', flat=True)[500:]
+        )
+        if history_ids:
+            DeliveryPositionHistory.objects.filter(id__in=history_ids).delete()
+
+        return Response({
+            'lat': lat,
+            'lng': lng,
+            'updated_at': assignment.position_updated_at.isoformat(),
+            'assignment_id': str(assignment.id),
+            'order_id': str(assignment.order_id),
+        })
+
+
+class DeliveryTrackingView(APIView):
+    """
+    GET orders/<uuid:pk>/tracking/
+    Acheteur / vendeur / admin : suivre la position du livreur en temps réel.
+    Retourne la position courante + les 50 derniers points de l'itinéraire.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, pk):
+        from .models import DeliveryPositionHistory
+        order = get_object_or_404(Order, pk=pk)
+        user  = request.user
+
+        # Autoriser : acheteur, vendeur, ou admin
+        is_admin = hasattr(user, 'is_super_admin') and (user.is_super_admin or user.role in ('admin', 'super_admin', 'admin_delivery'))
+        if order.buyer != user and order.seller != user and not is_admin:
+            return Response({'error': 'Accès interdit.'}, status=status.HTTP_403_FORBIDDEN)
+
+        try:
+            assignment = order.delivery_assignment
+        except DeliveryAssignment.DoesNotExist:
+            return Response({'error': 'Pas de livraison à domicile pour cette commande.'}, status=status.HTTP_404_NOT_FOUND)
+
+        # 50 derniers points de l'itinéraire
+        history = DeliveryPositionHistory.objects.filter(assignment=assignment).order_by('-recorded_at')[:50]
+        route   = [{'lat': float(p.lat), 'lng': float(p.lng), 'at': p.recorded_at.isoformat()} for p in reversed(list(history))]
+
+        return Response({
+            'order_id':        str(order.id),
+            'assignment_id':   str(assignment.id),
+            'livreur':         assignment.livreur.full_name,
+            'livreur_phone':   str(assignment.livreur.phone_number),
+            'status':          assignment.status,
+            'current_position': {
+                'lat': float(assignment.current_lat)  if assignment.current_lat  else None,
+                'lng': float(assignment.current_lng)  if assignment.current_lng  else None,
+                'updated_at': assignment.position_updated_at.isoformat() if assignment.position_updated_at else None,
+            },
+            'route':           route,
+            'verification_code': assignment.verification_code,
+        })
+
+
 class AdminAssignLivreurView(APIView):
     """Admin : affecter un livreur à une commande home_delivery."""
     permission_classes = [IsAdmin]
@@ -1247,10 +1369,22 @@ class AdminLivreurListView(generics.ListAPIView):
 
     def list(self, request):
         from apps.accounts.models import User as AppUser
-        livreurs = AppUser.objects.filter(role='livreur').values(
+        qs = AppUser.objects.filter(role='livreur').values(
             'id', 'full_name', 'phone_number', 'city', 'is_active', 'is_available',
         )
-        return Response(list(livreurs))
+        # UUID et PhoneNumber ne sont pas JSON-sérialisables nativement → conversion explicite
+        livreurs = [
+            {
+                'id':           str(u['id']),
+                'full_name':    u['full_name'],
+                'phone_number': str(u['phone_number']) if u['phone_number'] else '',
+                'city':         u['city'] or '',
+                'is_active':    u['is_active'],
+                'is_available': u['is_available'],
+            }
+            for u in qs
+        ]
+        return Response(livreurs)
 
 
 class AdminDeliveryAssignmentListView(generics.ListAPIView):

@@ -144,10 +144,17 @@ export default function MyListingsPage() {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-start justify-between gap-2 mb-1">
                                             <h3 className="font-bold text-gray-900 text-sm truncate leading-snug">{listing.title}</h3>
-                                            <span className={`flex-shrink-0 inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${status.color}`}>
-                                                <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
-                                                {status.label}
-                                            </span>
+                                            <div className="flex items-center gap-1.5 flex-shrink-0">
+                                                {listing.is_boosted && (
+                                                    <span className="inline-flex items-center gap-0.5 text-xs font-bold px-2 py-1 rounded-full bg-amber-100 text-amber-700">
+                                                        ⚡ Boosté
+                                                    </span>
+                                                )}
+                                                <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${status.color}`}>
+                                                    <span className={`w-1.5 h-1.5 rounded-full ${status.dot}`} />
+                                                    {status.label}
+                                                </span>
+                                            </div>
                                         </div>
                                         <p className="text-emerald-700 font-black text-sm">
                                             {formatPrice(listing.price_gnf, listing.price_type)}

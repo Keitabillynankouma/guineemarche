@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import SupportChatWidget from './components/SupportChatWidget'
+import useFCM from './hooks/useFCM'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useSettings } from './hooks/useSettings'
@@ -23,6 +24,7 @@ import ReviewsPage from './pages/ReviewsPage'
 import TermsPage from './pages/TermsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LivreurDashboard from './pages/LivreurDashboard'
+import NotificationsPage from './pages/NotificationsPage'
 
 const queryClient = new QueryClient()
 
@@ -129,6 +131,7 @@ function AppRoutes() {
   const { settings } = useSettings()
   const fetchMe = useAuthStore(s => s.fetchMe)
   const isAuthenticated = useAuthStore(s => s.isAuthenticated)
+  useFCM()  // Enregistrement push notifications Firebase
 
   // Charger l'utilisateur depuis l'API au démarrage pour que isSeller/isAdmin fonctionnent
   useEffect(() => {
@@ -149,6 +152,7 @@ function AppRoutes() {
         <Route path="/my-listings" element={<PrivateRoute><MyListingsPage /></PrivateRoute>} />
         <Route path="/messages" element={<PrivateRoute><MessagesPage /></PrivateRoute>} />
         <Route path="/profile" element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        <Route path="/notifications" element={<PrivateRoute><NotificationsPage /></PrivateRoute>} />
         <Route path="/orders" element={<PrivateRoute><OrdersPage /></PrivateRoute>} />
         {/* Page Tarifs masquée si abonnements désactivés */}
         <Route path="/upgrade" element={

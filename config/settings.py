@@ -144,12 +144,11 @@ SIMPLE_JWT = {
     'ROTATE_REFRESH_TOKENS':  True,
     'BLACKLIST_AFTER_ROTATION': True,
     # Clé de signature dédiée — évite le warning "HMAC key too short"
-    # Si JWT_SIGNING_KEY n'est pas défini, on étend SECRET_KEY à 64 chars via SHA256
-    'SIGNING_KEY': os.environ.get(
+    # Utilise decouple (lit .env) pour être cohérent entre le serveur et les scripts
+    # de test qui appellent django.setup() — les deux lisent le même .env.
+    'SIGNING_KEY': env(
         'JWT_SIGNING_KEY',
-        __import__('hashlib').sha256(
-            os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production').encode()
-        ).hexdigest()  # toujours 64 hex chars (256 bits) — jamais trop court
+        default=__import__('hashlib').sha256(SECRET_KEY.encode()).hexdigest()
     ),
 }
 
@@ -193,6 +192,7 @@ REST_FRAMEWORK = {
         'otp':          '5/hour',
         'login':        '10/hour',
         'message_send': '60/hour',    # Anti-spam messagerie
+        'webhook':      '60/minute',  # Protection bruteforce webhooks
     },
 }
 

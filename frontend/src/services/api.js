@@ -99,6 +99,8 @@ export const authAPI = {
   getSubscription: () => api.get('/accounts/subscription/'),
   subscribe: (data) => api.post('/accounts/subscription/', data),
   getBadges: () => api.get('/accounts/badges/'),
+  // Push notifications FCM
+  registerFCMToken: (token) => api.patch('/accounts/me/fcm-token/', { fcm_token: token }),
   // Livreur
   toggleAvailability: () => api.post('/accounts/livreur/toggle-availability/'),
   // Compte
@@ -160,6 +162,8 @@ export const ordersAPI = {
   getMyAssignments:    ()        => api.get('/orders/livreur/assignments/'),
   startDelivery:       (id)      => api.post(`/orders/livreur/assignments/${id}/start/`),
   confirmDelivery:     (id, code)=> api.post(`/orders/livreur/assignments/${id}/confirm/`, { verification_code: code }),
+  updatePosition:      (id, lat, lng) => api.patch(`/orders/livreur/assignments/${id}/position/`, { lat, lng }),
+  trackDelivery:       (orderId) => api.get(`/orders/${orderId}/tracking/`),
   // Admin — livreurs
   getLivreurs:         ()        => api.get('/orders/admin/livreurs/'),
   getAllAssignments:    (params)  => api.get('/orders/admin/assignments/', { params }),
@@ -176,6 +180,11 @@ export const reviewsAPI = {
 
 export const referralAPI = {
   getStats: () => api.get('/accounts/referral/'),
+}
+
+export const notificationsAPI = {
+  getAll:  () => api.get('/notifications/'),
+  markRead:(id) => api.post(`/notifications/${id}/read/`),
 }
 
 export default api

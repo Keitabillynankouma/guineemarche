@@ -60,4 +60,17 @@ class Notification(BaseModel):
                 )
         except Exception:
             pass
+        # Push FCM si l'utilisateur a un token mobile/web enregistré
+        try:
+            fcm_token = getattr(user, 'fcm_token', '')
+            if fcm_token:
+                from core.fcm import send_push
+                send_push(
+                    fcm_token=fcm_token,
+                    title=title,
+                    body=body,
+                    data={**(data or {}), 'notif_id': str(notif.id)},
+                )
+        except Exception:
+            pass
         return notif

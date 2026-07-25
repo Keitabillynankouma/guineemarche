@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ordersAPI, reviewsAPI, authAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 
@@ -77,6 +77,50 @@ function AssignmentCard({ assignment, onStart, onConfirm, onRefresh }) {
   const [loading, setLoading]         = useState(false)
   const [ratingModal, setRatingModal] = useState(null)
   const [rated, setRated]             = useState({})
+  const [gpsActive, setGpsActive]     = useState(false)
+  const [gpsError, setGpsError]       = useState('')
+  const lastSentRef                   = useRef(0)
+  const watchIdRef                    = useRef(null)
+
+  // ── GPS tracking actif quand en_route ─────────────────────────────────────
+  useEffect(() => {
+    if (assignment.status !== 'en_route') return
+    if (!navigator.geolocation) {
+      setGpsError('GPS non disponible sur cet appareil.')
+      return
+    }
+
+    watchIdRef.current = navigator.geolocation.watchPosition(
+      (pos) => {
+        setGpsActive(true)
+        setGpsError('')
+        const now = Date.now()
+        // Envoie au max toutes les 30 secondes pour ne pas saturer le backend
+        if (now - lastSentRef.current < 30_000) return
+        lastSentRef.current = now
+        ordersAPI.updatePosition(
+          assignment.id,
+          pos.coords.latitude,
+          pos.coords.longitude,
+        ).catch(() => {})
+      },
+      (err) => {
+        setGpsActive(false)
+        setGpsError(
+          err.code === 1 ? 'GPS refusé — autorisez la localisation dans votre navigateur.'
+          : 'Erreur GPS — vérifiez votre signal.',
+        )
+      },
+      { enableHighAccuracy: true, maximumAge: 15_000, timeout: 10_000 },
+    )
+
+    return () => {
+      if (watchIdRef.current !== null) {
+        navigator.geolocation.clearWatch(watchIdRef.current)
+        watchIdRef.current = null
+      }
+    }
+  }, [assignment.status, assignment.id])
 
   const o    = assignment.order_detail || {}
   const meta = STATUS_LABEL[assignment.status] || STATUS_LABEL.assigned
@@ -175,6 +219,22 @@ function AssignmentCard({ assignment, onStart, onConfirm, onRefresh }) {
                 <p className="font-bold mb-1">📋 Étape 2 — Confirmer la remise à l'acheteur</p>
                 <p>Demandez le code à l'acheteur et saisissez-le ci-dessous pour confirmer la livraison.</p>
               </div>
+              {/* Statut GPS */}
+              {gpsActive ? (
+                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-3 py-2 text-xs text-green-700">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                  GPS actif — votre position est partagée avec l'acheteur
+                </div>
+              ) : gpsError ? (
+                <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2 text-xs text-amber-700">
+                  ⚠️ {gpsError}
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-500">
+                  <span className="w-2 h-2 rounded-full bg-gray-300 animate-pulse flex-shrink-0" />
+                  Localisation en cours…
+                </div>
+              )}
               <div className="space-y-2">
                 <p className="text-sm text-gray-600 font-medium text-center">Code donné par l'acheteur :</p>
                 <input

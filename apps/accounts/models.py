@@ -49,6 +49,12 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     # Livreur : disponibilité manuelle (le livreur bascule lui-même)
     is_available  = models.BooleanField(default=True, help_text='Livreur disponible pour recevoir des commandes')
 
+    # Push notifications FCM (Firebase Cloud Messaging)
+    fcm_token = models.CharField(
+        max_length=512, blank=True, default='',
+        help_text='Token FCM du dernier appareil connecté (web ou mobile)',
+    )
+
     referral_code = models.CharField(max_length=12, unique=True, blank=True, db_index=True)
     referred_by   = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals_made')
 

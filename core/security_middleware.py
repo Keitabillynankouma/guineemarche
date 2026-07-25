@@ -51,7 +51,7 @@ SQL_INJECTION_PATTERNS = re.compile(
 )
 
 XSS_PATTERNS = re.compile(
-    r"(<script[\s>]|javascript:|on\w+\s*=|<iframe|<object|<embed|"
+    r"(<script[\s>]|javascript:|\bon\w+\s*=|<iframe|<object|<embed|"
     r"<link\s+.*href|eval\s*\(|expression\s*\(|vbscript:)",
     re.IGNORECASE
 )

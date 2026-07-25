@@ -22,11 +22,10 @@ class ConversationListView(generics.ListAPIView):
     serializer_class   = ConversationSerializer
 
     def get_queryset(self):
+        from django.db.models import Q
         user = self.request.user
         return Conversation.objects.filter(
-            buyer=user
-        ).union(
-            Conversation.objects.filter(seller=user)
+            Q(buyer=user) | Q(seller=user)
         ).order_by('-last_message_at')
 
 

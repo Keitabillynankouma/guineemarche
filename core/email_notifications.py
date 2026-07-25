@@ -274,6 +274,7 @@ def send_payment_received(order, payment) -> None:
             'mtn_momo':     'MTN Mobile Money',
             'card':         'Carte Visa (Paycard)',
             'cash':         'Espèces',
+            'chachap':      'ChaChap Pay',
         }
         provider_label = provider_labels.get(payment.provider, payment.provider)
         listing_title  = getattr(order.listing, 'title', 'article') if order.listing_id else 'article'
@@ -505,3 +506,47 @@ def send_otp_email(recipient_email: str, code: str, name: str = '') -> None:
         recipient_name=name,
         sync=True,
     )
+
+
+# ── 9. Boost annonce activé (vendeur) ────────────────────────────────────────
+
+def send_boost_activated(boost) -> None:
+    """Notifie le vendeur que son boost vient d'être activé suite au paiement ChaChap."""
+    try:
+        listing    = boost.listing
+        seller     = listing.seller
+        email      = getattr(seller, 'email', '') or ''
+        name       = getattr(seller, 'full_name', '') or 'Vendeur'
+        if not email:
+            return
+
+        end_date = None
+        if listing.boost_until:
+            end_date = listing.boost_until.strftime('%d/%m/%Y')
+
+        content = f'''
+        <p style="color:{GRAY};font-size:15px;">
+          Bonjour <strong>{name}</strong>, votre annonce est maintenant mise en avant sur Guimatrix !
+        </p>
+        {_box(f"""
+          <table width="100%" cellpadding="0" cellspacing="0">
+            {_row("Annonce", listing.title[:60])}
+            {_row("Durée du boost", f"{boost.days} jours")}
+            {_row("Montant payé", f"{boost.amount:,} GNF".replace(",", " "))}
+            {_row("Fin du boost", end_date or "—")}
+          </table>
+        """, '#fffbeb')}
+        <p style="color:{GRAY};font-size:13px;">
+          ⚡ Votre annonce apparaîtra en priorité dans les résultats de recherche
+          et sera mise en avant pour plus de visibilité.
+        </p>
+        '''
+        html = _base(
+            title='⚡ Votre annonce est boostée !',
+            content=content,
+            cta_url=f'https://guimatrix.com/listings/{listing.id}',
+            cta_label='Voir mon annonce →',
+        )
+        _send('⚡ Votre annonce est boostée — Guimatrix', html, email, name)
+    except Exception as e:
+        logger.warning("[EMAIL] send_boost_activated error: %s", e)

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { ordersAPI, reviewsAPI } from '../services/api'
@@ -297,6 +297,74 @@ function RatingModal({ orderId, revieweeId, revieweeName, label, onClose, onDone
     )
 }
 
+// ── Bloc tracking livreur (acheteur) ────────────────────────────────────────
+function DeliveryTracker({ orderId }) {
+    const [tracking, setTracking] = useState(null)
+    const intervalRef = useRef(null)
+
+    async function fetchTracking() {
+        try {
+            const res = await ordersAPI.trackDelivery(orderId)
+            setTracking(res.data)
+        } catch { /* silencieux si non disponible */ }
+    }
+
+    useEffect(() => {
+        fetchTracking()
+        intervalRef.current = setInterval(fetchTracking, 10_000)
+        return () => clearInterval(intervalRef.current)
+    }, [orderId])
+
+    if (!tracking) return null
+
+    const pos = tracking.current_position
+    const hasPos = pos?.lat && pos?.lng
+
+    const osmUrl = hasPos
+        ? `https://www.openstreetmap.org/export/embed.html?bbox=${pos.lng - 0.02},${pos.lat - 0.02},${pos.lng + 0.02},${pos.lat + 0.02}&layer=mapnik&marker=${pos.lat},${pos.lng}`
+        : null
+
+    return (
+        <div className="bg-blue-50 border border-blue-200 rounded-xl overflow-hidden">
+            <div className="px-3 py-2 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-blue-500 animate-pulse flex-shrink-0" />
+                    <span className="text-xs font-semibold text-blue-800">
+                        🚗 {tracking.livreur} — en route vers vous
+                    </span>
+                </div>
+                {pos?.updated_at && (
+                    <span className="text-xs text-blue-400">
+                        {new Date(pos.updated_at).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                )}
+            </div>
+            {hasPos ? (
+                <iframe
+                    title="Position livreur"
+                    width="100%"
+                    height="180"
+                    src={osmUrl}
+                    frameBorder="0"
+                    className="block"
+                    style={{ pointerEvents: 'none' }}
+                />
+            ) : (
+                <div className="px-3 pb-3 text-xs text-blue-600">
+                    📍 Position en cours de chargement…
+                </div>
+            )}
+            {tracking.livreur_phone && (
+                <div className="px-3 py-2 border-t border-blue-200 text-xs text-blue-700">
+                    📞 <a href={`tel:${tracking.livreur_phone}`} className="underline font-medium">
+                        Appeler le livreur
+                    </a>
+                </div>
+            )}
+        </div>
+    )
+}
+
 // ── Carte commande ──────────────────────────────────────────────────────────
 function OrderCard({ order, isBuyer, onInvalidate }) {
     const [payOpen, setPayOpen]           = useState(false)
@@ -399,6 +467,10 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                                 🚗 Livreur : <span className="font-semibold text-gray-700">{da.livreur_name}</span>
                                 {da.livreur_phone && ` · ${da.livreur_phone}`}
                             </p>
+                        )}
+                        {/* Carte tracking temps réel — acheteur uniquement, quand en route */}
+                        {isBuyer && da.status === 'en_route' && (
+                            <DeliveryTracker orderId={order.id} />
                         )}
                     </div>
                 )}

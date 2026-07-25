@@ -328,8 +328,7 @@ function OrderModal({ listing, onClose, onSuccess }) {
     const [buyerCommune, setBuyerCommune]   = useState('')
     const [geoLoading, setGeoLoading]       = useState(false)
     const [geoError, setGeoError]           = useState('')
-    const [provider, setProvider]           = useState('orange_money')
-    const [phone, setPhone]                 = useState('')
+    // ChaChap Pay est le seul mode de paiement — pas de sélection nécessaire
     const [error, setError]                 = useState('')
     const [negotiatedPrice, setNegotiatedPrice] = useState(listing.price_type === 'negotiable' ? String(listing.price_gnf) : '')
     const queryClient = useQueryClient()
@@ -455,7 +454,10 @@ function OrderModal({ listing, onClose, onSuccess }) {
                 if (buyerCommune) orderPayload.delivery_buyer_commune  = buyerCommune
             }
             const order = await createOrder.mutateAsync(orderPayload)
-            await pay.mutateAsync({ id: order.data.id, data: { provider, phone_number: phone } })
+            const payResult = await pay.mutateAsync({ id: order.data.id, data: { provider: 'chachap' } })
+            // ChaChap Pay : rediriger vers la page de paiement
+            const payUrl = payResult?.data?.payment_url
+            if (payUrl) { window.location.href = payUrl }
         } catch {}
     }
 
@@ -463,15 +465,6 @@ function OrderModal({ listing, onClose, onSuccess }) {
         { value: 'meeting_point', label: 'Main propre',     icon: '🤝', sub: 'Rencontre physique' },
         { value: 'pickup_point',  label: 'Point retrait',   icon: '🏪', sub: 'Dans notre réseau' },
         { value: 'home_delivery', label: 'Domicile',        icon: '🚗', sub: 'Livraison chez vous' },
-    ]
-
-    const PROVIDERS = [
-        { value: 'orange_money', label: '🟠 Orange Money', color: 'border-orange-400 bg-orange-50',   phonePlaceholder: 'Numéro Orange (ex: 622 XX XX XX)' },
-        { value: 'mtn_momo',     label: '🟡 MTN MoMo',     color: 'border-yellow-400 bg-yellow-50',   phonePlaceholder: 'Numéro MTN (ex: 624 XX XX XX)' },
-        { value: 'paycard',      label: '💳 PayCard',       color: 'border-blue-400 bg-blue-50',       phonePlaceholder: 'Numéro PayCard' },
-        { value: 'kulu',         label: '🔵 Kulu',          color: 'border-indigo-400 bg-indigo-50',   phonePlaceholder: 'Numéro Kulu' },
-        { value: 'soutra',       label: '🟢 Soutra Money',  color: 'border-emerald-400 bg-emerald-50', phonePlaceholder: 'Numéro Soutra' },
-        { value: 'cash',         label: '💵 Espèces',       color: 'border-gray-300 bg-gray-50',       phonePlaceholder: '' },
     ]
 
     return (
@@ -709,30 +702,10 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Paiement */}
-                        <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">💳 Paiement</label>
-                            <div className="grid grid-cols-3 gap-2 mb-3">
-                                {PROVIDERS.map(p => (
-                                    <button key={p.value} type="button" onClick={() => setProvider(p.value)}
-                                        className={`p-2.5 rounded-xl border-2 text-xs font-bold transition text-center ${provider === p.value ? p.color + ' text-gray-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}>
-                                        {p.label}
-                                    </button>
-                                ))}
-                            </div>
-                            {provider !== 'cash' && (
-                                <input type="tel"
-                                    placeholder={PROVIDERS.find(p => p.value === provider)?.phonePlaceholder || 'Numéro de téléphone'}
-                                    value={phone} onChange={e => setPhone(e.target.value)}
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" required />
-                            )}
+                        {/* Paiement — ChaChap Pay uniquement */}
+                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
+                            🔒 <strong>Paiement sécurisé via ChaChap Pay :</strong> vous serez redirigé pour payer avec Orange Money, MTN MoMo ou votre carte. Vos fonds sont libérés au vendeur après confirmation de réception.
                         </div>
-
-                        {provider !== 'cash' && (
-                            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
-                                🔒 <strong>Paiement sécurisé :</strong> vos fonds sont libérés au vendeur uniquement après confirmation de réception.
-                            </div>
-                        )}
 
                         <button type="submit" disabled={createOrder.isPending || pay.isPending}
                             className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50">
@@ -815,8 +788,7 @@ export default function ListingDetailPage() {
     const [sent, setSent]                 = useState(false)
     const [boostOpen, setBoostOpen]       = useState(false)
     const [boostDays, setBoostDays]       = useState(7)
-    const [boostProvider, setBoostProvider] = useState('orange_money')
-    const [boostPhone, setBoostPhone]     = useState('')
+    // Boost payé via ChaChap Pay — pas de sélection de provider nécessaire
     const [favorited, setFavorited]       = useState(false)
     const [showQR, setShowQR]             = useState(false)
 
@@ -845,8 +817,13 @@ export default function ListingDetailPage() {
     }, [listing?.is_favorited])
 
     const boostMutation = useMutation({
-        mutationFn: () => listingsAPI.boost(listing?.id, { days: boostDays, provider: boostProvider, phone: boostPhone }),
-        onSuccess:  () => { queryClient.invalidateQueries(['listing', id]); setBoostOpen(false) },
+        mutationFn: () => listingsAPI.boost(listing?.id, { days: boostDays }),
+        onSuccess:  (res) => {
+            // Rediriger vers ChaChap Pay pour finaliser le paiement du boost
+            const payUrl = res?.data?.payment_url
+            if (payUrl) { window.location.href = payUrl }
+            else { queryClient.invalidateQueries(['listing', id]); setBoostOpen(false) }
+        },
     })
 
     const favMutation = useMutation({
@@ -1113,33 +1090,9 @@ export default function ListingDetailPage() {
                                             </button>
                                         ))}
                                     </div>
-                                    <div className="grid grid-cols-3 gap-2">
-                                        {[
-                                            { value: 'orange_money', label: '🟠 Orange Money' },
-                                            { value: 'mtn_momo',     label: '🟡 MTN MoMo' },
-                                            { value: 'paycard',      label: '💳 PayCard' },
-                                            { value: 'kulu',         label: '🔵 Kulu' },
-                                            { value: 'soutra',       label: '🟢 Soutra' },
-                                        ].map(p => (
-                                            <button key={p.value} type="button"
-                                                onClick={() => setBoostProvider(p.value)}
-                                                className={`py-2 px-1 rounded-xl border-2 text-xs font-bold transition text-center
-                                                    ${boostProvider === p.value
-                                                        ? 'border-amber-500 bg-amber-50 text-amber-800'
-                                                        : 'border-gray-200 bg-white text-gray-600 hover:border-amber-300'}`}>
-                                                {p.label}
-                                            </button>
-                                        ))}
+                                    <div className="bg-amber-50 border border-amber-100 rounded-xl p-3 text-xs text-amber-700">
+                                        🔒 Paiement via <strong>ChaChap Pay</strong> — vous serez redirigé pour payer avec Orange Money, MTN MoMo ou votre carte.
                                     </div>
-                                    <input value={boostPhone} onChange={e => setBoostPhone(e.target.value)}
-                                        placeholder={
-                                            boostProvider === 'orange_money' ? 'Numéro Orange (ex: 622 XX XX XX)' :
-                                            boostProvider === 'mtn_momo'     ? 'Numéro MTN (ex: 624 XX XX XX)' :
-                                            boostProvider === 'paycard'      ? 'Numéro PayCard' :
-                                            boostProvider === 'kulu'         ? 'Numéro Kulu' :
-                                            'Numéro Soutra Money'
-                                        }
-                                        className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400" />
                                     {boostMutation.isError && (
                                         <p className="text-sm text-red-500">{boostMutation.error?.response?.data?.error || 'Erreur de paiement'}</p>
                                     )}

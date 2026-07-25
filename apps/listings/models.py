@@ -241,3 +241,37 @@ class ListingReport(BaseModel):
 
     def __str__(self):
         return f"Signalement — {self.listing.title} par {self.reporter.full_name}"
+
+
+class BoostPayment(BaseModel):
+    """
+    Enregistrement d'un paiement boost.
+    - Orange Money → statut APPROVED automatiquement après confirmation paiement
+    - Espèces (cash) → statut PENDING jusqu'à validation admin
+    """
+
+    class Status(models.TextChoices):
+        PENDING  = 'pending',  'En attente validation'
+        APPROVED = 'approved', 'Approuvé — boost activé'
+        REJECTED = 'rejected', 'Rejeté'
+
+    listing  = models.ForeignKey(
+        Listing, on_delete=models.CASCADE, related_name='boost_payments'
+    )
+    days     = models.PositiveIntegerField(help_text='Durée du boost en jours')
+    amount   = models.PositiveIntegerField(help_text='Montant en GNF')
+    provider = models.CharField(max_length=20)          # cash, orange_money, …
+    status   = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.PENDING
+    )
+    phone    = models.CharField(max_length=20, blank=True)
+    ext_ref  = models.CharField(max_length=100, blank=True, help_text='Référence paiement externe')
+    admin_note = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name         = 'Paiement boost'
+        verbose_name_plural  = 'Paiements boost'
+        ordering             = ['-created_at']
+
+    def __str__(self):
+        return f"Boost {self.listing.title} — {self.days}j — {self.status}"

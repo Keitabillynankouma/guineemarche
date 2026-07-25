@@ -5,6 +5,7 @@ import api, { listingsAPI, shopsAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { useDarkMode } from '../hooks/useDarkMode'
 import Logo from '../components/Logo'
+import NotificationBell from '../components/NotificationBell'
 
 function formatPrice(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -68,9 +69,14 @@ function ListingCard({ listing }) {
                     {/* Dégradé bas */}
                     <div className="absolute inset-x-0 bottom-0 h-12 bg-gradient-to-t from-black/20 to-transparent pointer-events-none" />
                     {/* Badges */}
-                    {fresh && (
-                        <span className="absolute top-2 left-2 bg-green-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm tracking-wide">Nouveau</span>
-                    )}
+                    <div className="absolute top-2 left-2 flex flex-col gap-1">
+                        {listing.is_boosted && (
+                            <span className="bg-amber-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-sm">⚡ Boost</span>
+                        )}
+                        {fresh && (
+                            <span className="bg-green-500 text-white text-xs font-semibold px-2 py-0.5 rounded-full shadow-sm">Nouveau</span>
+                        )}
+                    </div>
                     {/* Vue count */}
                     {listing.view_count > 0 && (
                         <span className="absolute bottom-2 right-2 bg-black/50 backdrop-blur-sm text-white text-xs px-2 py-0.5 rounded-full font-medium">
@@ -193,6 +199,7 @@ function Navbar({ isAuthenticated }) {
                             <Link to="/create" className="btn-primary text-sm px-4 py-2 rounded-xl">+ Publier</Link>
                             <Link to="/messages" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Messages">💬</Link>
                             <Link to="/favorites" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Favoris">❤️</Link>
+                            <NotificationBell />
                             <Link to="/profile" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Profil">👤</Link>
                         </>
                     ) : (
@@ -355,6 +362,7 @@ export default function HomePage() {
     const [ordering, setOrdering]               = useState('-is_boosted,-created_at')
     const [priceMin, setPriceMin]               = useState('')
     const [priceMax, setPriceMax]               = useState('')
+    const [condition, setCondition]             = useState('')
     const [showFilters, setShowFilters]         = useState(false)
     const [aiResults, setAiResults]             = useState(null)  // résultats de la recherche IA
     const [nearLat, setNearLat]                 = useState(null)
@@ -409,11 +417,12 @@ export default function HomePage() {
     const featuredShops = Array.isArray(shopsData) ? shopsData : (shopsData?.results || [])
 
     const { data, fetchNextPage, hasNextPage, isFetchingNextPage, isLoading } = useInfiniteQuery({
-        queryKey: ['listings', debouncedSearch, city, categoryId, ordering, priceMin, priceMax, nearLat, nearLng, radiusKm],
+        queryKey: ['listings', debouncedSearch, city, categoryId, ordering, priceMin, priceMax, condition, nearLat, nearLng, radiusKm],
         queryFn: ({ pageParam = 1 }) =>
             listingsAPI.getAll({
                 search: debouncedSearch, city, category: categoryId, page: pageParam,
                 ordering, min_price: priceMin || undefined, max_price: priceMax || undefined,
+                condition: condition || undefined,
                 ...(nearLat && nearLng ? { near_lat: nearLat, near_lng: nearLng, radius_km: radiusKm } : {}),
             }).then(r => r.data),
         getNextPageParam: (lastPage) => {
@@ -516,6 +525,25 @@ export default function HomePage() {
                                 </div>
                             </div>
                             <div>
+                                <label className="text-xs font-semibold text-gray-500 block mb-2">État de l'article</label>
+                                <div className="flex flex-wrap gap-2">
+                                    {[
+                                        { value: '',         label: 'Tous' },
+                                        { value: 'new',      label: '✨ Neuf' },
+                                        { value: 'like_new', label: '🌟 Comme neuf' },
+                                        { value: 'good',     label: '👍 Bon état' },
+                                        { value: 'fair',     label: '👌 Correct' },
+                                        { value: 'poor',     label: '🔧 Très usé' },
+                                    ].map(opt => (
+                                        <button key={opt.value} onClick={() => setCondition(opt.value)}
+                                            className={`px-3 py-1.5 rounded-full text-xs font-semibold transition
+                                                ${condition === opt.value ? 'bg-green-600 text-white shadow-sm shadow-green-500/30' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                            <div>
                                 <div className="flex items-center justify-between mb-2">
                                     <label className="text-xs font-semibold text-gray-500">📍 Près de moi</label>
                                     {nearLat && (
@@ -541,8 +569,8 @@ export default function HomePage() {
                                     </button>
                                 )}
                             </div>
-                            {(priceMin || priceMax || ordering !== '-is_boosted,-created_at' || nearLat) && (
-                                <button onClick={() => { setPriceMin(''); setPriceMax(''); setOrdering('-is_boosted,-created_at'); setNearLat(null); setNearLng(null) }}
+                            {(priceMin || priceMax || condition || ordering !== '-is_boosted,-created_at' || nearLat) && (
+                                <button onClick={() => { setPriceMin(''); setPriceMax(''); setCondition(''); setOrdering('-is_boosted,-created_at'); setNearLat(null); setNearLng(null) }}
                                     className="text-xs text-red-500 hover:text-red-700 font-medium underline underline-offset-2">
                                     Réinitialiser tous les filtres
                                 </button>
