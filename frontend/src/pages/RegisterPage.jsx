@@ -164,6 +164,7 @@ export default function RegisterPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [acceptedTerms, setAcceptedTerms] = useState(false)
+  const [acceptedAntiVol, setAcceptedAntiVol] = useState(false)
   const [showPwd, setShowPwd] = useState(false)
   const [showPwd2, setShowPwd2] = useState(false)
 
@@ -179,6 +180,7 @@ export default function RegisterPage() {
   const handleRegister = async (e) => {
     e?.preventDefault()
     if (!acceptedTerms) { setError("Veuillez accepter les conditions d'utilisation."); return }
+    if (!acceptedAntiVol) { setError("Veuillez confirmer que vous ne vendrez pas de biens volés ou illicites."); return }
     if (form.password !== form.password2) { setError("Les mots de passe ne correspondent pas."); return }
     if (form.password.length < 6) { setError("Le mot de passe doit contenir au moins 6 caractères."); return }
     setError(''); setLoading(true)
@@ -358,7 +360,7 @@ export default function RegisterPage() {
                     <p className="text-xs text-green-600 -mt-2 ml-1">✓ Code appliqué — annonces gratuites offertes !</p>
                   )}
 
-                  {/* Checkbox CGU — une seule coche pour tout accepter */}
+                  {/* Checkbox CGU */}
                   <label className="flex items-start gap-3 cursor-pointer select-none group">
                     <div className="relative mt-0.5 flex-shrink-0">
                       <input
@@ -383,8 +385,32 @@ export default function RegisterPage() {
                     </span>
                   </label>
 
+                  {/* Checkbox décharge biens volés — obligatoire */}
+                  <label className="flex items-start gap-3 cursor-pointer select-none group">
+                    <div className="relative mt-0.5 flex-shrink-0">
+                      <input
+                        type="checkbox"
+                        checked={acceptedAntiVol}
+                        onChange={e => setAcceptedAntiVol(e.target.checked)}
+                        className="absolute opacity-0 w-5 h-5 cursor-pointer"
+                      />
+                      <div className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all ${
+                        acceptedAntiVol ? 'bg-red-600 border-red-600' : 'border-red-300 group-hover:border-red-500'
+                      }`}>
+                        {acceptedAntiVol && <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7"/></svg>}
+                      </div>
+                    </div>
+                    <span className="text-xs text-gray-600 leading-relaxed">
+                      <span className="font-semibold text-red-700">⚠️ Déclaration obligatoire : </span>
+                      Je certifie sur l'honneur que les articles que je vendrai sur Guimatrix m'appartiennent légalement
+                      et ne sont pas volés, contrefaits ou illégalement obtenus. Je comprends que Guimatrix coopérera
+                      avec les autorités judiciaires en cas d'infraction. J'ai lu et j'accepte la{' '}
+                      <a href="/terms" target="_blank" onClick={e => e.stopPropagation()} className="text-red-600 font-medium hover:underline">Décharge de responsabilité</a>.
+                    </span>
+                  </label>
+
                   <button
-                    type="submit" disabled={loading || !acceptedTerms}
+                    type="submit" disabled={loading || !acceptedTerms || !acceptedAntiVol}
                     className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600
                       text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-500/20
                       disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
