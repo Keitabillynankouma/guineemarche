@@ -25,6 +25,7 @@ import TermsPage from './pages/TermsPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import LivreurDashboard from './pages/LivreurDashboard'
 import NotificationsPage from './pages/NotificationsPage'
+import SellerEarningsPage from './pages/SellerEarningsPage'
 
 const queryClient = new QueryClient()
 
@@ -167,6 +168,7 @@ function AppRoutes() {
         <Route path="/reviews/:userId" element={<ReviewsPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/livreur" element={<PrivateRoute><LivreurDashboard /></PrivateRoute>} />
+        <Route path="/earnings" element={<PrivateRoute><SellerEarningsPage /></PrivateRoute>} />
       </Routes>
       {/* Footer discret */}
       <footer className="bg-white border-t mt-8 py-4 px-4 text-center text-xs text-gray-400 space-x-4">

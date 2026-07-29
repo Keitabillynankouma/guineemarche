@@ -2005,3 +2005,156 @@ class AdminGenerateWeeklyPayoutsView(APIView):
 
         count = LivreurWeeklyPayout.generate_for_week(week_start)
         return Response({'generated': count, 'week_start': str(week_start)})
+
+
+# ── Paiements vendeur ─────────────────────────────────────────────────────────
+
+class SellerEarningsView(APIView):
+    """
+    GET /orders/seller/earnings/
+    Retourne le résumé des gains du vendeur connecté + liste de ses paiements.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from .models import SellerPayout
+        if request.user.role not in ('seller', 'admin', 'super_admin'):
+            return Response({'error': 'Réservé aux vendeurs.'}, status=403)
+
+        payouts = SellerPayout.objects.filter(seller=request.user).order_by('-created_at')
+
+        total_earned   = sum(p.amount_gnf for p in payouts if p.status == 'completed')
+        total_pending  = sum(p.amount_gnf for p in payouts if p.status in ('pending', 'processing'))
+        total_failed   = sum(p.amount_gnf for p in payouts if p.status == 'failed')
+
+        payout_list = [
+            {
+                'id':           str(p.id),
+                'order_id':     str(p.order_id),
+                'amount_gnf':   p.amount_gnf,
+                'status':       p.status,
+                'provider':     p.provider,
+                'payout_phone': p.payout_phone,
+                'external_ref': p.external_ref,
+                'processed_at': p.processed_at,
+                'created_at':   p.created_at,
+                'admin_note':   p.admin_note,
+            }
+            for p in payouts[:50]
+        ]
+
+        return Response({
+            'summary': {
+                'total_earned':  total_earned,
+                'total_pending': total_pending,
+                'total_failed':  total_failed,
+                'count':         payouts.count(),
+            },
+            'payouts': payout_list,
+        })
+
+
+class SellerUpdatePayoutInfoView(APIView):
+    """
+    PUT /orders/seller/payout-info/
+    Le vendeur met à jour son numéro mobile money pour recevoir les paiements.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def put(self, request):
+        phone    = (request.data.get('payout_phone') or '').strip()
+        provider = (request.data.get('payout_provider') or '').strip()
+
+        if not phone or not provider:
+            return Response({'error': 'Numéro et opérateur requis.'}, status=400)
+
+        if provider not in ('orange_money', 'mtn_momo'):
+            return Response({'error': 'Opérateur invalide. Choisir orange_money ou mtn_momo.'}, status=400)
+
+        profile = request.user.profile
+        profile.payout_phone    = phone
+        profile.payout_provider = provider
+        profile.save(update_fields=['payout_phone', 'payout_provider', 'updated_at'])
+
+        return Response({
+            'message':          'Informations de paiement mises à jour.',
+            'payout_phone':     profile.payout_phone,
+            'payout_provider':  profile.payout_provider,
+        })
+
+
+class AdminSellerPayoutListView(APIView):
+    """GET /orders/admin/seller-payouts/ — liste tous les paiements vendeurs."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        from .models import SellerPayout
+        if not (request.user.is_super_admin or request.user.can_manage_accounting):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        status_filter = request.query_params.get('status')
+        qs = SellerPayout.objects.select_related('seller', 'order').order_by('-created_at')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        data = [
+            {
+                'id':           str(p.id),
+                'seller':       p.seller.full_name,
+                'seller_phone': str(p.seller.phone_number),
+                'order_id':     str(p.order_id),
+                'amount_gnf':   p.amount_gnf,
+                'status':       p.status,
+                'provider':     p.provider,
+                'payout_phone': p.payout_phone,
+                'external_ref': p.external_ref,
+                'processed_at': p.processed_at,
+                'created_at':   p.created_at,
+                'admin_note':   p.admin_note,
+            }
+            for p in qs[:200]
+        ]
+        total_pending = sum(p['amount_gnf'] for p in data if p['status'] in ('pending', 'processing'))
+        return Response({'payouts': data, 'total_pending_gnf': total_pending})
+
+
+class AdminTriggerSellerPayoutView(APIView):
+    """POST /orders/admin/seller-payouts/<uuid>/disburse/ — déclenche le virement."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from .models import SellerPayout
+        from .payment_service import disburse_to_seller
+        if not (request.user.is_super_admin or request.user.can_manage_accounting):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        try:
+            payout = SellerPayout.objects.get(pk=pk)
+        except SellerPayout.DoesNotExist:
+            return Response({'error': 'Paiement introuvable.'}, status=404)
+
+        result = disburse_to_seller(str(payout.id))
+        return Response({
+            'success': result.success,
+            'message': result.message,
+            'reference': result.reference,
+        })
+
+
+class AdminMarkSellerPayoutPaidView(APIView):
+    """POST /orders/admin/seller-payouts/<uuid>/mark-paid/ — marquer comme versé manuellement."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from .models import SellerPayout
+        if not (request.user.is_super_admin or request.user.can_manage_accounting):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        try:
+            payout = SellerPayout.objects.get(pk=pk)
+        except SellerPayout.DoesNotExist:
+            return Response({'error': 'Paiement introuvable.'}, status=404)
+
+        note = request.data.get('note', 'Versement manuel admin')
+        payout.mark_completed(note=note)
+        return Response({'message': 'Paiement marqué comme versé.', 'id': str(payout.id)})

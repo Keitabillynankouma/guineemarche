@@ -268,6 +268,90 @@ def initiate_mtn_momo(phone: str, amount: int, order_id: str) -> PaymentResult:
         return _simulate_payment('mtn_momo', phone, amount)
 
 
+def disburse_to_seller(payout_id: str) -> PaymentResult:
+    """
+    Déclenche le versement au vendeur après libération de l'escrow.
+
+    Flux :
+    1. Charge le SellerPayout depuis la DB.
+    2. Si le vendeur a un numéro mobile money → appel ChaChaP B2C (quand disponible).
+    3. Sinon → marque comme PENDING MANUAL pour traitement admin.
+
+    À appeler par :
+    - La tâche Celery `apps.orders.tasks.process_seller_payout`
+    - L'action admin "Déclencher le virement"
+    """
+    from apps.orders.models import SellerPayout
+
+    try:
+        payout = SellerPayout.objects.select_related('seller', 'order').get(pk=payout_id)
+    except SellerPayout.DoesNotExist:
+        logger.error("[PAYOUT] SellerPayout %s introuvable", payout_id)
+        return PaymentResult(success=False, message="Payout introuvable")
+
+    if payout.status == SellerPayout.Status.COMPLETED:
+        logger.info("[PAYOUT] %s déjà versé, ignoré", payout_id)
+        return PaymentResult(success=True, reference=payout.external_ref, message="Déjà versé")
+
+    amount = payout.amount_gnf
+    phone  = payout.payout_phone
+    logger.info("[PAYOUT] Démarrage versement %s → %s GNF sur %s (%s)",
+                payout_id, amount, phone, payout.provider)
+
+    # ── Cas 1 : Pas de numéro → traitement manuel admin ──────────────────────
+    if not phone:
+        payout.admin_note = "Aucun numéro mobile money enregistré — versement manuel requis"
+        payout.save(update_fields=['admin_note', 'updated_at'])
+        logger.warning("[PAYOUT] %s — numéro absent, versement manuel nécessaire", payout_id)
+        return PaymentResult(success=False, message="Numéro mobile money manquant — versement manuel")
+
+    # ── Cas 2 : ChaChaP B2C (quand l'API B2C sera disponible) ─────────────────
+    api_key = getattr(settings, 'CHACHAP_API_KEY', '')
+    if api_key:
+        try:
+            import requests as _req
+            resp = _req.post(
+                f'{CHACHAP_API_URL}/b2c/transfer',
+                json={
+                    'recipient_phone': phone,
+                    'amount':          amount,
+                    'currency':        'GNF',
+                    'reference':       str(payout.id),
+                    'description':     f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
+                },
+                headers={
+                    'CCP-Api-Key':  api_key,
+                    'Content-Type': 'application/json',
+                },
+                timeout=20,
+            )
+            data = resp.json()
+            if resp.status_code in (200, 201) and data.get('status') in ('success', 'PENDING', 'PROCESSING'):
+                ext_ref = data.get('transaction_id', '')
+                payout.mark_completed(external_ref=ext_ref, note="Versement ChaChaP B2C automatique")
+                logger.info("[PAYOUT] %s versé via ChaChaP B2C — tx=%s", payout_id, ext_ref)
+                return PaymentResult(success=True, reference=ext_ref, message="Versement ChaChaP B2C réussi")
+            err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
+            logger.warning("[PAYOUT] ChaChaP B2C échoué: %s", err)
+            payout.mark_failed(note=f"ChaChaP B2C: {err}")
+            return PaymentResult(success=False, message=f"ChaChaP B2C: {err}")
+        except Exception as exc:
+            logger.error("[PAYOUT] ChaChaP B2C exception: %s", exc)
+            payout.mark_failed(note=f"Exception: {exc}")
+            return PaymentResult(success=False, message=str(exc))
+
+    # ── Cas 3 : Pas de clé API → simulation / attente manuelle ───────────────
+    sim_ref = f"SIM-PAYOUT-{uuid.uuid4().hex[:10].upper()}"
+    logger.info("[PAYOUT] Simulation versement %s → ref %s", payout_id, sim_ref)
+    payout.admin_note = f"Simulation — virement manuel de {amount:,} GNF vers {phone} ({payout.provider}) requis"
+    payout.save(update_fields=['admin_note', 'updated_at'])
+    return PaymentResult(
+        success=True,
+        reference=sim_ref,
+        message=f"Simulation : virement de {amount:,} GNF vers {phone} à effectuer manuellement",
+    )
+
+
 def initiate_paycard_card(amount: int, order_id: str, customer_email: str = '', customer_name: str = '') -> PaymentResult:
     """
     Paycard Guinée — paiement par carte Visa/Mastercard.

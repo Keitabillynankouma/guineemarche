@@ -31,8 +31,8 @@ SECRET_KEY = os.environ.get(
     env('SECRET_KEY', default='dev-secret-key-guimatrix-local-2024-xK9mP2nQ')
 )
 
-# DEBUG : true si variable d'env présente, sinon lire .env, sinon True en local
-_debug_env = os.environ.get('DEBUG') or env('DEBUG', default='True')
+# DEBUG : true si variable d'env présente, sinon lire .env, sinon False (sécurisé par défaut)
+_debug_env = os.environ.get('DEBUG') or env('DEBUG', default='False')
 DEBUG = str(_debug_env).lower() in ('true', '1', 'yes')
 
 # ALLOWED_HOSTS

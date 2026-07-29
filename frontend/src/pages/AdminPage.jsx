@@ -163,7 +163,7 @@ function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
             <StatCard label="Commandes terminées"    value={stats.orders_completed}      icon="✅" color="green" />
             <StatCard label="Livrées aujourd'hui"    value={stats.deliveries_today}      icon="🏁" color="green" />
             <StatCard
-              label="Revenus plateforme (5%)"
+              label="Revenus plateforme (4%)"
               value={Math.round((stats.revenue_gnf || 0) * 0.05).toLocaleString('fr-GN') + ' GNF'}
               icon="💰" color="yellow"
             />

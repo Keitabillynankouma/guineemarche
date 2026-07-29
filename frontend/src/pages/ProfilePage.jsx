@@ -513,6 +513,12 @@ export default function ProfilePage() {
                             <span className="text-gray-300 text-lg">›</span>
                         </Link>
                     ))}
+                    {user.role === 'seller' && (
+                        <Link to="/earnings" className="flex items-center justify-between px-5 py-4 hover:bg-emerald-50 border-b transition-colors">
+                            <span className="font-medium text-emerald-600">💰 Mes gains</span>
+                            <span className="text-emerald-300 text-lg">›</span>
+                        </Link>
+                    )}
                     {user.role === 'livreur' && (
                         <Link to="/livreur" className="flex items-center justify-between px-5 py-4 hover:bg-blue-50 border-b transition-colors">
                             <span className="font-medium text-blue-600">🚗 Mes livraisons</span>

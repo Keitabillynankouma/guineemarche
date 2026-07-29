@@ -187,4 +187,21 @@ urlpatterns = [
     path('admin/returns/<uuid:pk>/',
         views.AdminReturnUpdateView.as_view(),
         name='admin-return-update'),
+
+    # Paiements vendeurs
+    path('seller/earnings/',
+        views.SellerEarningsView.as_view(),
+        name='seller-earnings'),
+    path('seller/payout-info/',
+        views.SellerUpdatePayoutInfoView.as_view(),
+        name='seller-payout-info'),
+    path('admin/seller-payouts/',
+        views.AdminSellerPayoutListView.as_view(),
+        name='admin-seller-payouts'),
+    path('admin/seller-payouts/<uuid:pk>/disburse/',
+        views.AdminTriggerSellerPayoutView.as_view(),
+        name='admin-seller-payout-disburse'),
+    path('admin/seller-payouts/<uuid:pk>/mark-paid/',
+        views.AdminMarkSellerPayoutPaidView.as_view(),
+        name='admin-seller-payout-mark-paid'),
 ]

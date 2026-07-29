@@ -1,0 +1,42 @@
+services:
+  # ── Backend Django (ASGI / WebSockets via Daphne) ─────────────────────────
+  - type: web
+    name: guineemarche-backend
+    runtime: python
+    region: frankfurt
+    plan: free
+    buildCommand: "./build.sh"
+    startCommand: "daphne -b 0.0.0.0 -p $PORT config.asgi:application"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: guineemarche-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: guineemarche-redis
+          property: connectionString
+      # Secrets à ajouter manuellement dans le dashboard :
+      # SECRET_KEY, CLOUDINARY_URL, CHACHAP_API_KEY, BREVO_API_KEY,
+      # FIREBASE_PROJECT_ID, FIREBASE_SERVICE_ACCOUNT
+
+  # ── Redis (Django Channels) ────────────────────────────────────────────────
+  - type: redis
+    name: guineemarche-redis
+    region: frankfurt
+    plan: free
+    ipAllowList: []
+
+databases:
+  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  - name: guineemarche-db
+    databaseName: guineemarche
+    region: frankfurt
+    plan: free

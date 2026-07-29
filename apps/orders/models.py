@@ -263,10 +263,73 @@ class Order(BaseModel):
         # Vérifier les badges après chaque vente
         from apps.accounts.models import Badge
         Badge.check_and_award(self.seller)
+        # Créer un enregistrement de paiement vendeur (PENDING → traitement async ou admin)
+        payout_phone    = getattr(profile, 'payout_phone', '') or ''
+        payout_provider = getattr(profile, 'payout_provider', '') or ''
+        SellerPayout.objects.get_or_create(
+            order=self,
+            defaults=dict(
+                seller        = self.seller,
+                amount_gnf    = self.seller_payout_gnf,
+                payout_phone  = payout_phone,
+                provider      = payout_provider or SellerPayout.Provider.ORANGE_MONEY,
+                status        = SellerPayout.Status.PENDING,
+            )
+        )
 
     def refund_escrow(self):
         self.escrow_status = self.EscrowStatus.REFUNDED
         self.save(update_fields=['escrow_status', 'updated_at'])
+
+
+class SellerPayout(BaseModel):
+    """
+    Enregistre chaque versement dû à un vendeur après libération de l'escrow.
+    Le statut passe de 'pending' à 'completed' quand le virement est effectué
+    (automatiquement via ChaChaP B2C, ou manuellement par l'admin).
+    """
+
+    class Status(models.TextChoices):
+        PENDING    = 'pending',    'En attente'
+        PROCESSING = 'processing', 'En cours'
+        COMPLETED  = 'completed',  'Versé'
+        FAILED     = 'failed',     'Échec'
+
+    class Provider(models.TextChoices):
+        ORANGE_MONEY = 'orange_money', 'Orange Money'
+        MTN_MOMO     = 'mtn_momo',     'MTN MoMo'
+        MANUAL       = 'manual',       'Virement manuel'
+
+    order          = models.OneToOneField(Order, on_delete=models.PROTECT, related_name='seller_payout')
+    seller         = models.ForeignKey('accounts.User', on_delete=models.PROTECT, related_name='seller_payouts')
+    amount_gnf     = models.BigIntegerField()
+    payout_phone   = models.CharField(max_length=20, blank=True)
+    provider       = models.CharField(max_length=15, choices=Provider.choices, default=Provider.ORANGE_MONEY)
+    status         = models.CharField(max_length=12, choices=Status.choices, default=Status.PENDING)
+    external_ref   = models.CharField(max_length=255, blank=True, help_text="Référence transaction ChaChaP / OM / MTN")
+    processed_at   = models.DateTimeField(null=True, blank=True)
+    admin_note     = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name        = 'Paiement vendeur'
+        verbose_name_plural = 'Paiements vendeurs'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return f"Paiement {self.seller.full_name} — {self.amount_gnf} GNF ({self.status})"
+
+    def mark_completed(self, external_ref: str = '', note: str = ''):
+        from django.utils import timezone
+        self.status       = self.Status.COMPLETED
+        self.external_ref = external_ref
+        self.admin_note   = note
+        self.processed_at = timezone.now()
+        self.save(update_fields=['status', 'external_ref', 'admin_note', 'processed_at', 'updated_at'])
+
+    def mark_failed(self, note: str = ''):
+        self.status     = self.Status.FAILED
+        self.admin_note = note
+        self.save(update_fields=['status', 'admin_note', 'updated_at'])
 
 
 class Payment(BaseModel):

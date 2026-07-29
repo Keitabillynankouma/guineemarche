@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Order, PickupPoint, MeetingZone, DeliveryZone, Payment, DeliveryAssignment
+from .models import Order, PickupPoint, MeetingZone, DeliveryZone, Payment, DeliveryAssignment, SellerPayout
 
 
 @admin.register(PickupPoint)
@@ -77,3 +77,39 @@ class DeliveryAssignmentAdmin(admin.ModelAdmin):
         from django.utils import timezone
         queryset.update(status='delivered', delivered_at=timezone.now())
         self.message_user(request, 'Livraisons marquées comme livrées.')
+
+
+@admin.register(SellerPayout)
+class SellerPayoutAdmin(admin.ModelAdmin):
+    list_display   = ('seller_name', 'amount_gnf_fmt', 'provider', 'payout_phone', 'status', 'processed_at', 'created_at')
+    list_filter    = ('status', 'provider')
+    search_fields  = ('seller__full_name', 'seller__phone_number', 'payout_phone', 'external_ref')
+    readonly_fields = ('id', 'order', 'seller', 'amount_gnf', 'created_at', 'updated_at', 'processed_at', 'external_ref')
+    ordering       = ('-created_at',)
+    actions        = ['trigger_payout', 'mark_paid_manually']
+
+    @admin.display(description='Vendeur')
+    def seller_name(self, obj):
+        return obj.seller.full_name
+
+    @admin.display(description='Montant (GNF)')
+    def amount_gnf_fmt(self, obj):
+        return f"{obj.amount_gnf:,} GNF"
+
+    @admin.action(description='💸 Déclencher le virement automatique')
+    def trigger_payout(self, request, queryset):
+        from apps.orders.payment_service import disburse_to_seller
+        ok = err = 0
+        for payout in queryset.filter(status__in=['pending', 'failed']):
+            result = disburse_to_seller(str(payout.id))
+            if result.success:
+                ok += 1
+            else:
+                err += 1
+        self.message_user(request, f'{ok} virement(s) lancé(s), {err} échec(s).')
+
+    @admin.action(description='✅ Marquer comme versé manuellement')
+    def mark_paid_manually(self, request, queryset):
+        for payout in queryset.filter(status__in=['pending', 'processing', 'failed']):
+            payout.mark_completed(note='Versement manuel validé par admin')
+        self.message_user(request, 'Virements marqués comme versés.')

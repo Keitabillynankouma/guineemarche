@@ -170,6 +170,13 @@ export const ordersAPI = {
   assignLivreur:       (orderId, livreurId) => api.post(`/orders/admin/orders/${orderId}/assign/`, { livreur_id: livreurId }),
   // Retours
   createReturn:        (id, data) => api.post(`/orders/${id}/return/`, data),
+  // Gains vendeur
+  getSellerEarnings:   ()         => api.get('/orders/seller/earnings/'),
+  updatePayoutInfo:    (data)     => api.put('/orders/seller/payout-info/', data),
+  // Admin — paiements vendeurs
+  adminGetSellerPayouts:    (params) => api.get('/orders/admin/seller-payouts/', { params }),
+  adminDisburseSellerPayout:(id)     => api.post(`/orders/admin/seller-payouts/${id}/disburse/`),
+  adminMarkSellerPayoutPaid:(id, note) => api.post(`/orders/admin/seller-payouts/${id}/mark-paid/`, { note }),
 }
 
 export const reviewsAPI = {

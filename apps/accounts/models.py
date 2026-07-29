@@ -123,18 +123,37 @@ class AdminUser(User):
 
 
 class UserProfile(BaseModel):
-    user        = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
-    avatar_url  = models.ImageField(upload_to='avatars/', blank=True, null=True)
-    bio         = models.TextField(max_length=500, blank=True)
-    rating_avg  = models.FloatField(default=0.0)
+
+    class PayoutProvider(models.TextChoices):
+        ORANGE_MONEY = 'orange_money', 'Orange Money'
+        MTN_MOMO     = 'mtn_momo',     'MTN MoMo'
+
+    user          = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
+    avatar_url    = models.ImageField(upload_to='avatars/', blank=True, null=True)
+    bio           = models.TextField(max_length=500, blank=True)
+    rating_avg    = models.FloatField(default=0.0)
     total_ratings = models.PositiveIntegerField(default=0)
-    total_sales = models.PositiveIntegerField(default=0)
+    total_sales   = models.PositiveIntegerField(default=0)
+
+    # Coordonnées de paiement sortant (pour recevoir les revenus de ventes)
+    payout_phone    = models.CharField(
+        max_length=20, blank=True,
+        help_text="Numéro Orange Money ou MTN MoMo pour recevoir vos paiements"
+    )
+    payout_provider = models.CharField(
+        max_length=15, choices=PayoutProvider.choices, blank=True,
+        help_text="Opérateur mobile money pour les versements"
+    )
 
     class Meta:
         verbose_name = 'Profil'
 
     def __str__(self):
         return f"Profil de {self.user.full_name}"
+
+    @property
+    def has_payout_info(self):
+        return bool(self.payout_phone and self.payout_provider)
 
 
 class OTPCode(BaseModel):
