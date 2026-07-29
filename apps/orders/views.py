@@ -932,10 +932,10 @@ class AdminExportCSVView(APIView):
 
 def _auto_assign_livreur(order):
     """
-    Algorithme d'affectation intelligent — Option B + filtre jour même.
+    Algorithme d'affectation intelligent — priorité proximité vendeur.
 
     Priorités (dans l'ordre) :
-      1. Même ville que l'acheteur (si possible)
+      1. Même ville que le VENDEUR (le livreur doit d'abord aller chercher le colis)
       2. Parmi ceux en service aujourd'hui (≥1 livraison ce jour) → le moins chargé
       3. Sinon (première commande de la journée) → le moins chargé parmi tous
       4. En cas d'égalité → le premier par ordre alphabétique (stable, pas aléatoire)
@@ -968,10 +968,10 @@ def _auto_assign_livreur(order):
     if not livreurs.exists():
         return  # Aucun livreur dans le système
 
-    # Filtre ville (priorité géographique)
-    buyer_city = getattr(order.buyer, 'city', '') or ''
-    if buyer_city:
-        city_match = livreurs.filter(city__iexact=buyer_city)
+    # Priorité géographique : ville du VENDEUR (le livreur récupère le colis chez lui)
+    seller_city = getattr(order.seller, 'city', '') or ''
+    if seller_city:
+        city_match = livreurs.filter(city__iexact=seller_city)
         if city_match.exists():
             livreurs = city_match
 
