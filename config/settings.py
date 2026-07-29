@@ -244,6 +244,13 @@ NIMBA_SENDER_NAME  = env('NIMBA_SENDER_NAME',  default='Guimatrix')
 # Anthropic Claude API (support chatbot + modération)
 ANTHROPIC_API_KEY = env('ANTHROPIC_API_KEY', default='')
 
+# ── Firebase Cloud Messaging (FCM) — notifications push ───────────────────────
+# Créer un projet Firebase → Settings → Service Accounts → Generate new private key
+# FIREBASE_PROJECT_ID    : ID du projet (ex: guineemarche-prod)
+# FIREBASE_SERVICE_ACCOUNT : contenu JSON complet du compte de service (une seule ligne)
+FIREBASE_PROJECT_ID      = env('FIREBASE_PROJECT_ID', default='')
+FIREBASE_SERVICE_ACCOUNT = env('FIREBASE_SERVICE_ACCOUNT', default='')
+
 # ── Sentry — monitoring erreurs + performance + sécurité ──────────────────────
 SENTRY_DSN = env('SENTRY_DSN', default='')
 
