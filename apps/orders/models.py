@@ -264,8 +264,9 @@ class Order(BaseModel):
         from apps.accounts.models import Badge
         Badge.check_and_award(self.seller)
         # Créer un enregistrement de paiement vendeur (PENDING → traitement async ou admin)
-        payout_phone    = getattr(profile, 'payout_phone', '') or ''
-        payout_provider = getattr(profile, 'payout_provider', '') or ''
+        # Priorité : champ User.payout_phone, puis UserProfile.payout_phone
+        payout_phone    = self.seller.payout_phone or getattr(profile, 'payout_phone', '') or ''
+        payout_provider = self.seller.payout_provider or getattr(profile, 'payout_provider', '') or ''
         SellerPayout.objects.get_or_create(
             order=self,
             defaults=dict(

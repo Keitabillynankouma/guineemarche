@@ -164,6 +164,9 @@ export const ordersAPI = {
   confirmDelivery:     (id, code)=> api.post(`/orders/livreur/assignments/${id}/confirm/`, { verification_code: code }),
   updatePosition:      (id, lat, lng) => api.patch(`/orders/livreur/assignments/${id}/position/`, { lat, lng }),
   trackDelivery:       (orderId) => api.get(`/orders/${orderId}/tracking/`),
+  // Compte de paiement livreur
+  getLivreurPayoutInfo:    ()     => api.get('/orders/livreur/payout-info/'),
+  updateLivreurPayoutInfo: (data) => api.put('/orders/livreur/payout-info/', data),
   // Admin — livreurs
   getLivreurs:         ()        => api.get('/orders/admin/livreurs/'),
   getAllAssignments:    (params)  => api.get('/orders/admin/assignments/', { params }),

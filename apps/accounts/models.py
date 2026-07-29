@@ -58,6 +58,21 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     referral_code = models.CharField(max_length=12, unique=True, blank=True, db_index=True)
     referred_by   = models.ForeignKey('self', null=True, blank=True, on_delete=models.SET_NULL, related_name='referrals_made')
 
+    # Coordonnées mobile money — utilisées pour les virements automatiques
+    # (livreurs : virements hebdomadaires / vendeurs : libération escrow)
+    class PayoutProvider(models.TextChoices):
+        ORANGE_MONEY = 'orange_money', 'Orange Money'
+        MTN_MOMO     = 'mtn_momo',     'MTN MoMo'
+
+    payout_phone    = models.CharField(
+        max_length=20, blank=True,
+        help_text="Numéro Orange Money ou MTN MoMo pour recevoir les paiements"
+    )
+    payout_provider = models.CharField(
+        max_length=15, choices=PayoutProvider.choices, blank=True,
+        help_text="Opérateur mobile money pour les virements"
+    )
+
     objects = UserManager()
 
     USERNAME_FIELD  = 'phone_number'
@@ -81,6 +96,10 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
                     self.referral_code = code
                     break
         super().save(*args, **kwargs)
+
+    @property
+    def has_payout_info(self):
+        return bool(self.payout_phone and self.payout_provider)
 
     @property
     def is_seller(self):

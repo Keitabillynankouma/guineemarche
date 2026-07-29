@@ -313,6 +313,7 @@ class UserSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'phone_number', 'full_name', 'email',
             'role', 'city', 'quartier', 'is_verified', 'is_available',
+            'payout_phone', 'payout_provider',
             'created_at', 'profile', 'badges', 'subscription', 'shop'
         )
         # SÉCURITÉ : role, is_staff, is_active, is_available ne peuvent pas être

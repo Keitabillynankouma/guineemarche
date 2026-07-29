@@ -268,6 +268,102 @@ def initiate_mtn_momo(phone: str, amount: int, order_id: str) -> PaymentResult:
         return _simulate_payment('mtn_momo', phone, amount)
 
 
+def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
+    """
+    Déclenche le virement hebdomadaire vers un livreur.
+
+    Flux :
+    1. Charge le LivreurWeeklyPayout depuis la DB.
+    2. Si le livreur a un numéro mobile money → appel ChaChaP B2C.
+    3. Sinon → note admin pour virement manuel.
+
+    À appeler par :
+    - L'action admin "Déclencher le virement" dans LivreurWeeklyPayoutAdmin
+    - La tâche Celery weekly_livreur_payouts (option auto-disburse)
+    """
+    from apps.orders.models import LivreurWeeklyPayout
+    from django.utils import timezone
+
+    try:
+        payout = LivreurWeeklyPayout.objects.select_related('livreur').get(pk=weekly_payout_id)
+    except LivreurWeeklyPayout.DoesNotExist:
+        logger.error("[LIVREUR PAYOUT] LivreurWeeklyPayout %s introuvable", weekly_payout_id)
+        return PaymentResult(success=False, message="Payout introuvable")
+
+    if payout.status == LivreurWeeklyPayout.Status.PAID:
+        logger.info("[LIVREUR PAYOUT] %s déjà versé, ignoré", weekly_payout_id)
+        return PaymentResult(success=True, reference=payout.payment_ref, message="Déjà versé")
+
+    amount  = payout.net_gnf
+    livreur = payout.livreur
+    phone   = livreur.payout_phone
+    provider = livreur.payout_provider
+
+    logger.info("[LIVREUR PAYOUT] Démarrage virement %s → %s GNF sur %s (%s) pour %s",
+                weekly_payout_id, amount, phone, provider, livreur.full_name)
+
+    # ── Cas 1 : Pas de numéro → traitement manuel admin ──────────────────────
+    if not phone:
+        payout.note = "Aucun numéro mobile money enregistré — virement manuel requis"
+        payout.save(update_fields=['note', 'updated_at'])
+        logger.warning("[LIVREUR PAYOUT] %s — numéro absent pour %s", weekly_payout_id, livreur.full_name)
+        return PaymentResult(success=False, message=f"Numéro mobile money manquant pour {livreur.full_name}")
+
+    # ── Cas 2 : ChaChaP B2C (quand l'API B2C sera disponible) ─────────────────
+    api_key = getattr(settings, 'CHACHAP_API_KEY', '')
+    if api_key:
+        try:
+            import requests as _req
+            resp = _req.post(
+                f'{CHACHAP_API_URL}/b2c/transfer',
+                json={
+                    'recipient_phone': phone,
+                    'amount':          amount,
+                    'currency':        'GNF',
+                    'reference':       str(payout.id),
+                    'description':     f'Salaire livreur Guimatrix semaine du {payout.week_start}',
+                },
+                headers={
+                    'CCP-Api-Key':  api_key,
+                    'Content-Type': 'application/json',
+                },
+                timeout=20,
+            )
+            data = resp.json()
+            if resp.status_code in (200, 201) and data.get('status') in ('success', 'PENDING', 'PROCESSING'):
+                ext_ref = data.get('transaction_id', '')
+                payout.status         = LivreurWeeklyPayout.Status.PAID
+                payout.paid_at        = timezone.now()
+                payout.payment_ref    = ext_ref
+                payout.payment_method = provider
+                payout.note           = "Virement ChaChaP B2C automatique"
+                payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
+                logger.info("[LIVREUR PAYOUT] %s versé via ChaChaP B2C — tx=%s", weekly_payout_id, ext_ref)
+                return PaymentResult(success=True, reference=ext_ref, message="Virement ChaChaP B2C réussi")
+
+            err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
+            logger.warning("[LIVREUR PAYOUT] ChaChaP B2C échoué: %s", err)
+            payout.note = f"ChaChaP B2C échoué: {err}"
+            payout.save(update_fields=['note', 'updated_at'])
+            return PaymentResult(success=False, message=f"ChaChaP B2C: {err}")
+        except Exception as exc:
+            logger.error("[LIVREUR PAYOUT] ChaChaP B2C exception: %s", exc)
+            payout.note = f"Exception virement: {exc}"
+            payout.save(update_fields=['note', 'updated_at'])
+            return PaymentResult(success=False, message=str(exc))
+
+    # ── Cas 3 : Pas de clé API → simulation / attente manuelle ───────────────
+    sim_ref = f"SIM-LIV-{uuid.uuid4().hex[:10].upper()}"
+    logger.info("[LIVREUR PAYOUT] Simulation virement %s → ref %s", weekly_payout_id, sim_ref)
+    payout.note = f"Simulation — virement manuel de {amount:,} GNF vers {phone} ({provider}) requis"
+    payout.save(update_fields=['note', 'updated_at'])
+    return PaymentResult(
+        success=True,
+        reference=sim_ref,
+        message=f"Simulation : virement de {amount:,} GNF vers {phone} à effectuer manuellement",
+    )
+
+
 def disburse_to_seller(payout_id: str) -> PaymentResult:
     """
     Déclenche le versement au vendeur après libération de l'escrow.

@@ -302,6 +302,87 @@ function AssignmentCard({ assignment, onStart, onConfirm, onRefresh }) {
 }
 
 // ── Page principale ───────────────────────────────────────────────────────────
+// ── Modale compte de paiement livreur ────────────────────────────────────────
+function PayoutInfoModal({ current, onClose, onSaved }) {
+  const [phone,    setPhone]    = useState(current.phone    || '')
+  const [provider, setProvider] = useState(current.provider || 'orange_money')
+  const [loading,  setLoading]  = useState(false)
+  const [error,    setError]    = useState('')
+
+  async function save() {
+    if (!phone.trim()) { setError('Entrez votre numéro mobile money.'); return }
+    setLoading(true); setError('')
+    try {
+      await ordersAPI.updateLivreurPayoutInfo({ payout_phone: phone.trim(), payout_provider: provider })
+      onSaved({ phone: phone.trim(), provider })
+      onClose()
+    } catch (e) {
+      const d = e.response?.data
+      setError(d?.error || d?.detail || 'Erreur lors de la mise à jour.')
+    } finally { setLoading(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-3xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-gray-900">💳 Compte de paiement</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">×</button>
+        </div>
+        <p className="text-sm text-gray-600">
+          Renseignez le numéro sur lequel vous voulez recevoir votre salaire chaque semaine.
+        </p>
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Opérateur</label>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { value: 'orange_money', label: '🟠 Orange Money' },
+                { value: 'mtn_momo',     label: '🟡 MTN MoMo' },
+              ].map(op => (
+                <button
+                  key={op.value}
+                  onClick={() => setProvider(op.value)}
+                  className={`py-2.5 px-3 rounded-xl border-2 text-sm font-medium transition-all ${
+                    provider === op.value
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700'
+                      : 'border-gray-200 text-gray-600 hover:border-gray-300'
+                  }`}
+                >
+                  {op.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Numéro de téléphone</label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={e => setPhone(e.target.value)}
+              placeholder="ex: +224 622 00 00 00"
+              className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            />
+          </div>
+        </div>
+        {error && <p className="text-sm text-red-600 bg-red-50 rounded-xl px-4 py-2">{error}</p>}
+        <div className="flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm text-gray-600 hover:bg-gray-50">
+            Annuler
+          </button>
+          <button
+            onClick={save}
+            disabled={loading}
+            className="flex-1 py-2.5 rounded-xl bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+          >
+            {loading ? 'Enregistrement…' : 'Enregistrer'}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function LivreurDashboard() {
   const user                          = useAuthStore(s => s.user)
   const setUser                       = useAuthStore(s => s.setUser)
@@ -309,6 +390,18 @@ export default function LivreurDashboard() {
   const [loading, setLoading]         = useState(true)
   const [error, setError]             = useState('')
   const [toggling, setToggling]       = useState(false)
+  const [showPayoutModal, setShowPayoutModal] = useState(false)
+  const [payoutInfo, setPayoutInfo]   = useState({
+    phone:    user?.payout_phone    || '',
+    provider: user?.payout_provider || 'orange_money',
+  })
+
+  // Sync payout info si user store se met à jour
+  useEffect(() => {
+    if (user?.payout_phone) {
+      setPayoutInfo({ phone: user.payout_phone, provider: user.payout_provider || 'orange_money' })
+    }
+  }, [user?.payout_phone, user?.payout_provider])
 
   // is_available vient du store auth (mis à jour par /me/ au login)
   const isAvailable = user?.is_available ?? true
@@ -365,6 +458,16 @@ export default function LivreurDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showPayoutModal && (
+        <PayoutInfoModal
+          current={payoutInfo}
+          onClose={() => setShowPayoutModal(false)}
+          onSaved={info => {
+            setPayoutInfo(info)
+            if (user) setUser({ ...user, payout_phone: info.phone, payout_provider: info.provider })
+          }}
+        />
+      )}
       <div className="bg-gradient-to-r from-green-800 to-emerald-700 px-4 pt-10 pb-8">
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -395,6 +498,44 @@ export default function LivreurDashboard() {
       </div>
 
       <div className="px-4 py-6 max-w-lg mx-auto space-y-4">
+
+        {/* ── Compte de paiement ─────────────────────────────────────────── */}
+        {!payoutInfo.phone ? (
+          <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+            <span className="text-xl mt-0.5">⚠️</span>
+            <div className="flex-1">
+              <p className="text-sm font-bold text-amber-800">Compte de paiement manquant</p>
+              <p className="text-xs text-amber-700 mt-0.5 leading-relaxed">
+                Ajoutez votre numéro Orange Money ou MTN MoMo pour recevoir votre salaire automatiquement chaque semaine.
+              </p>
+              <button
+                onClick={() => setShowPayoutModal(true)}
+                className="mt-2 text-xs font-bold text-amber-900 bg-amber-200 hover:bg-amber-300 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Configurer maintenant →
+              </button>
+            </div>
+          </div>
+        ) : (
+          <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center justify-between shadow-sm">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl">{payoutInfo.provider === 'orange_money' ? '🟠' : '🟡'}</span>
+              <div>
+                <p className="text-xs font-bold text-gray-700">
+                  {payoutInfo.provider === 'orange_money' ? 'Orange Money' : 'MTN MoMo'}
+                </p>
+                <p className="text-sm font-mono text-gray-900">{payoutInfo.phone}</p>
+              </div>
+            </div>
+            <button
+              onClick={() => setShowPayoutModal(true)}
+              className="text-xs text-emerald-600 font-semibold border border-emerald-200 hover:bg-emerald-50 px-3 py-1.5 rounded-lg transition-colors"
+            >
+              Modifier
+            </button>
+          </div>
+        )}
+
         {loading && (
           <div className="flex justify-center py-16">
             <div className="w-8 h-8 border-4 border-green-700 border-t-transparent rounded-full animate-spin" />

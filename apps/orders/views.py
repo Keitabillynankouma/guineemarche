@@ -1959,11 +1959,17 @@ class AdminWeeklyPayoutsView(APIView):
 
 
 class AdminMarkWeeklyPayoutPaidView(APIView):
-    """POST /orders/admin/accounting/weekly-payouts/mark-paid/ — marquer payé."""
+    """
+    POST /orders/admin/accounting/weekly-payouts/mark-paid/
+    Marque les virements comme payés.
+    Si auto_disburse=true (défaut), tente le virement ChaChaP B2C pour chaque livreur
+    qui a configuré son numéro mobile money.
+    """
     permission_classes = [IsAdmin]
 
     def post(self, request):
         from .models import LivreurWeeklyPayout
+        from .payment_service import disburse_to_livreur
         from django.utils import timezone
         if not (request.user.can_manage_accounting or request.user.is_super_admin):
             return Response({'error': 'Accès réservé.'}, status=403)
@@ -1972,18 +1978,83 @@ class AdminMarkWeeklyPayoutPaidView(APIView):
         payment_ref    = request.data.get('payment_ref', '').strip()
         payment_method = request.data.get('payment_method', '').strip()
         note           = request.data.get('note', '').strip()
+        auto_disburse  = request.data.get('auto_disburse', True)
 
         if not payout_ids:
             return Response({'error': 'payout_ids requis.'}, status=400)
 
-        qs    = LivreurWeeklyPayout.objects.filter(id__in=payout_ids, status='pending')
-        count = qs.update(
-            status='paid', paid_at=timezone.now(),
-            payment_ref=payment_ref,
-            payment_method=payment_method,
-            note=note,
-        )
-        return Response({'paid': count, 'payment_ref': payment_ref})
+        qs = LivreurWeeklyPayout.objects.filter(id__in=payout_ids, status='pending').select_related('livreur')
+
+        auto_ok = auto_fail = manual = 0
+        results = []
+
+        for payout in qs:
+            if auto_disburse and payout.livreur.has_payout_info:
+                # Tentative virement automatique
+                result = disburse_to_livreur(str(payout.id))
+                if result.success:
+                    auto_ok += 1
+                    results.append({'id': str(payout.id), 'method': 'auto', 'ref': result.reference})
+                else:
+                    auto_fail += 1
+                    results.append({'id': str(payout.id), 'method': 'auto_failed', 'error': result.message})
+            else:
+                # Pas de numéro → marquer manuellement
+                payout.status         = LivreurWeeklyPayout.Status.PAID
+                payout.paid_at        = timezone.now()
+                payout.payment_ref    = payment_ref
+                payout.payment_method = payment_method or 'manual'
+                payout.note           = note or ('Numéro mobile money non configuré — virement manuel' if not payout.livreur.has_payout_info else note)
+                payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
+                manual += 1
+                results.append({'id': str(payout.id), 'method': 'manual'})
+
+        return Response({
+            'auto_disbursed': auto_ok,
+            'auto_failed':    auto_fail,
+            'manual_marked':  manual,
+            'payment_ref':    payment_ref,
+            'results':        results,
+        })
+
+
+class LivreurUpdatePayoutInfoView(APIView):
+    """
+    PUT /orders/livreur/payout-info/
+    Le livreur configure son numéro mobile money pour recevoir ses salaires.
+    """
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        if request.user.role != 'livreur':
+            return Response({'error': 'Réservé aux livreurs.'}, status=403)
+        return Response({
+            'payout_phone':    request.user.payout_phone,
+            'payout_provider': request.user.payout_provider,
+            'has_payout_info': request.user.has_payout_info,
+        })
+
+    def put(self, request):
+        if request.user.role != 'livreur':
+            return Response({'error': 'Réservé aux livreurs.'}, status=403)
+
+        phone    = (request.data.get('payout_phone')    or '').strip()
+        provider = (request.data.get('payout_provider') or '').strip()
+
+        if not phone or not provider:
+            return Response({'error': 'Numéro et opérateur requis.'}, status=400)
+        if provider not in ('orange_money', 'mtn_momo'):
+            return Response({'error': 'Opérateur invalide. Choisir orange_money ou mtn_momo.'}, status=400)
+
+        request.user.payout_phone    = phone
+        request.user.payout_provider = provider
+        request.user.save(update_fields=['payout_phone', 'payout_provider', 'updated_at'])
+
+        return Response({
+            'message':         'Compte de paiement mis à jour.',
+            'payout_phone':    phone,
+            'payout_provider': provider,
+        })
 
 
 class AdminGenerateWeeklyPayoutsView(APIView):
@@ -2071,15 +2142,22 @@ class SellerUpdatePayoutInfoView(APIView):
         if provider not in ('orange_money', 'mtn_momo'):
             return Response({'error': 'Opérateur invalide. Choisir orange_money ou mtn_momo.'}, status=400)
 
-        profile = request.user.profile
-        profile.payout_phone    = phone
-        profile.payout_provider = provider
-        profile.save(update_fields=['payout_phone', 'payout_provider', 'updated_at'])
+        # Écrire sur User (universel) + UserProfile (pour la rétro-compatibilité)
+        request.user.payout_phone    = phone
+        request.user.payout_provider = provider
+        request.user.save(update_fields=['payout_phone', 'payout_provider', 'updated_at'])
+        try:
+            profile = request.user.profile
+            profile.payout_phone    = phone
+            profile.payout_provider = provider
+            profile.save(update_fields=['payout_phone', 'payout_provider', 'updated_at'])
+        except Exception:
+            pass  # Pas de profil — pas grave, User est source de vérité
 
         return Response({
             'message':          'Informations de paiement mises à jour.',
-            'payout_phone':     profile.payout_phone,
-            'payout_provider':  profile.payout_provider,
+            'payout_phone':     phone,
+            'payout_provider':  provider,
         })
 
 

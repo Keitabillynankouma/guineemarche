@@ -84,6 +84,9 @@ urlpatterns = [
     path('livreur/assignments/<uuid:pk>/position/',
         views.LivreurUpdatePositionView.as_view(),
         name='livreur-update-position'),
+    path('livreur/payout-info/',
+        views.LivreurUpdatePayoutInfoView.as_view(),
+        name='livreur-payout-info'),
 
     # Admin
     path('admin/pickup-points/',

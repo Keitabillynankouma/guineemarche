@@ -1,5 +1,9 @@
 from django.contrib import admin
-from .models import Order, PickupPoint, MeetingZone, DeliveryZone, Payment, DeliveryAssignment, SellerPayout
+from .models import (
+    Order, PickupPoint, MeetingZone, DeliveryZone,
+    Payment, DeliveryAssignment, SellerPayout,
+    LivreurPayment, LivreurWeeklyPayout, LivreurFine,
+)
 
 
 @admin.register(PickupPoint)
@@ -113,3 +117,90 @@ class SellerPayoutAdmin(admin.ModelAdmin):
         for payout in queryset.filter(status__in=['pending', 'processing', 'failed']):
             payout.mark_completed(note='Versement manuel validé par admin')
         self.message_user(request, 'Virements marqués comme versés.')
+
+
+@admin.register(LivreurPayment)
+class LivreurPaymentAdmin(admin.ModelAdmin):
+    list_display  = ('livreur_name', 'gross_gnf_fmt', 'net_gnf_fmt', 'status', 'paid_at', 'created_at')
+    list_filter   = ('status',)
+    search_fields = ('livreur__full_name', 'livreur__phone_number', 'payment_ref')
+    readonly_fields = ('id', 'assignment', 'livreur', 'gross_gnf', 'platform_cut_gnf', 'net_gnf', 'created_at', 'updated_at')
+    ordering      = ('-created_at',)
+
+    @admin.display(description='Livreur')
+    def livreur_name(self, obj): return obj.livreur.full_name
+
+    @admin.display(description='Brut')
+    def gross_gnf_fmt(self, obj): return f"{obj.gross_gnf:,} GNF"
+
+    @admin.display(description='Net livreur')
+    def net_gnf_fmt(self, obj): return f"{obj.net_gnf:,} GNF"
+
+
+@admin.register(LivreurWeeklyPayout)
+class LivreurWeeklyPayoutAdmin(admin.ModelAdmin):
+    list_display  = ('livreur_name', 'week_start', 'deliveries_count', 'gross_gnf_fmt', 'fines_gnf_fmt', 'net_gnf_fmt', 'livreur_phone', 'status', 'paid_at')
+    list_filter   = ('status',)
+    search_fields = ('livreur__full_name', 'livreur__phone_number', 'payment_ref')
+    readonly_fields = ('id', 'livreur', 'week_start', 'week_end', 'deliveries_count', 'gross_gnf', 'fines_gnf', 'net_gnf', 'created_at', 'updated_at')
+    ordering      = ('-week_start',)
+    actions       = ['trigger_auto_disburse', 'mark_paid_manual']
+
+    @admin.display(description='Livreur')
+    def livreur_name(self, obj): return obj.livreur.full_name
+
+    @admin.display(description='📱 Mobile money')
+    def livreur_phone(self, obj):
+        if obj.livreur.payout_phone:
+            icon = '🟠' if obj.livreur.payout_provider == 'orange_money' else '🟡'
+            return f"{icon} {obj.livreur.payout_phone}"
+        return '⚠️ Non configuré'
+
+    @admin.display(description='Brut')
+    def gross_gnf_fmt(self, obj): return f"{obj.gross_gnf:,} GNF"
+
+    @admin.display(description='Amendes')
+    def fines_gnf_fmt(self, obj): return f"-{obj.fines_gnf:,} GNF" if obj.fines_gnf else '—'
+
+    @admin.display(description='Net à verser')
+    def net_gnf_fmt(self, obj): return f"{obj.net_gnf:,} GNF"
+
+    @admin.action(description='💸 Déclencher le virement automatique (ChaChaP B2C)')
+    def trigger_auto_disburse(self, request, queryset):
+        from apps.orders.payment_service import disburse_to_livreur
+        ok = err = skip = 0
+        for payout in queryset.filter(status='pending'):
+            if not payout.livreur.has_payout_info:
+                skip += 1
+                continue
+            result = disburse_to_livreur(str(payout.id))
+            if result.success: ok += 1
+            else:              err += 1
+        self.message_user(request, f'{ok} virement(s) lancé(s), {err} échec(s), {skip} sans numéro mobile money.')
+
+    @admin.action(description='✅ Marquer comme versé manuellement')
+    def mark_paid_manual(self, request, queryset):
+        from django.utils import timezone
+        count = queryset.filter(status='pending').update(
+            status='paid', paid_at=timezone.now(),
+            payment_method='manual', note='Versement manuel admin',
+        )
+        self.message_user(request, f'{count} virement(s) marqué(s) comme versé(s).')
+
+
+@admin.register(LivreurFine)
+class LivreurFineAdmin(admin.ModelAdmin):
+    list_display  = ('livreur_name', 'reason_display', 'amount_gnf_fmt', 'status', 'created_at')
+    list_filter   = ('status', 'reason')
+    search_fields = ('livreur__full_name', 'livreur__phone_number')
+    readonly_fields = ('id', 'livreur', 'created_at', 'updated_at')
+    ordering      = ('-created_at',)
+
+    @admin.display(description='Livreur')
+    def livreur_name(self, obj): return obj.livreur.full_name
+
+    @admin.display(description='Raison')
+    def reason_display(self, obj): return obj.get_reason_display()
+
+    @admin.display(description='Montant')
+    def amount_gnf_fmt(self, obj): return f"{obj.amount_gnf:,} GNF"
