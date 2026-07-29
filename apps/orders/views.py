@@ -22,6 +22,7 @@ from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, Deli
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer, IntraCityZoneRateSerializer
 from .payment_service import initiate_chachap
 from core.permissions import IsAdmin
+from rest_framework.permissions import IsAuthenticated
 
 
 class PickupPointListView(generics.ListAPIView):
