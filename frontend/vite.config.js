@@ -63,6 +63,11 @@ export default defineConfig({
       },
     }),
   ],
+  build: {
+    rolldownOptions: {
+      external: ['firebase/app', 'firebase/messaging'],
+    },
+  },
   server: {
     host: true,
     port: 5173,
