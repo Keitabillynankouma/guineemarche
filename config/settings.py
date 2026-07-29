@@ -37,7 +37,7 @@ DEBUG = str(_debug_env).lower() in ('true', '1', 'yes')
 
 # ALLOWED_HOSTS
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS') or env('ALLOWED_HOSTS', default='')
-_base_hosts = ['guineemarche.onrender.com', 'www.guineemarche.com']
+_base_hosts = ['guineemarche.onrender.com', 'www.guineemarche.com', 'api.guimatrix.com', 'guimatrix.com']
 if _allowed_hosts_env:
     ALLOWED_HOSTS = list({h.strip() for h in _allowed_hosts_env.split(',') if h.strip()} | set(_base_hosts))
 elif DEBUG:
@@ -211,10 +211,9 @@ CORS_ALLOWED_ORIGINS = [
     "https://guimatrix.onrender.com",
     "https://guimatrix.com",
     "https://www.guimatrix.com",
+    "https://api.guimatrix.com",
     "https://guineemarche.com",
     "https://www.guineemarche.com",
-    "https://guineemarche-production.up.railway.app",
-    "https://guineemarche-frontend-production.up.railway.app",
     "http://localhost:5173",   # Dev local
     "http://127.0.0.1:5173",
 ]
