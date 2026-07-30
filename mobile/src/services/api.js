@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store'
 // ── Base URL — à changer selon l'env ──────────────────────────────────────────
 // Dev local   : 'http://192.168.X.X:8000/api/v1'  (IP de votre machine)
 // Production  : 'https://votre-app.onrender.com/api/v1'
-export const BASE_URL = 'https://guineemarche.onrender.com/api/v1'
+export const BASE_URL = 'https://api.guimatrix.com/api/v1'
 
 const api = axios.create({ baseURL: BASE_URL })
 
@@ -42,10 +42,13 @@ api.interceptors.response.use(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authAPI = {
-    login:     (phone, password) => api.post('/auth/login/', { phone_number: phone, password }),
-    register:  (data)            => api.post('/auth/register/', data),
-    me:        ()                => api.get('/auth/me/'),
-    logout:    (refresh)         => api.post('/auth/logout/', { refresh }),
+    login:              (phone, password) => api.post('/auth/login/', { phone_number: phone, password }),
+    register:           (data)            => api.post('/auth/register/', data),
+    me:                 ()                => api.get('/auth/me/'),
+    logout:             (refresh)         => api.post('/auth/logout/', { refresh }),
+    updateMe:           (data)            => api.patch('/auth/me/', data),
+    toggleAvailability: ()                => api.post('/auth/toggle-availability/'),
+    registerFcmToken:   (token)           => api.post('/auth/fcm-token/', { fcm_token: token }),
 }
 
 // ── Listings ──────────────────────────────────────────────────────────────────
@@ -68,12 +71,24 @@ export const messagesAPI = {
 
 // ── Commandes ─────────────────────────────────────────────────────────────────
 export const ordersAPI = {
-    list:      ()        => api.get('/orders/'),
-    received:  ()        => api.get('/orders/received/'),
-    detail:    (id)      => api.get(`/orders/${id}/`),
-    create:    (data)    => api.post('/orders/', data),
-    action:    (id, act) => api.post(`/orders/${id}/${act}/`),
-    pay:       (id, data)=> api.post(`/orders/${id}/pay/`, data),
+    list:           ()            => api.get('/orders/'),
+    received:       ()            => api.get('/orders/received/'),
+    detail:         (id)          => api.get(`/orders/${id}/`),
+    create:         (data)        => api.post('/orders/', data),
+    action:         (id, act)     => api.post(`/orders/${id}/${act}/`),
+    pay:            (id, data)    => api.post(`/orders/${id}/pay/`, data),
+    confirmReceipt: (id)          => api.post(`/orders/${id}/confirm-receipt/`),
+    dispute:        (id)          => api.post(`/orders/${id}/dispute/`),
+    // Gains vendeur
+    sellerEarnings:     ()        => api.get('/orders/seller/earnings/'),
+    updatePayoutInfo:   (data)    => api.put('/orders/seller/payout-info/', data),
+    // Livreur
+    myAssignments:      ()        => api.get('/orders/livreur/assignments/'),
+    startDelivery:      (id)      => api.post(`/orders/livreur/assignments/${id}/start/`),
+    confirmDelivery:    (id, code)=> api.post(`/orders/livreur/assignments/${id}/confirm/`, { verification_code: code }),
+    updatePosition:     (id, lat, lng) => api.patch(`/orders/livreur/assignments/${id}/position/`, { lat, lng }),
+    getLivreurPayoutInfo:   ()    => api.get('/orders/livreur/payout-info/'),
+    updateLivreurPayoutInfo:(data)=> api.put('/orders/livreur/payout-info/', data),
 }
 
 // ── Notifications ─────────────────────────────────────────────────────────────

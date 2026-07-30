@@ -48,7 +48,7 @@ function OrderCard({ order, onAction }) {
             {/* Actions */}
             <View style={styles.actions}>
                 {order.status === 'confirmed' && (
-                    <TouchableOpacity onPress={() => onAction(order.id, 'complete')} style={styles.btnPrimary}>
+                    <TouchableOpacity onPress={() => onAction(order.id, 'confirm-receipt')} style={styles.btnPrimary}>
                         <Text style={styles.btnPrimaryText}>✅ Confirmer réception</Text>
                     </TouchableOpacity>
                 )}
@@ -82,7 +82,11 @@ export default function OrdersScreen({ navigation }) {
     })
 
     const actionMut = useMutation({
-        mutationFn: ({ id, action }) => ordersAPI.action(id, action),
+        mutationFn: ({ id, action }) => {
+            if (action === 'confirm-receipt') return ordersAPI.confirmReceipt(id)
+            if (action === 'cancel')          return ordersAPI.action(id, 'cancel')
+            return ordersAPI.action(id, action)
+        },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['orders-buyer'] })
             qc.invalidateQueries({ queryKey: ['orders-seller'] })
@@ -98,6 +102,11 @@ export default function OrdersScreen({ navigation }) {
             ])
         } else if (action === 'pay') {
             navigation.navigate('Payment', { orderId: id })
+        } else if (action === 'confirm-receipt') {
+            Alert.alert('Confirmer la réception', 'Avez-vous bien reçu cet article ?', [
+                { text: 'Oui, confirmé', onPress: () => actionMut.mutate({ id, action }) },
+                { text: 'Annuler', style: 'cancel' },
+            ])
         } else {
             actionMut.mutate({ id, action })
         }

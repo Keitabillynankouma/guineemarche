@@ -1,10 +1,6 @@
 /**
- * Villes et quartiers/communes de Guinée.
- * Ordre : Grande Conakry en premier, puis régions par ordre alphabétique.
- *
- * ⚠️  Coyah et Dubreka sont des préfectures à part entière de la région
- *     de Kindia, mais économiquement rattachées à la Grande Conakry.
- *     Elles apparaissent donc en tête de liste après Conakry.
+ * Villes et quartiers/communes de Guinée — version mobile.
+ * Identique à frontend/src/constants/communes.js
  */
 export const COMMUNES_PAR_VILLE = {
   // ── Grande Conakry ────────────────────────────────────────────────
@@ -23,10 +19,8 @@ export const COMMUNES_PAR_VILLE = {
   'Siguiri':   ['Siguiri Centre', 'Doko', 'Kintinian', 'Nounkounkan'],
 }
 
-/** Liste ordonnée de toutes les villes */
 export const VILLES = Object.keys(COMMUNES_PAR_VILLE)
 
-/** Retourne les communes/quartiers d'une ville */
 export function getCommunesByVille(ville) {
   return COMMUNES_PAR_VILLE[ville] || []
 }

@@ -7,19 +7,29 @@ import {
 import { authAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 import { colors, spacing, radius, font } from '../theme'
-
-const CITIES = ['Conakry', 'Kindia', 'Labé', 'Kankan', 'Nzérékoré', 'Mamou', 'Boké', 'Faranah', 'Siguiri']
+import { VILLES, getCommunesByVille } from '../constants/communes'
 
 export default function RegisterScreen({ navigation }) {
-    const [form, setForm] = useState({ full_name: '', phone_number: '', password: '', city: 'Conakry', role: 'buyer' })
+    const [form, setForm] = useState({ full_name: '', phone_number: '', password: '', city: 'Conakry', quartier: '', role: 'buyer' })
     const [loading, setLoading] = useState(false)
+    const [acceptedAntiVol, setAcceptedAntiVol] = useState(false)
     const { login } = useAuthStore()
 
     const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+    const setCity = (city) => setForm(f => ({ ...f, city, quartier: '' }))
+
+    const communes = getCommunesByVille(form.city)
 
     const handleRegister = async () => {
         if (!form.full_name || !form.phone_number || !form.password) {
             Alert.alert('Erreur', 'Tous les champs sont obligatoires.')
+            return
+        }
+        if (!acceptedAntiVol) {
+            Alert.alert(
+                '⚠️ Déclaration obligatoire',
+                'Vous devez certifier que les articles que vous vendrez vous appartiennent légalement et ne sont pas volés.'
+            )
             return
         }
         setLoading(true)
@@ -67,14 +77,28 @@ export default function RegisterScreen({ navigation }) {
                     ))}
 
                     <Text style={styles.label}>Ville</Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
-                        {CITIES.map(c => (
-                            <TouchableOpacity key={c} onPress={() => set('city', c)}
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.sm }}>
+                        {VILLES.map(c => (
+                            <TouchableOpacity key={c} onPress={() => setCity(c)}
                                 style={[styles.pill, form.city === c && styles.pillActive]}>
                                 <Text style={[styles.pillText, form.city === c && styles.pillTextActive]}>{c}</Text>
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
+
+                    {communes.length > 0 && (
+                        <>
+                            <Text style={styles.label}>Quartier / Commune</Text>
+                            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginBottom: spacing.md }}>
+                                {communes.map(q => (
+                                    <TouchableOpacity key={q} onPress={() => set('quartier', q)}
+                                        style={[styles.pill, form.quartier === q && styles.pillActive]}>
+                                        <Text style={[styles.pillText, form.quartier === q && styles.pillTextActive]}>{q}</Text>
+                                    </TouchableOpacity>
+                                ))}
+                            </ScrollView>
+                        </>
+                    )}
 
                     <Text style={styles.label}>Je suis…</Text>
                     <View style={styles.roleRow}>
@@ -86,10 +110,25 @@ export default function RegisterScreen({ navigation }) {
                         ))}
                     </View>
 
+                    {/* ── Déclaration anti-vol obligatoire ── */}
                     <TouchableOpacity
-                        style={[styles.btn, loading && styles.btnDisabled]}
+                        style={styles.checkRow}
+                        onPress={() => setAcceptedAntiVol(v => !v)}
+                        activeOpacity={0.7}
+                    >
+                        <View style={[styles.checkbox, acceptedAntiVol && styles.checkboxChecked]}>
+                            {acceptedAntiVol && <Text style={styles.checkmark}>✓</Text>}
+                        </View>
+                        <Text style={styles.checkLabel}>
+                            <Text style={{ color: '#dc2626', fontWeight: '700' }}>⚠️ Déclaration obligatoire : </Text>
+                            Je certifie sur l'honneur que les articles que je vendrai sur Guimatrix m'appartiennent légalement et ne sont pas volés. Toute infraction expose à des poursuites judiciaires.
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[styles.btn, (loading || !acceptedAntiVol) && styles.btnDisabled]}
                         onPress={handleRegister}
-                        disabled={loading}
+                        disabled={loading || !acceptedAntiVol}
                         activeOpacity={0.85}
                     >
                         {loading
@@ -124,10 +163,15 @@ const styles = StyleSheet.create({
     roleBtnActive: { borderColor: colors.primary, backgroundColor: colors.primaryLight },
     roleText:  { fontSize: font.sm, color: colors.textMuted },
     roleTextActive: { color: colors.primary, fontWeight: font.semi },
-    btn:       { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
-    btnDisabled: { opacity: 0.6 },
-    btnText:   { color: '#fff', fontWeight: font.bold, fontSize: font.base },
-    linkWrap:  { marginTop: spacing.lg, alignItems: 'center' },
-    link:      { fontSize: font.sm, color: colors.textMuted },
-    linkBold:  { color: colors.primary, fontWeight: font.semi },
+    btn:          { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+    btnDisabled:  { opacity: 0.6 },
+    btnText:      { color: '#fff', fontWeight: font.bold, fontSize: font.base },
+    linkWrap:     { marginTop: spacing.lg, alignItems: 'center' },
+    link:         { fontSize: font.sm, color: colors.textMuted },
+    linkBold:     { color: colors.primary, fontWeight: font.semi },
+    checkRow:     { flexDirection: 'row', alignItems: 'flex-start', marginBottom: spacing.md, gap: 10 },
+    checkbox:     { width: 22, height: 22, borderRadius: 4, borderWidth: 2, borderColor: '#dc2626', marginTop: 2, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+    checkboxChecked: { backgroundColor: '#dc2626' },
+    checkmark:    { color: '#fff', fontSize: 14, fontWeight: '700' },
+    checkLabel:   { flex: 1, fontSize: font.xs || 11, color: colors.textMuted, lineHeight: 17 },
 })

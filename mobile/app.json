@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "GuinéeMarché",
-    "slug": "guineemarche",
+    "name": "Guimatrix",
+    "slug": "guimatrix",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -11,40 +11,51 @@
       "resizeMode": "contain",
       "backgroundColor": "#16a34a"
     },
-    "assetBundlePatterns": ["**/*"],
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.guineemarche.app"
+      "bundleIdentifier": "com.guimatrix.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Guimatrix utilise votre position pour suivre les livraisons.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Guimatrix utilise votre position en arrière-plan pour le suivi GPS des livreurs.",
+        "NSCameraUsageDescription": "Guimatrix utilise la caméra pour photographier vos articles.",
+        "NSPhotoLibraryUsageDescription": "Guimatrix accède à vos photos pour illustrer vos annonces."
+      }
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#16a34a"
       },
-      "package": "com.guineemarche.app",
+      "package": "com.guimatrix.app",
       "permissions": [
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
         "WRITE_EXTERNAL_STORAGE",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
         "RECEIVE_BOOT_COMPLETED",
         "VIBRATE"
       ]
     },
     "plugins": [
-      "expo-router",
       [
-        "expo-notifications",
+        "expo-location",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#16a34a"
+          "locationAlwaysAndWhenInUsePermission": "Guimatrix utilise votre localisation pour le suivi de livraison."
         }
-      ]
+      ],
+      "expo-secure-store"
     ],
-    "scheme": "guineemarche",
+    "scheme": "guimatrix",
     "extra": {
       "eas": {
-        "projectId": "YOUR_EAS_PROJECT_ID"
+        "projectId": "562b79e3-b924-430c-ab31-47b043f8e81c"
       }
-    }
+    },
+    "owner": "billynankouma"
   }
 }

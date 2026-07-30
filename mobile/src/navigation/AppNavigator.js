@@ -2,23 +2,31 @@ import React, { useEffect } from 'react'
 import { NavigationContainer } from '@react-navigation/native'
 import { createStackNavigator } from '@react-navigation/stack'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
-import { View, Text } from 'react-native'
+import { Text } from 'react-native'
 import useAuthStore from '../store/authStore'
 import { colors, font } from '../theme'
 
-// Screens
-import LoginScreen        from '../screens/LoginScreen'
-import RegisterScreen     from '../screens/RegisterScreen'
-import HomeScreen         from '../screens/HomeScreen'
-import ListingDetailScreen from '../screens/ListingDetailScreen'
-import MessagesScreen     from '../screens/MessagesScreen'
-import OrdersScreen       from '../screens/OrdersScreen'
-import ProfileScreen      from '../screens/ProfileScreen'
+// ── Auth ──────────────────────────────────────────────────────────────────────
+import LoginScreen          from '../screens/LoginScreen'
+import RegisterScreen       from '../screens/RegisterScreen'
+
+// ── Tabs ──────────────────────────────────────────────────────────────────────
+import HomeScreen           from '../screens/HomeScreen'
+import MessagesScreen       from '../screens/MessagesScreen'
+import OrdersScreen         from '../screens/OrdersScreen'
+import ProfileScreen        from '../screens/ProfileScreen'
+
+// ── Écrans full-screen ────────────────────────────────────────────────────────
+import ListingDetailScreen  from '../screens/ListingDetailScreen'
+import CreateListingScreen  from '../screens/CreateListingScreen'
+import PaymentScreen        from '../screens/PaymentScreen'
+import LivreurDashboardScreen from '../screens/LivreurDashboardScreen'
+import SellerEarningsScreen from '../screens/SellerEarningsScreen'
 
 const Stack = createStackNavigator()
 const Tab   = createBottomTabNavigator()
 
-// ── Auth stack ────────────────────────────────────────────────────────────────
+// ── Auth stack ─────────────────────────────────────────────────────────────────
 function AuthStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -28,14 +36,12 @@ function AuthStack() {
     )
 }
 
-// ── Tab icon helper ───────────────────────────────────────────────────────────
+// ── Tab icon ───────────────────────────────────────────────────────────────────
 function TabIcon({ emoji, focused }) {
-    return (
-        <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>
-    )
+    return <Text style={{ fontSize: 22, opacity: focused ? 1 : 0.5 }}>{emoji}</Text>
 }
 
-// ── Bottom tabs ───────────────────────────────────────────────────────────────
+// ── Bottom tabs ────────────────────────────────────────────────────────────────
 function MainTabs() {
     return (
         <Tab.Navigator
@@ -92,27 +98,65 @@ function MainTabs() {
     )
 }
 
-// ── Root stack (inclut le detail d'annonce au-dessus des tabs) ────────────────
+// ── Options d'en-tête standard ─────────────────────────────────────────────────
+const stdHeader = (title) => ({
+    title,
+    headerStyle:      { backgroundColor: colors.primary },
+    headerTintColor:  '#fff',
+    headerTitleStyle: { fontWeight: font.bold },
+    headerBackTitle:  ' ',
+})
+
+// ── Root stack ─────────────────────────────────────────────────────────────────
 function RootStack() {
     return (
         <Stack.Navigator>
-            <Stack.Screen name="Main" component={MainTabs} options={{ headerShown: false }} />
+            {/* Tabs */}
+            <Stack.Screen
+                name="Main"
+                component={MainTabs}
+                options={{ headerShown: false }}
+            />
+
+            {/* Détail annonce */}
             <Stack.Screen
                 name="ListingDetail"
                 component={ListingDetailScreen}
-                options={{
-                    title: 'Annonce',
-                    headerStyle:     { backgroundColor: colors.primary },
-                    headerTintColor: '#fff',
-                    headerTitleStyle:{ fontWeight: font.bold },
-                    headerBackTitle: ' ',
-                }}
+                options={stdHeader('Annonce')}
+            />
+
+            {/* Créer une annonce */}
+            <Stack.Screen
+                name="CreateListing"
+                component={CreateListingScreen}
+                options={{ headerShown: false }}  // écran gère son propre header
+            />
+
+            {/* Paiement */}
+            <Stack.Screen
+                name="Payment"
+                component={PaymentScreen}
+                options={{ headerShown: false }}  // écran gère son propre header
+            />
+
+            {/* Dashboard livreur */}
+            <Stack.Screen
+                name="LivreurDashboard"
+                component={LivreurDashboardScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Gains vendeur */}
+            <Stack.Screen
+                name="SellerEarnings"
+                component={SellerEarningsScreen}
+                options={{ headerShown: false }}
             />
         </Stack.Navigator>
     )
 }
 
-// ── AppNavigator ──────────────────────────────────────────────────────────────
+// ── AppNavigator ───────────────────────────────────────────────────────────────
 export default function AppNavigator() {
     const { isAuthenticated, restoreSession } = useAuthStore()
 

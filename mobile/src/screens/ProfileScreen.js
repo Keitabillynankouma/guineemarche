@@ -125,6 +125,24 @@ export default function ProfileScreen({ navigation }) {
                     </TouchableOpacity>
                 ))}
 
+                {/* Lien gains vendeur */}
+                {user.role === 'seller' && (
+                    <TouchableOpacity onPress={() => navigation.navigate('SellerEarnings')} style={styles.menuItem} activeOpacity={0.7}>
+                        <Text style={styles.menuIcon}>💰</Text>
+                        <Text style={styles.menuLabel}>Mes gains</Text>
+                        <Text style={styles.menuArrow}>›</Text>
+                    </TouchableOpacity>
+                )}
+
+                {/* Lien tableau de bord livreur */}
+                {user.role === 'livreur' && (
+                    <TouchableOpacity onPress={() => navigation.navigate('LivreurDashboard')} style={[styles.menuItem, styles.livreurItem]} activeOpacity={0.7}>
+                        <Text style={styles.menuIcon}>🚚</Text>
+                        <Text style={[styles.menuLabel, { color: '#0369a1' }]}>Tableau de bord livreur</Text>
+                        <Text style={[styles.menuArrow, { color: '#0369a1' }]}>›</Text>
+                    </TouchableOpacity>
+                )}
+
                 {user.role === 'admin' && (
                     <TouchableOpacity onPress={() => navigation.navigate('Admin')} style={[styles.menuItem, styles.adminItem]}>
                         <Text style={styles.menuIcon}>🛡️</Text>
@@ -185,6 +203,7 @@ const styles = StyleSheet.create({
     menuLabel:      { flex: 1, fontSize: font.base, color: colors.text },
     menuArrow:      { fontSize: font.lg, color: colors.textMuted },
     adminItem:      { backgroundColor: '#fff5f5' },
+    livreurItem:    { backgroundColor: '#f0f9ff' },
     // Logout
     logoutBtn:      { margin: spacing.lg, backgroundColor: '#fee2e2', borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.lg },
     logoutText:     { color: colors.danger, fontWeight: font.semi, fontSize: font.base },
