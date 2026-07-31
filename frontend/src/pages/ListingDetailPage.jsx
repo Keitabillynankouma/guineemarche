@@ -454,11 +454,30 @@ function OrderModal({ listing, onClose, onSuccess }) {
                 if (buyerCommune) orderPayload.delivery_buyer_commune  = buyerCommune
             }
             const order = await createOrder.mutateAsync(orderPayload)
-            const payResult = await pay.mutateAsync({ id: order.data.id, data: { provider: 'chachap' } })
+            let payResult
+            try {
+                payResult = await pay.mutateAsync({ id: order.data.id, data: { provider: 'chachap' } })
+            } catch (payErr) {
+                const msg = payErr?.response?.data?.error
+                    || payErr?.response?.data?.detail
+                    || 'Erreur lors de l\'initialisation du paiement ChaChap Pay.'
+                setError(msg)
+                return
+            }
             // ChaChap Pay : rediriger vers la page de paiement
             const payUrl = payResult?.data?.payment_url
-            if (payUrl) { window.location.href = payUrl }
-        } catch {}
+            if (payUrl) {
+                window.location.href = payUrl
+            } else {
+                setError('Aucune URL de paiement reçue. Vérifiez la configuration ChaChap Pay.')
+            }
+        } catch (err) {
+            const msg = err?.response?.data?.detail
+                || err?.response?.data?.error
+                || Object.values(err?.response?.data || {}).flat().join(' ')
+                || 'Une erreur est survenue. Réessayez.'
+            setError(msg)
+        }
     }
 
     const DELIVERY_MODES = [
