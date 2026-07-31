@@ -458,11 +458,14 @@ class InitiatePaymentView(APIView):
             )
 
         # ── Tous les paiements passent par ChaChap Pay ───────────────────────────
-        # Aucun paiement en espèces (cash) ni autre agrégateur n'est accepté.
+        # ChaChap Pay est un agrégateur qui supporte Orange Money, MTN MoMo,
+        # PayCard, Kulu, Soutra Money, etc. Peu importe le provider envoyé par
+        # le frontend, on route tout vers ChaChap Pay (sauf cash).
         provider = request.data.get('provider', Payment.Provider.CHACHAP)
-        if provider != Payment.Provider.CHACHAP:
+        CASH_PROVIDERS = {'cash', 'especes', 'espèces'}
+        if provider in CASH_PROVIDERS:
             return Response(
-                {'error': 'Seul ChaChap Pay est accepté pour les paiements.'},
+                {'error': 'Le paiement en espèces n\'est pas accepté. Utilisez ChaChap Pay (Orange Money, MTN MoMo, PayCard…).'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
