@@ -43,7 +43,7 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
             body['notify_url'] = webhook_url
 
         resp = requests.post(
-            f'{CHACHAP_API_URL}/api/ecommerce/operation/',
+            f'{CHACHAP_API_URL}/api/ecommerce/operation',
             json=body,
             headers={
                 'CCP-Api-Key':  api_key,
