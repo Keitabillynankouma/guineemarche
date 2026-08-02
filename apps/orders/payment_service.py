@@ -18,9 +18,11 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
         CHACHAP_API_KEY     — clé API ChaChap Pay (64 chars hex)
         CHACHAP_WEBHOOK_URL — URL de votre webhook (ex: https://api.guimatrix.com/api/v1/orders/webhook/chachap/)
     """
-    api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
+    api_key     = getattr(settings, 'CHACHAP_API_KEY', '').strip()
     webhook_url = getattr(settings, 'CHACHAP_WEBHOOK_URL',
-                          'https://api.guimatrix.com/api/v1/orders/webhook/chachap/')
+                          'https://api.guimatrix.com/api/v1/orders/webhook/chachap/').strip()
+
+    logger.info("[CHACHAP] Clé API présente: %s, longueur: %d", bool(api_key), len(api_key))
 
     # Sans clé → simulation avec URL de redirection factice
     if not api_key:
@@ -69,7 +71,7 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
                 timeout=20,
             )
 
-        logger.info("[CHACHAP] Réponse HTTP %s", resp.status_code)
+        logger.info("[CHACHAP] Réponse HTTP %s — body brut: %s", resp.status_code, resp.text[:500])
         try:
             data = resp.json()
         except Exception:
