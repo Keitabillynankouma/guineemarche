@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Guimatrix",
-    "slug": "guimatrix",
+    "name": "Guinée Marché",
+    "slug": "guineemarche",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -16,12 +16,12 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.guimatrix.app",
+      "bundleIdentifier": "com.billynankouma.guineemarche",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "Guimatrix utilise votre position pour suivre les livraisons.",
-        "NSLocationAlwaysAndWhenInUseUsageDescription": "Guimatrix utilise votre position en arrière-plan pour le suivi GPS des livreurs.",
-        "NSCameraUsageDescription": "Guimatrix utilise la caméra pour photographier vos articles.",
-        "NSPhotoLibraryUsageDescription": "Guimatrix accède à vos photos pour illustrer vos annonces.",
+        "NSLocationWhenInUseUsageDescription": "Guinée Marché utilise votre position pour suivre les livraisons.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Guinée Marché utilise votre position en arrière-plan pour le suivi GPS des livreurs.",
+        "NSCameraUsageDescription": "Guinée Marché utilise la caméra pour photographier vos articles.",
+        "NSPhotoLibraryUsageDescription": "Guinée Marché accède à vos photos pour illustrer vos annonces.",
         "ITSAppUsesNonExemptEncryption": false
       }
     },
@@ -30,7 +30,7 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#16a34a"
       },
-      "package": "com.guimatrix.app",
+      "package": "com.billynankouma.guineemarche",
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.READ_EXTERNAL_STORAGE",
@@ -40,8 +40,6 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.RECEIVE_BOOT_COMPLETED",
         "android.permission.VIBRATE",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -49,22 +47,22 @@
       [
         "expo-location",
         {
-          "locationAlwaysAndWhenInUsePermission": "Guimatrix utilise votre localisation pour le suivi de livraison."
+          "locationAlwaysAndWhenInUsePermission": "Guinée Marché utilise votre localisation pour le suivi de livraison."
         }
       ],
       "expo-secure-store",
       [
         "expo-image-picker",
         {
-          "photosPermission": "Guimatrix accède à vos photos pour illustrer vos annonces.",
-          "cameraPermission": "Guimatrix utilise la caméra pour photographier vos articles."
+          "photosPermission": "Guinée Marché accède à vos photos pour illustrer vos annonces.",
+          "cameraPermission": "Guinée Marché utilise la caméra pour photographier vos articles."
         }
       ]
     ],
-    "scheme": "guimatrix",
+    "scheme": "guineemarche",
     "extra": {
       "eas": {
-        "projectId": "562b79e3-b924-430c-ab31-47b043f8e81c"
+        "projectId": "73870af4-2d7e-4cb5-a361-4e7288d5b3b1"
       }
     },
     "owner": "billynankouma"
