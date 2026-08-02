@@ -29,12 +29,22 @@ class AISearchUserThrottle(UserRateThrottle):
 # ─── Helper : appel Claude ───────────────────────────────────────────────────
 
 def _claude(system: str, user: str, max_tokens: int = 400) -> str | None:
+    """
+    Appel synchrone à l'API Claude avec timeout strict.
+    Le timeout évite de bloquer un worker ASGI trop longtemps.
+    On attrape BaseException pour intercepter asyncio.CancelledError
+    qui hérite de BaseException (pas Exception) en Python 3.8+.
+    """
     api_key = getattr(settings, 'ANTHROPIC_API_KEY', '')
     if not api_key:
         return None
     try:
         import anthropic
-        client = anthropic.Anthropic(api_key=api_key)
+        # Timeout court : 10 s connect, 20 s total — évite de bloquer le worker ASGI
+        client = anthropic.Anthropic(
+            api_key=api_key,
+            timeout=20.0,
+        )
         resp = client.messages.create(
             model='claude-haiku-4-5-20251001',
             max_tokens=max_tokens,
@@ -42,7 +52,12 @@ def _claude(system: str, user: str, max_tokens: int = 400) -> str | None:
             messages=[{'role': 'user', 'content': user}],
         )
         return resp.content[0].text
-    except Exception as e:
+    except BaseException as e:          # attrape aussi CancelledError
+        import asyncio
+        if isinstance(e, asyncio.CancelledError):
+            # Le client s'est déconnecté — ne pas logger comme une erreur
+            logger.debug("Claude API call cancelled (client disconnect).")
+            return None
         logger.error("Claude API error: %s", e)
         return None
 
@@ -114,9 +129,12 @@ Retourne uniquement le JSON de filtres."""
             # Extraire le JSON (parfois Claude ajoute du texte autour)
             start = raw.find('{')
             end   = raw.rfind('}') + 1
+            if start < 0 or end <= 0 or end <= start:
+                logger.warning("AI search: no JSON in response. raw=%r", raw[:80])
+                return self._fallback_search(query, request)
             filters = json.loads(raw[start:end])
         except (json.JSONDecodeError, ValueError):
-            logger.warning("Claude returned invalid JSON: %s", raw)
+            logger.warning("Claude returned invalid JSON: %s", raw[:80])
             return self._fallback_search(query, request)
 
         # Construire le queryset Django à partir des filtres extraits
@@ -414,10 +432,14 @@ class SimilarListingsView(APIView):
         try:
             start = raw.find('{')
             end   = raw.rfind('}') + 1
+            # Garde-fou : si '{' ou '}' absent, start/end seront -1/0 → slice invalide
+            if start < 0 or end <= 0 or end <= start:
+                logger.warning("AI similar: no JSON object in response. raw=%r", raw[:80])
+                return sql_results
             data  = json.loads(raw[start:end])
             ids   = data.get('ids', [])
             pool_map = {str(p.id): p for p in pool}
             return [pool_map[i] for i in ids if i in pool_map]
         except Exception as e:
-            logger.warning("AI similar parsing error: %s", e)
+            logger.warning("AI similar parsing error: %s | raw=%r", e, raw[:80])
             return sql_results
