@@ -27,10 +27,15 @@ export default function ListingDetailScreen({ route, navigation }) {
         mutationFn: () => ordersAPI.create({ listing: id, delivery_mode: delivery }),
         onSuccess: (res) => {
             qc.invalidateQueries({ queryKey: ['orders'] })
-            Alert.alert('✅ Commande créée !', 'Votre commande a été envoyée au vendeur.', [
-                { text: 'Voir mes commandes', onPress: () => navigation.navigate('Orders') },
-                { text: 'OK' },
-            ])
+            const orderId = res.data?.id
+            if (orderId) {
+                // Naviguer vers l'écran de paiement ChaChap Pay
+                navigation.navigate('Payment', { orderId })
+            } else {
+                Alert.alert('✅ Commande créée !', 'Votre commande a été envoyée.', [
+                    { text: 'Voir mes commandes', onPress: () => navigation.navigate('Orders') },
+                ])
+            }
         },
         onError: (e) => {
             Alert.alert('Erreur', e.response?.data?.detail || 'Impossible de créer la commande.')
@@ -49,10 +54,15 @@ export default function ListingDetailScreen({ route, navigation }) {
             Alert.alert('Erreur', 'Vous ne pouvez pas acheter votre propre annonce.')
             return
         }
-        Alert.alert('Confirmer la commande', `${listing.title}\n${delivery === 'delivery' ? 'Livraison à domicile' : 'Retrait en main propre'}`, [
-            { text: 'Confirmer', onPress: () => orderMut.mutate() },
-            { text: 'Annuler', style: 'cancel' },
-        ])
+        const modeLabel = delivery === 'delivery' ? 'Livraison à domicile' : 'Retrait en main propre'
+        Alert.alert(
+            'Confirmer la commande',
+            `${listing.title}\n${modeLabel}\n\nVous serez redirigé vers ChaChap Pay pour le paiement.`,
+            [
+                { text: 'Confirmer et payer', onPress: () => orderMut.mutate() },
+                { text: 'Annuler', style: 'cancel' },
+            ]
+        )
     }
 
     const handleMessage = () => {

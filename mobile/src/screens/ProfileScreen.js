@@ -99,7 +99,7 @@ export default function ProfileScreen({ navigation }) {
                                 backgroundColor: sub?.remaining_free === 0 ? colors.danger : colors.primary,
                             }]} />
                         </View>
-                        <TouchableOpacity onPress={() => navigation.navigate('Upgrade')} style={styles.upgradeBtn}>
+                        <TouchableOpacity onPress={() => Alert.alert('Plan Pro', 'Contactez-nous via guimatrix.com pour activer le plan Pro.')} style={styles.upgradeBtn}>
                             <Text style={styles.upgradeBtnText}>💎 Passer au plan Pro</Text>
                         </TouchableOpacity>
                     </View>
@@ -109,13 +109,12 @@ export default function ProfileScreen({ navigation }) {
             {/* Menu */}
             <View style={styles.section}>
                 {[
-                    { icon: '📋', label: 'Mes annonces',   screen: 'MyListings' },
-                    { icon: '🛍️', label: 'Mes commandes',  screen: 'Orders' },
-                    { icon: '💬', label: 'Messages',        screen: 'Messages' },
-                    { icon: '⭐', label: 'Mes avis',         screen: 'Reviews', params: { userId: user.id } },
+                    { icon: '📋', label: 'Mes annonces',  screen: 'MyListings' },
+                    { icon: '🛍️', label: 'Mes commandes', screen: 'Orders' },
+                    { icon: '💬', label: 'Messages',       screen: 'Messages' },
                 ].map(item => (
                     <TouchableOpacity key={item.screen}
-                        onPress={() => navigation.navigate(item.screen, item.params)}
+                        onPress={() => navigation.navigate(item.screen)}
                         style={styles.menuItem}
                         activeOpacity={0.7}
                     >
@@ -144,7 +143,7 @@ export default function ProfileScreen({ navigation }) {
                 )}
 
                 {user.role === 'admin' && (
-                    <TouchableOpacity onPress={() => navigation.navigate('Admin')} style={[styles.menuItem, styles.adminItem]}>
+                    <TouchableOpacity onPress={() => Alert.alert('Admin', 'Accédez à l\'administration via guimatrix.com/admin')} style={[styles.menuItem, styles.adminItem]}>
                         <Text style={styles.menuIcon}>🛡️</Text>
                         <Text style={[styles.menuLabel, { color: '#dc2626' }]}>Administration</Text>
                         <Text style={[styles.menuArrow, { color: '#dc2626' }]}>›</Text>

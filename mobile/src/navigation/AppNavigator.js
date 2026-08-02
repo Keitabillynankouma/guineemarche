@@ -21,7 +21,8 @@ import ListingDetailScreen  from '../screens/ListingDetailScreen'
 import CreateListingScreen  from '../screens/CreateListingScreen'
 import PaymentScreen        from '../screens/PaymentScreen'
 import LivreurDashboardScreen from '../screens/LivreurDashboardScreen'
-import SellerEarningsScreen from '../screens/SellerEarningsScreen'
+import SellerEarningsScreen   from '../screens/SellerEarningsScreen'
+import MyListingsScreen       from '../screens/MyListingsScreen'
 
 const Stack = createStackNavigator()
 const Tab   = createBottomTabNavigator()
@@ -150,6 +151,13 @@ function RootStack() {
             <Stack.Screen
                 name="SellerEarnings"
                 component={SellerEarningsScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Mes annonces */}
+            <Stack.Screen
+                name="MyListings"
+                component={MyListingsScreen}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>
