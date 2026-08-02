@@ -37,21 +37,45 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
 
     try:
         import requests
+        # Body selon la doc officielle : amount + notify_url uniquement
+        body = {'amount': amount}
+        if webhook_url:
+            body['notify_url'] = webhook_url
+
         resp = requests.post(
-            f'{CHACHAP_API_URL}/api/ecommerce/operation',
-            json={
-                'amount':     amount,
-                'order_id':   str(order_id),
-                'notify_url': webhook_url,
-            },
+            f'{CHACHAP_API_URL}/api/ecommerce/operation/',
+            json=body,
             headers={
                 'CCP-Api-Key':  api_key,
                 'Content-Type': 'application/json',
                 'Accept':       'application/json',
             },
             timeout=20,
+            allow_redirects=False,  # évite que 301 → GET change la méthode
         )
-        data = resp.json()
+
+        # Gérer les redirects manuellement pour préserver POST
+        if resp.status_code in (301, 302, 307, 308):
+            redirect_url = resp.headers.get('Location', '')
+            logger.warning("[CHACHAP] Redirect %s → %s", resp.status_code, redirect_url)
+            resp = requests.post(
+                redirect_url,
+                json=body,
+                headers={
+                    'CCP-Api-Key':  api_key,
+                    'Content-Type': 'application/json',
+                    'Accept':       'application/json',
+                },
+                timeout=20,
+            )
+
+        logger.info("[CHACHAP] Réponse HTTP %s", resp.status_code)
+        try:
+            data = resp.json()
+        except Exception:
+            logger.error("[CHACHAP] Réponse non-JSON (status=%s): %s", resp.status_code, resp.text[:300])
+            return PaymentResult(success=False, message=f"ChaChap Pay : réponse invalide (HTTP {resp.status_code})")
+
         payment_url = data.get('payment_url', '')
         operation_id = data.get('operation_id', '')
 
@@ -65,29 +89,12 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
             )
 
         err = data.get('error') or data.get('message') or f'Erreur HTTP {resp.status_code}'
-        logger.warning("[CHACHAP] Échec création opération: %s", err)
-        # En mode DEBUG (dev local), fallback simulation pour permettre les tests
-        # sans accès à l'URL API réelle. En production, on retourne l'erreur.
-        if getattr(settings, 'DEBUG', False):
-            logger.info("[CHACHAP] DEBUG → fallback simulation (ref=order_id)")
-            return PaymentResult(
-                success=True,
-                reference=str(order_id),
-                message="ChaChap Pay (simulation — API inaccessible en local)",
-                payment_url=f"https://chapchappay.com/pay/sim-{uuid.uuid4().hex[:12]}",
-            )
+        logger.warning("[CHACHAP] Échec création opération (HTTP %s): %s | body=%s", resp.status_code, err, data)
         return PaymentResult(success=False, message=f"ChaChap Pay : {err}")
 
     except Exception as exc:
         logger.error("[CHACHAP] Erreur API: %s", exc)
-        # Fallback simulation si problème réseau — utilise order_id comme ref
-        # pour que le webhook puisse retrouver le paiement
-        return PaymentResult(
-            success=True,
-            reference=str(order_id),
-            message="ChaChap Pay (mode dégradé — réseau indisponible)",
-            payment_url=f"https://chapchappay.com/pay/sim-{uuid.uuid4().hex[:12]}",
-        )
+        return PaymentResult(success=False, message=f"ChaChap Pay : erreur réseau ({exc})")
 
 
 class PaymentResult:
