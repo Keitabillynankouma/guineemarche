@@ -11,11 +11,11 @@ import { colors, spacing, radius, font } from '../theme'
 import { VILLES, getCommunesByVille } from '../constants/communes'
 
 const CONDITIONS = [
-    { v: 'new',           l: '🆕 Neuf' },
-    { v: 'like_new',      l: '✨ Comme neuf' },
-    { v: 'good',          l: '👍 Bon état' },
-    { v: 'fair',          l: '⚠️ État correct' },
-    { v: 'for_parts',     l: '🔧 Pour pièces' },
+    { v: 'new',       l: '🆕 Neuf' },
+    { v: 'like_new',  l: '✨ Comme neuf' },
+    { v: 'good',      l: '👍 Bon état' },
+    { v: 'fair',      l: '⚠️ État correct' },
+    { v: 'for_parts', l: '🔧 Pour pièces' },
 ]
 
 const DELIVERY_MODES = [
@@ -24,36 +24,44 @@ const DELIVERY_MODES = [
     { v: 'both',     l: '🔄 Les deux' },
 ]
 
-export default function CreateListingScreen({ navigation }) {
+export default function CreateListingScreen({ route, navigation }) {
     const qc = useQueryClient()
 
-    const [form, setForm] = useState({
-        title: '',
-        description: '',
-        price: '',
-        city: 'Conakry',
-        quartier: '',
-        condition: 'good',
-        delivery_mode: 'pickup',
-        category: '',
-    })
-    const [images, setImages] = useState([])   // array of { uri, base64? }
+    // ── Mode édition : listing existant passé en paramètre ────────────────────
+    const existing = route?.params?.listing ?? null
+    const isEdit   = Boolean(existing)
 
-    const set = (k, v) => setForm(f => ({ ...f, [k]: v }))
+    const [form, setForm] = useState({
+        title:         existing?.title         ?? '',
+        description:   existing?.description   ?? '',
+        price:         existing?.price_gnf     ? String(existing.price_gnf) : '',
+        city:          existing?.city          ?? 'Conakry',
+        quartier:      existing?.quartier      ?? '',
+        condition:     existing?.condition     ?? 'good',
+        delivery_mode: existing?.delivery_mode ?? 'pickup',
+        category:      existing?.category      ?? '',
+    })
+
+    // Photos existantes (URLs Cloudinary) — affichage uniquement
+    const [existingImages] = useState(existing?.media ?? [])
+    // Nouvelles photos à ajouter
+    const [newImages, setNewImages] = useState([])
+
+    const set     = (k, v) => setForm(f => ({ ...f, [k]: v }))
     const setCity = (city) => setForm(f => ({ ...f, city, quartier: '' }))
 
     const communes = getCommunesByVille(form.city)
 
-    // Fetch categories
     const { data: categories = [] } = useQuery({
         queryKey: ['categories'],
         queryFn:  () => listingsAPI.categories().then(r => r.data),
     })
 
-    // Pick image from gallery
+    // ── Sélection photo ───────────────────────────────────────────────────────
+    const totalImages = existingImages.length + newImages.length
     const pickImage = async () => {
-        if (images.length >= 5) {
-            Alert.alert('Maximum atteint', 'Vous pouvez ajouter au maximum 5 photos.')
+        if (totalImages >= 5) {
+            Alert.alert('Maximum atteint', 'Vous pouvez avoir au maximum 5 photos.')
             return
         }
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync()
@@ -67,45 +75,46 @@ export default function CreateListingScreen({ navigation }) {
             quality: 0.7,
         })
         if (!result.canceled && result.assets?.length) {
-            setImages(prev => [...prev, result.assets[0]])
+            setNewImages(prev => [...prev, result.assets[0]])
         }
     }
 
-    const removeImage = (idx) => setImages(prev => prev.filter((_, i) => i !== idx))
+    const removeNewImage = (idx) => setNewImages(prev => prev.filter((_, i) => i !== idx))
 
-    // Submit
+    // ── Soumission ────────────────────────────────────────────────────────────
     const mutation = useMutation({
         mutationFn: async () => {
-            if (!form.title || !form.price) {
-                throw new Error('Le titre et le prix sont obligatoires.')
-            }
-            if (isNaN(Number(form.price)) || Number(form.price) <= 0) {
-                throw new Error('Le prix doit être un nombre positif.')
-            }
+            if (!form.title || !form.price) throw new Error('Le titre et le prix sont obligatoires.')
+            if (isNaN(Number(form.price)) || Number(form.price) <= 0) throw new Error('Le prix doit être un nombre positif.')
 
             const data = new FormData()
-            Object.entries(form).forEach(([k, v]) => {
-                if (v) data.append(k, String(v))
-            })
-            images.forEach((img, idx) => {
+            Object.entries(form).forEach(([k, v]) => { if (v) data.append(k, String(v)) })
+            newImages.forEach((img, idx) => {
                 const ext = img.uri.split('.').pop() || 'jpg'
                 data.append('images', {
-                    uri: img.uri,
+                    uri:  img.uri,
                     name: `photo_${idx}.${ext}`,
                     type: `image/${ext === 'jpg' ? 'jpeg' : ext}`,
                 })
             })
+
+            if (isEdit) return listingsAPI.update(existing.id, data)
             return listingsAPI.create(data)
         },
         onSuccess: () => {
             qc.invalidateQueries({ queryKey: ['listings'] })
             qc.invalidateQueries({ queryKey: ['my-listings'] })
-            Alert.alert('✅ Annonce publiée !', 'Votre annonce est maintenant visible.', [
-                { text: 'OK', onPress: () => navigation.goBack() },
-            ])
+            Alert.alert(
+                isEdit ? '✅ Annonce modifiée !' : '✅ Annonce publiée !',
+                isEdit ? 'Vos modifications ont été enregistrées.' : 'Votre annonce est maintenant visible.',
+                [{ text: 'OK', onPress: () => navigation.goBack() }],
+            )
         },
         onError: (e) => {
-            const msg = e.message || e.response?.data?.detail || Object.values(e.response?.data || {}).flat().join('\n') || 'Une erreur est survenue.'
+            const msg = e.message
+                || e.response?.data?.detail
+                || Object.values(e.response?.data || {}).flat().join('\n')
+                || 'Une erreur est survenue.'
             Alert.alert('Erreur', msg)
         },
     })
@@ -121,32 +130,47 @@ export default function CreateListingScreen({ navigation }) {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <Text style={styles.backIcon}>‹</Text>
                     </TouchableOpacity>
-                    <Text style={styles.title}>Nouvelle annonce</Text>
+                    <Text style={styles.title}>{isEdit ? 'Modifier l\'annonce' : 'Nouvelle annonce'}</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
                 {/* Photos */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>📸 Photos ({images.length}/5)</Text>
+                    <Text style={styles.sectionTitle}>📸 Photos ({totalImages}/5)</Text>
                     <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: spacing.sm }}>
-                        {images.map((img, idx) => (
-                            <View key={idx} style={styles.imgWrap}>
+                        {/* Photos existantes */}
+                        {existingImages.map((img, idx) => (
+                            <View key={`ex-${idx}`} style={styles.imgWrap}>
+                                <Image source={{ uri: img.file }} style={styles.img} />
+                                {img.is_cover && (
+                                    <View style={styles.coverBadge}>
+                                        <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700' }}>★</Text>
+                                    </View>
+                                )}
+                            </View>
+                        ))}
+                        {/* Nouvelles photos */}
+                        {newImages.map((img, idx) => (
+                            <View key={`new-${idx}`} style={styles.imgWrap}>
                                 <Image source={{ uri: img.uri }} style={styles.img} />
-                                <TouchableOpacity onPress={() => removeImage(idx)} style={styles.imgRemove}>
+                                <TouchableOpacity onPress={() => removeNewImage(idx)} style={styles.imgRemove}>
                                     <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>✕</Text>
                                 </TouchableOpacity>
                             </View>
                         ))}
-                        {images.length < 5 && (
+                        {totalImages < 5 && (
                             <TouchableOpacity onPress={pickImage} style={styles.addImgBtn}>
                                 <Text style={styles.addImgIcon}>+</Text>
                                 <Text style={styles.addImgText}>Ajouter</Text>
                             </TouchableOpacity>
                         )}
                     </ScrollView>
+                    {isEdit && existingImages.length > 0 && (
+                        <Text style={styles.photoNote}>★ = photo principale · Les nouvelles photos s'ajoutent aux existantes</Text>
+                    )}
                 </View>
 
-                {/* Titre */}
+                {/* Titre & description */}
                 <View style={styles.section}>
                     <Text style={styles.label}>Titre <Text style={{ color: colors.danger }}>*</Text></Text>
                     <TextInput
@@ -157,13 +181,12 @@ export default function CreateListingScreen({ navigation }) {
                         placeholderTextColor={colors.textMuted}
                         maxLength={100}
                     />
-
                     <Text style={styles.label}>Description</Text>
                     <TextInput
                         style={[styles.input, styles.textarea]}
                         value={form.description}
                         onChangeText={v => set('description', v)}
-                        placeholder="Décrivez votre article (état, accessoires inclus, raison de la vente…)"
+                        placeholder="Décrivez votre article…"
                         placeholderTextColor={colors.textMuted}
                         multiline
                         numberOfLines={4}
@@ -209,7 +232,7 @@ export default function CreateListingScreen({ navigation }) {
                     </View>
                 )}
 
-                {/* Ville */}
+                {/* Localisation */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>📍 Localisation</Text>
                     <Text style={styles.label}>Ville</Text>
@@ -224,7 +247,6 @@ export default function CreateListingScreen({ navigation }) {
                             </TouchableOpacity>
                         ))}
                     </ScrollView>
-
                     {communes.length > 0 && (
                         <>
                             <Text style={styles.label}>Quartier / Commune</Text>
@@ -277,7 +299,7 @@ export default function CreateListingScreen({ navigation }) {
                     ))}
                 </View>
 
-                {/* Publier */}
+                {/* Bouton principal */}
                 <TouchableOpacity
                     style={[styles.btn, mutation.isPending && styles.btnDisabled]}
                     onPress={() => mutation.mutate()}
@@ -286,7 +308,7 @@ export default function CreateListingScreen({ navigation }) {
                 >
                     {mutation.isPending
                         ? <ActivityIndicator color="#fff" />
-                        : <Text style={styles.btnText}>📢 Publier l'annonce</Text>
+                        : <Text style={styles.btnText}>{isEdit ? '💾 Enregistrer les modifications' : '📢 Publier l\'annonce'}</Text>
                     }
                 </TouchableOpacity>
 
@@ -308,10 +330,12 @@ const styles = StyleSheet.create({
     input:          { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, fontSize: font.base, color: colors.text, backgroundColor: colors.bg },
     textarea:       { minHeight: 100, textAlignVertical: 'top' },
     pricePreview:   { fontSize: font.sm, color: colors.primary, marginTop: 4 },
+    photoNote:      { fontSize: 11, color: colors.textMuted, marginTop: spacing.sm },
     // Images
     imgWrap:        { position: 'relative', marginRight: spacing.sm },
     img:            { width: 90, height: 90, borderRadius: radius.md },
     imgRemove:      { position: 'absolute', top: -6, right: -6, width: 22, height: 22, borderRadius: 11, backgroundColor: colors.danger, alignItems: 'center', justifyContent: 'center' },
+    coverBadge:     { position: 'absolute', top: 4, left: 4, width: 18, height: 18, borderRadius: 9, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
     addImgBtn:      { width: 90, height: 90, borderRadius: radius.md, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center', justifyContent: 'center', gap: 4 },
     addImgIcon:     { fontSize: 28, color: colors.textMuted },
     addImgText:     { fontSize: font.sm, color: colors.textMuted },

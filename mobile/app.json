@@ -21,7 +21,8 @@
         "NSLocationWhenInUseUsageDescription": "Guimatrix utilise votre position pour suivre les livraisons.",
         "NSLocationAlwaysAndWhenInUseUsageDescription": "Guimatrix utilise votre position en arrière-plan pour le suivi GPS des livreurs.",
         "NSCameraUsageDescription": "Guimatrix utilise la caméra pour photographier vos articles.",
-        "NSPhotoLibraryUsageDescription": "Guimatrix accède à vos photos pour illustrer vos annonces."
+        "NSPhotoLibraryUsageDescription": "Guimatrix accède à vos photos pour illustrer vos annonces.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -31,14 +32,17 @@
       },
       "package": "com.guimatrix.app",
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION",
-        "ACCESS_BACKGROUND_LOCATION",
-        "RECEIVE_BOOT_COMPLETED",
-        "VIBRATE"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_BACKGROUND_LOCATION",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.RECORD_AUDIO"
       ]
     },
     "plugins": [
@@ -49,14 +53,6 @@
         }
       ],
       "expo-secure-store",
-      [
-        "expo-notifications",
-        {
-          "icon": "./assets/icon.png",
-          "color": "#16a34a",
-          "defaultChannel": "default"
-        }
-      ],
       [
         "expo-image-picker",
         {

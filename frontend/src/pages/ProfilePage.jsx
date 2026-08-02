@@ -199,7 +199,7 @@ function ReferralSection({ referral }) {
     }
 
     const waText = encodeURIComponent(
-        `🛒 Rejoins-moi sur Guimatrix — la marketplace #1 en Guinée !\nInscris-toi avec mon code et on gagne tous les deux des annonces gratuites : ${referral.referral_url}`
+        `🛒 Rejoins-moi sur Guinée Marché — la marketplace #1 en Guinée !\nInscris-toi avec mon code et on gagne tous les deux des annonces gratuites : ${referral.referral_url}`
     )
     const waUrl = `https://wa.me/?text=${waText}`
 

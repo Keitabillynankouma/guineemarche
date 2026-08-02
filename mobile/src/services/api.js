@@ -104,4 +104,9 @@ export const reviewsAPI = {
     create:    (data)   => api.post('/reviews/', data),
 }
 
+// ── Parrainage ────────────────────────────────────────────────────────────────
+export const referralAPI = {
+    getStats: () => api.get('/accounts/referral/'),
+}
+
 export default api

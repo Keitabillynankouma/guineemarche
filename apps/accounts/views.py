@@ -60,8 +60,8 @@ class RegisterView(APIView):
                 if referrer.id != user.id:
                     user.referred_by = referrer
                     user.save(update_fields=['referred_by'])
-                    referral = Referral.objects.create(referrer=referrer, referred=user)
-                    referral.give_reward()
+                    Referral.objects.create(referrer=referrer, referred=user)
+                    # La récompense est déclenchée lors de la 1ère commande payée du filleul
             except User.DoesNotExist:
                 pass  # code invalide, on ignore silencieusement
 
@@ -89,8 +89,8 @@ class EmailRegisterView(APIView):
                 if referrer.id != user.id:
                     user.referred_by = referrer
                     user.save(update_fields=['referred_by'])
-                    referral = Referral.objects.create(referrer=referrer, referred=user)
-                    referral.give_reward()
+                    Referral.objects.create(referrer=referrer, referred=user)
+                    # La récompense est déclenchée lors de la 1ère commande payée du filleul
             except User.DoesNotExist:
                 pass
 

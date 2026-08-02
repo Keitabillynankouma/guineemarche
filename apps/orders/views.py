@@ -469,6 +469,14 @@ class InitiatePaymentView(APIView):
                 status=Payment.Status.PENDING,
             )
             order.confirm()
+            # Récompense parrainage : première commande confirmée du filleul
+            try:
+                from apps.accounts.models import Referral
+                referral = Referral.objects.filter(referred=request.user).first()
+                if referral:
+                    referral.give_reward()
+            except Exception as _ref_exc:
+                logger.warning("[CASH] Récompense parrainage : %s", _ref_exc)
             return Response({
                 'message': 'Commande confirmée. Le paiement en espèces sera effectué à la livraison.',
                 'payment': PaymentSerializer(payment).data,
@@ -668,6 +676,16 @@ class PaymentWebhookView(APIView):
                 if success and payment.order.status == Order.Status.PENDING:
                     payment.order.confirm()
                     payment.order.set_escrow_schedule()
+                    # Récompense parrainage : première commande payée du filleul
+                    try:
+                        from apps.accounts.models import Referral
+                        referral = getattr(payment.order.buyer, 'referral_received', None)
+                        if referral is None:
+                            referral = Referral.objects.filter(referred=payment.order.buyer).first()
+                        if referral:
+                            referral.give_reward()
+                    except Exception as _ref_exc:
+                        logger.warning("[WEBHOOK] Récompense parrainage : %s", _ref_exc)
                     # Emails transactionnels : commande confirmée + paiement reçu
                     try:
                         from core.email_notifications import (

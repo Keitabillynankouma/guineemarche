@@ -35,12 +35,20 @@ export default function MyListingsScreen({ navigation }) {
                 listing={item}
                 onPress={() => navigation.navigate('ListingDetail', { id: item.id })}
             />
-            <TouchableOpacity
-                style={styles.deleteBtn}
-                onPress={() => handleDelete(item.id, item.title)}
-            >
-                <Text style={styles.deleteBtnText}>🗑️ Supprimer</Text>
-            </TouchableOpacity>
+            <View style={styles.actions}>
+                <TouchableOpacity
+                    style={styles.editBtn}
+                    onPress={() => navigation.navigate('CreateListing', { listing: item })}
+                >
+                    <Text style={styles.editBtnText}>✏️ Modifier</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                    style={styles.deleteBtn}
+                    onPress={() => handleDelete(item.id, item.title)}
+                >
+                    <Text style={styles.deleteBtnText}>🗑️ Supprimer</Text>
+                </TouchableOpacity>
+            </View>
         </View>
     ), [navigation])
 
@@ -95,7 +103,10 @@ const styles = StyleSheet.create({
     addBtn:       { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.2)', borderRadius: radius.md },
     addBtnText:   { fontSize: 22, color: '#fff', lineHeight: 24 },
     list:         { padding: spacing.lg },
-    deleteBtn:    { marginHorizontal: spacing.lg, marginTop: -spacing.md, marginBottom: spacing.md, backgroundColor: '#fee2e2', borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
+    actions:      { flexDirection: 'row', gap: spacing.sm, marginHorizontal: spacing.lg, marginTop: -spacing.md, marginBottom: spacing.md },
+    editBtn:      { flex: 1, backgroundColor: '#eff6ff', borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
+    editBtnText:  { color: '#2563eb', fontSize: font.sm, fontWeight: font.semi },
+    deleteBtn:    { flex: 1, backgroundColor: '#fee2e2', borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
     deleteBtnText:{ color: '#dc2626', fontSize: font.sm, fontWeight: font.semi },
     empty:        { alignItems: 'center', marginTop: spacing.xxl * 2, paddingHorizontal: spacing.xl },
     emptyIcon:    { fontSize: 56, marginBottom: spacing.md },

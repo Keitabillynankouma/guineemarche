@@ -4,15 +4,6 @@ import * as Device from 'expo-device'
 import { Platform } from 'react-native'
 import { authAPI } from '../services/api'
 
-// Comportement par défaut : afficher la notification même si l'app est au premier plan
-Notifications.setNotificationHandler({
-    handleNotification: async () => ({
-        shouldShowAlert: true,
-        shouldPlaySound: true,
-        shouldSetBadge:  true,
-    }),
-})
-
 /**
  * useNotifications
  * - Demande la permission push
@@ -33,6 +24,20 @@ export default function useNotifications({ enabled = true, onNotification, onRes
         if (!enabled) return
 
         let cancelled = false
+
+        // Configurer le comportement d'affichage des notifications
+        try {
+            Notifications.setNotificationHandler({
+                handleNotification: async () => ({
+                    shouldShowAlert: true,
+                    shouldPlaySound: true,
+                    shouldSetBadge:  true,
+                }),
+            })
+        } catch (e) {
+            console.warn('[useNotifications] setNotificationHandler failed:', e)
+            return // Si le module n'est pas disponible, on abandonne
+        }
 
         const register = async () => {
             // Uniquement sur un vrai appareil (simulateur/émulateur ne supporte pas push)

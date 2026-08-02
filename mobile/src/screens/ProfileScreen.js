@@ -1,11 +1,11 @@
 import React from 'react'
 import {
     View, Text, ScrollView, TouchableOpacity,
-    StyleSheet, ActivityIndicator, Alert,
+    StyleSheet, ActivityIndicator, Alert, Share, Clipboard,
 } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import useAuthStore from '../store/authStore'
-import { authAPI } from '../services/api'
+import { authAPI, referralAPI } from '../services/api'
 import { colors, spacing, radius, font } from '../theme'
 
 export default function ProfileScreen({ navigation }) {
@@ -14,6 +14,12 @@ export default function ProfileScreen({ navigation }) {
     const { data: sub } = useQuery({
         queryKey: ['subscription'],
         queryFn:  () => authAPI.getSubscription?.().then(r => r.data),
+        enabled:  isAuthenticated,
+    })
+
+    const { data: referral } = useQuery({
+        queryKey: ['referral-stats'],
+        queryFn:  () => referralAPI.getStats().then(r => r.data),
         enabled:  isAuthenticated,
     })
 
@@ -151,6 +157,63 @@ export default function ProfileScreen({ navigation }) {
                 )}
             </View>
 
+            {/* Parrainage */}
+            {referral && (
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>🎁 Programme de parrainage</Text>
+                    <View style={{ padding: spacing.lg }}>
+                        {/* Stats */}
+                        <View style={styles.referralStats}>
+                            <View style={styles.referralStat}>
+                                <Text style={[styles.referralStatNum, { color: colors.primary }]}>{referral.referral_count}</Text>
+                                <Text style={styles.referralStatLabel}>Filleuls actifs</Text>
+                            </View>
+                            <View style={styles.referralStat}>
+                                <Text style={[styles.referralStatNum, { color: '#3b82f6' }]}>+{referral.reward_per_ref}</Text>
+                                <Text style={styles.referralStatLabel}>Annonces / filleul</Text>
+                            </View>
+                            <View style={styles.referralStat}>
+                                <Text style={[styles.referralStatNum, { color: '#7c3aed' }]}>+{referral.total_bonus}</Text>
+                                <Text style={styles.referralStatLabel}>Slots gagnés</Text>
+                            </View>
+                        </View>
+
+                        {/* Description */}
+                        <Text style={styles.referralDesc}>
+                            Partage ton lien. Chaque filleul qui passe sa 1ère commande te rapporte{' '}
+                            <Text style={{ fontWeight: font.bold, color: colors.primary }}>{referral.reward_per_ref} annonces gratuites</Text> supplémentaires.
+                        </Text>
+
+                        {/* Code */}
+                        <View style={styles.referralCodeRow}>
+                            <View>
+                                <Text style={styles.referralCodeLabel}>Ton code</Text>
+                                <Text style={styles.referralCode}>{referral.referral_code}</Text>
+                            </View>
+                            <TouchableOpacity
+                                style={styles.copyBtn}
+                                onPress={() => {
+                                    Clipboard.setString(referral.referral_url)
+                                    Alert.alert('Copié !', 'Lien de parrainage copié dans le presse-papier.')
+                                }}
+                            >
+                                <Text style={styles.copyBtnText}>📋 Copier le lien</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Partage */}
+                        <TouchableOpacity
+                            style={styles.shareBtn}
+                            onPress={() => Share.share({
+                                message: `🛒 Rejoins-moi sur Guinée Marché — la marketplace #1 en Guinée !\nInscris-toi avec mon code et on gagne tous les deux des annonces gratuites : ${referral.referral_url}`,
+                            })}
+                        >
+                            <Text style={styles.shareBtnText}>📤 Partager via WhatsApp / SMS</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            )}
+
             <TouchableOpacity onPress={handleLogout} style={styles.logoutBtn}>
                 <Text style={styles.logoutText}>🚪 Se déconnecter</Text>
             </TouchableOpacity>
@@ -203,6 +266,19 @@ const styles = StyleSheet.create({
     menuArrow:      { fontSize: font.lg, color: colors.textMuted },
     adminItem:      { backgroundColor: '#fff5f5' },
     livreurItem:    { backgroundColor: '#f0f9ff' },
+    // Parrainage
+    referralStats:      { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.md },
+    referralStat:       { flex: 1, alignItems: 'center', backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.sm, marginHorizontal: 3 },
+    referralStatNum:    { fontSize: font.xl, fontWeight: font.bold },
+    referralStatLabel:  { fontSize: 10, color: colors.textMuted, textAlign: 'center', marginTop: 2 },
+    referralDesc:       { fontSize: font.sm, color: colors.textMuted, lineHeight: 20, marginBottom: spacing.md },
+    referralCodeRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', backgroundColor: colors.bg, borderRadius: radius.lg, padding: spacing.md, marginBottom: spacing.sm },
+    referralCodeLabel:  { fontSize: 10, color: colors.textMuted, marginBottom: 2 },
+    referralCode:       { fontSize: font.lg, fontWeight: font.bold, color: colors.primary, fontVariant: ['tabular-nums'], letterSpacing: 2 },
+    copyBtn:            { backgroundColor: colors.primary + '15', borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
+    copyBtnText:        { fontSize: font.sm, color: colors.primary, fontWeight: font.semi },
+    shareBtn:           { backgroundColor: '#25D366', borderRadius: radius.md, padding: spacing.sm + 2, alignItems: 'center' },
+    shareBtnText:       { color: '#fff', fontWeight: font.semi, fontSize: font.sm },
     // Logout
     logoutBtn:      { margin: spacing.lg, backgroundColor: '#fee2e2', borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.lg },
     logoutText:     { color: colors.danger, fontWeight: font.semi, fontSize: font.base },

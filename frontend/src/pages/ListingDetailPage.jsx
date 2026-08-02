@@ -328,7 +328,7 @@ function OrderModal({ listing, onClose, onSuccess }) {
     const [buyerCommune, setBuyerCommune]   = useState('')
     const [geoLoading, setGeoLoading]       = useState(false)
     const [geoError, setGeoError]           = useState('')
-    // ChaChap Pay est le seul mode de paiement — pas de sélection nécessaire
+    const [paymentMethod, setPaymentMethod] = useState('chachap') // 'chachap' | 'cash'
     const [error, setError]                 = useState('')
     const [negotiatedPrice, setNegotiatedPrice] = useState(listing.price_type === 'negotiable' ? String(listing.price_gnf) : '')
     const queryClient = useQueryClient()
@@ -456,12 +456,18 @@ function OrderModal({ listing, onClose, onSuccess }) {
             const order = await createOrder.mutateAsync(orderPayload)
             let payResult
             try {
-                payResult = await pay.mutateAsync({ id: order.data.id, data: { provider: 'chachap' } })
+                payResult = await pay.mutateAsync({ id: order.data.id, data: { provider: paymentMethod } })
             } catch (payErr) {
                 const msg = payErr?.response?.data?.error
                     || payErr?.response?.data?.detail
-                    || 'Erreur lors de l\'initialisation du paiement ChaChap Pay.'
+                    || 'Erreur lors de l\'initialisation du paiement.'
                 setError(msg)
+                return
+            }
+            // En espèces : commande confirmée directement
+            if (payResult?.data?.cash) {
+                queryClient.invalidateQueries(['listing', listing.id])
+                onSuccess()
                 return
             }
             // ChaChap Pay : rediriger vers la page de paiement
@@ -721,16 +727,53 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Paiement — ChaChap Pay uniquement */}
-                        <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 text-xs text-blue-700">
-                            🔒 <strong>Paiement sécurisé via ChaChap Pay :</strong> vous serez redirigé pour payer avec Orange Money, MTN MoMo ou votre carte. Vos fonds sont libérés au vendeur après confirmation de réception.
+                        {/* Mode de paiement */}
+                        <div className="space-y-2">
+                            <p className="text-xs font-semibold text-gray-600">💳 Mode de paiement</p>
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod('chachap')}
+                                className={`w-full flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                                    paymentMethod === 'chachap'
+                                        ? 'border-green-500 bg-green-50'
+                                        : 'border-gray-200 bg-white hover:border-green-300'
+                                }`}
+                            >
+                                <span className="text-xl mt-0.5">📱</span>
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold text-gray-800">Mobile Money</p>
+                                    <p className="text-xs text-gray-500">Orange Money · MTN MoMo · PayCard</p>
+                                    <p className="text-xs text-green-700 mt-0.5">🔒 Paiement sécurisé par escrow</p>
+                                </div>
+                                {paymentMethod === 'chachap' && <span className="text-green-500 font-bold text-base">✓</span>}
+                            </button>
+
+                            <button
+                                type="button"
+                                onClick={() => setPaymentMethod('cash')}
+                                className={`w-full flex items-start gap-3 rounded-xl border p-3 text-left transition ${
+                                    paymentMethod === 'cash'
+                                        ? 'border-amber-500 bg-amber-50'
+                                        : 'border-gray-200 bg-white hover:border-amber-300'
+                                }`}
+                            >
+                                <span className="text-xl mt-0.5">💵</span>
+                                <div className="flex-1">
+                                    <p className="text-sm font-semibold text-gray-800">En espèces</p>
+                                    <p className="text-xs text-gray-500">Paiement à la livraison ou au retrait</p>
+                                    <p className="text-xs text-amber-600 mt-0.5">⚠️ Sans protection escrow</p>
+                                </div>
+                                {paymentMethod === 'cash' && <span className="text-amber-500 font-bold text-base">✓</span>}
+                            </button>
                         </div>
 
                         <button type="submit" disabled={createOrder.isPending || pay.isPending}
                             className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50">
                             {(createOrder.isPending || pay.isPending)
                                 ? 'Traitement en cours…'
-                                : `Payer ${new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF`}
+                                : paymentMethod === 'cash'
+                                    ? `Commander — payer en espèces`
+                                    : `Payer ${new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF`}
                         </button>
                     </form>
                 </div>
