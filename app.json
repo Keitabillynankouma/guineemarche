@@ -1,0 +1,12 @@
+{
+  "expo": {
+    "extra": {
+      "eas": {
+        "projectId": "73870af4-2d7e-4cb5-a361-4e7288d5b3b1"
+      }
+    },
+    "android": {
+      "package": "com.billynankouma.guineemarche"
+    }
+  }
+}
