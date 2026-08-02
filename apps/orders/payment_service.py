@@ -4,7 +4,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-CHACHAP_API_URL = 'https://chapchappay.com/api'
+CHACHAP_API_URL = 'https://chapchappay.com'
 
 
 def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
@@ -38,7 +38,7 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
     try:
         import requests
         resp = requests.post(
-            f'{CHACHAP_API_URL}/ecommerce/operation',
+            f'{CHACHAP_API_URL}/api/ecommerce/operation',
             json={
                 'amount':     amount,
                 'order_id':   str(order_id),
