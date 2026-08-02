@@ -44,6 +44,10 @@ api.interceptors.response.use(
 export const authAPI = {
     login:              (phone, password) => api.post('/auth/login/', { phone_number: phone, password }),
     register:           (data)            => api.post('/auth/register/', data),
+    verifyOTP:          (data)            => api.post('/auth/verify-otp/', data),
+    resendOTP:          (data)            => api.post('/auth/resend-otp/', data),
+    forgotPassword:     (data)            => api.post('/auth/forgot-password/', data),
+    resetPassword:      (data)            => api.post('/auth/reset-password/', data),
     me:                 ()                => api.get('/auth/me/'),
     logout:             (refresh)         => api.post('/auth/logout/', { refresh }),
     updateMe:           (data)            => api.patch('/auth/me/', data),
@@ -107,6 +111,19 @@ export const reviewsAPI = {
 // ── Parrainage ────────────────────────────────────────────────────────────────
 export const referralAPI = {
     getStats: () => api.get('/accounts/referral/'),
+}
+
+// ── Favoris ───────────────────────────────────────────────────────────────────
+export const favoritesAPI = {
+    list:   ()   => api.get('/listings/favorites/'),
+    toggle: (id) => api.post(`/listings/${id}/favorite/`),
+}
+
+// ── Boutiques vendeurs ────────────────────────────────────────────────────────
+export const shopsAPI = {
+    getOne: (id) => api.get(`/accounts/shops/${id}/`),
+    myShop: ()   => api.get('/accounts/shop/'),
+    save:   (data) => api.post('/accounts/shop/', data),
 }
 
 export default api

@@ -9,6 +9,7 @@ import { colors, font } from '../theme'
 // ── Auth ──────────────────────────────────────────────────────────────────────
 import LoginScreen          from '../screens/LoginScreen'
 import RegisterScreen       from '../screens/RegisterScreen'
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen'
 
 // ── Tabs ──────────────────────────────────────────────────────────────────────
 import HomeScreen           from '../screens/HomeScreen'
@@ -23,6 +24,11 @@ import PaymentScreen        from '../screens/PaymentScreen'
 import LivreurDashboardScreen from '../screens/LivreurDashboardScreen'
 import SellerEarningsScreen   from '../screens/SellerEarningsScreen'
 import MyListingsScreen       from '../screens/MyListingsScreen'
+import FavoritesScreen        from '../screens/FavoritesScreen'
+import NotificationsScreen    from '../screens/NotificationsScreen'
+import EditProfileScreen      from '../screens/EditProfileScreen'
+import ReviewsScreen          from '../screens/ReviewsScreen'
+import SellerShopScreen       from '../screens/SellerShopScreen'
 
 const Stack = createStackNavigator()
 const Tab   = createBottomTabNavigator()
@@ -31,8 +37,9 @@ const Tab   = createBottomTabNavigator()
 function AuthStack() {
     return (
         <Stack.Navigator screenOptions={{ headerShown: false }}>
-            <Stack.Screen name="Login"    component={LoginScreen} />
-            <Stack.Screen name="Register" component={RegisterScreen} />
+            <Stack.Screen name="Login"          component={LoginScreen} />
+            <Stack.Screen name="Register"       component={RegisterScreen} />
+            <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
         </Stack.Navigator>
     )
 }
@@ -158,6 +165,41 @@ function RootStack() {
             <Stack.Screen
                 name="MyListings"
                 component={MyListingsScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Favoris */}
+            <Stack.Screen
+                name="Favorites"
+                component={FavoritesScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Notifications */}
+            <Stack.Screen
+                name="Notifications"
+                component={NotificationsScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Modifier le profil */}
+            <Stack.Screen
+                name="EditProfile"
+                component={EditProfileScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Avis utilisateur */}
+            <Stack.Screen
+                name="Reviews"
+                component={ReviewsScreen}
+                options={{ headerShown: false }}
+            />
+
+            {/* Boutique vendeur */}
+            <Stack.Screen
+                name="SellerShop"
+                component={SellerShopScreen}
                 options={{ headerShown: false }}
             />
         </Stack.Navigator>

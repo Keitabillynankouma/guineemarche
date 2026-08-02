@@ -115,9 +115,12 @@ export default function ProfileScreen({ navigation }) {
             {/* Menu */}
             <View style={styles.section}>
                 {[
-                    { icon: '📋', label: 'Mes annonces',  screen: 'MyListings' },
-                    { icon: '🛍️', label: 'Mes commandes', screen: 'Orders' },
-                    { icon: '💬', label: 'Messages',       screen: 'Messages' },
+                    { icon: '✏️', label: 'Modifier le profil', screen: 'EditProfile' },
+                    { icon: '📋', label: 'Mes annonces',        screen: 'MyListings' },
+                    { icon: '❤️', label: 'Mes favoris',         screen: 'Favorites' },
+                    { icon: '🔔', label: 'Notifications',        screen: 'Notifications' },
+                    { icon: '🛍️', label: 'Mes commandes',       screen: 'Orders' },
+                    { icon: '💬', label: 'Messages',             screen: 'Messages' },
                 ].map(item => (
                     <TouchableOpacity key={item.screen}
                         onPress={() => navigation.navigate(item.screen)}

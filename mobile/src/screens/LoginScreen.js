@@ -10,6 +10,7 @@ import { colors, spacing, radius, font } from '../theme'
 export default function LoginScreen({ navigation }) {
     const [phone, setPhone]       = useState('')
     const [password, setPassword] = useState('')
+    const [showPwd, setShowPwd]   = useState(false)
     const { login, loading }      = useAuthStore()
 
     const handleLogin = async () => {
@@ -57,14 +58,26 @@ export default function LoginScreen({ navigation }) {
                     />
 
                     <Text style={styles.label}>Mot de passe</Text>
-                    <TextInput
-                        style={styles.input}
-                        value={password}
-                        onChangeText={setPassword}
-                        placeholder="Votre mot de passe"
-                        secureTextEntry
-                        placeholderTextColor={colors.textMuted}
-                    />
+                    <View style={styles.pwdWrap}>
+                        <TextInput
+                            style={[styles.input, { flex: 1, marginBottom: 0 }]}
+                            value={password}
+                            onChangeText={setPassword}
+                            placeholder="Votre mot de passe"
+                            secureTextEntry={!showPwd}
+                            placeholderTextColor={colors.textMuted}
+                        />
+                        <TouchableOpacity onPress={() => setShowPwd(p => !p)} style={styles.eyeBtn}>
+                            <Text style={styles.eyeIcon}>{showPwd ? '🙈' : '👁️'}</Text>
+                        </TouchableOpacity>
+                    </View>
+
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('ForgotPassword')}
+                        style={{ alignSelf: 'flex-end', marginBottom: spacing.md }}
+                    >
+                        <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity
                         style={[styles.btn, loading && styles.btnDisabled]}
@@ -88,19 +101,23 @@ export default function LoginScreen({ navigation }) {
 }
 
 const styles = StyleSheet.create({
-    container: { flexGrow: 1, padding: spacing.xl, justifyContent: 'center' },
-    logoWrap:  { alignItems: 'center', marginBottom: spacing.xxl },
-    logo:      { fontSize: 64, marginBottom: spacing.sm },
-    appName:   { fontSize: font.xxl, fontWeight: font.bold, color: colors.primary },
-    tagline:   { fontSize: font.sm, color: colors.textMuted, marginTop: 4 },
-    card:      { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.xl, shadowColor: '#000', shadowOffset: { width:0,height:2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4 },
-    title:     { fontSize: font.xl, fontWeight: font.bold, color: colors.text, marginBottom: spacing.lg },
-    label:     { fontSize: font.sm, fontWeight: font.semi, color: colors.textMuted, marginBottom: 4 },
-    input:     { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, fontSize: font.base, color: colors.text, backgroundColor: colors.bg },
-    btn:       { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
+    container:   { flexGrow: 1, padding: spacing.xl, justifyContent: 'center' },
+    logoWrap:    { alignItems: 'center', marginBottom: spacing.xxl },
+    logo:        { fontSize: 64, marginBottom: spacing.sm },
+    appName:     { fontSize: font.xxl, fontWeight: font.bold, color: colors.primary },
+    tagline:     { fontSize: font.sm, color: colors.textMuted, marginTop: 4 },
+    card:        { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.xl, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.08, shadowRadius: 8, elevation: 4 },
+    title:       { fontSize: font.xl, fontWeight: font.bold, color: colors.text, marginBottom: spacing.lg },
+    label:       { fontSize: font.sm, fontWeight: font.semi, color: colors.textMuted, marginBottom: 4 },
+    input:       { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.md, fontSize: font.base, color: colors.text, backgroundColor: colors.bg },
+    pwdWrap:     { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.bg, marginBottom: spacing.sm, paddingRight: spacing.sm },
+    eyeBtn:      { padding: spacing.sm },
+    eyeIcon:     { fontSize: 18 },
+    forgotText:  { fontSize: font.sm, color: colors.primary, fontWeight: font.semi },
+    btn:         { backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md, alignItems: 'center', marginTop: spacing.sm },
     btnDisabled: { opacity: 0.6 },
-    btnText:   { color: '#fff', fontWeight: font.bold, fontSize: font.base },
-    linkWrap:  { marginTop: spacing.lg, alignItems: 'center' },
-    link:      { fontSize: font.sm, color: colors.textMuted },
-    linkBold:  { color: colors.primary, fontWeight: font.semi },
+    btnText:     { color: '#fff', fontWeight: font.bold, fontSize: font.base },
+    linkWrap:    { marginTop: spacing.lg, alignItems: 'center' },
+    link:        { fontSize: font.sm, color: colors.textMuted },
+    linkBold:    { color: colors.primary, fontWeight: font.semi },
 })
