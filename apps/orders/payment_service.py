@@ -44,8 +44,10 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
         if webhook_url:
             body['notify_url'] = webhook_url
 
+        # Endpoint réel vérifié en prod : /api/ecommerce/create
+        # (la doc indique /api/ecommerce/operation mais c'est incorrect)
         resp = requests.post(
-            f'{CHACHAP_API_URL}/api/ecommerce/operation',
+            f'{CHACHAP_API_URL}/api/ecommerce/create',
             json=body,
             headers={
                 'CCP-Api-Key':  api_key,
@@ -53,23 +55,7 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
                 'Accept':       'application/json',
             },
             timeout=20,
-            allow_redirects=False,  # évite que 301 → GET change la méthode
         )
-
-        # Gérer les redirects manuellement pour préserver POST
-        if resp.status_code in (301, 302, 307, 308):
-            redirect_url = resp.headers.get('Location', '')
-            logger.warning("[CHACHAP] Redirect %s → %s", resp.status_code, redirect_url)
-            resp = requests.post(
-                redirect_url,
-                json=body,
-                headers={
-                    'CCP-Api-Key':  api_key,
-                    'Content-Type': 'application/json',
-                    'Accept':       'application/json',
-                },
-                timeout=20,
-            )
 
         logger.info("[CHACHAP] Réponse HTTP %s — body brut: %s", resp.status_code, resp.text[:500])
         try:
