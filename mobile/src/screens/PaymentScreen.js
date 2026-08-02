@@ -5,40 +5,48 @@ import {
 } from 'react-native'
 import { WebView } from 'react-native-webview'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { ordersAPI, BASE_URL } from '../services/api'
+import { ordersAPI } from '../services/api'
 import { colors, spacing, radius, font } from '../theme'
 
 /**
  * PaymentScreen
  * Reçoit en paramètre : orderId
- * 1. Crée une session de paiement via POST /orders/:id/pay/
- * 2. Affiche l'URL de paiement ChaChaP dans une WebView
- * 3. Écoute les URLs de retour (success/cancel) et navigue en conséquence
+ * Étapes :
+ *   method  → l'acheteur choisit Mobile Money ou En espèces
+ *   init    → initiation du paiement (ChaChap ou cash)
+ *   webview → page de paiement ChaChap (Mobile Money uniquement)
+ *   success → confirmation
+ *   failed  → échec / annulation
  */
 export default function PaymentScreen({ route, navigation }) {
     const { orderId } = route.params || {}
     const qc = useQueryClient()
     const webViewRef = useRef(null)
 
+    const [step, setStep]             = useState('method')  // method | init | webview | success | failed
+    const [provider, setProvider]     = useState(null)      // 'chachap' | 'cash'
     const [checkoutUrl, setCheckoutUrl] = useState(null)
     const [webViewLoading, setWebViewLoading] = useState(false)
-    const [step, setStep] = useState('init')  // init | webview | success | failed
 
-    // Crée la session de paiement
+    // ── Initiation du paiement ────────────────────────────────────────────────
     const initMutation = useMutation({
-        mutationFn: () => ordersAPI.pay(orderId, { provider: 'chachap' }),
+        mutationFn: (selectedProvider) => ordersAPI.pay(orderId, { provider: selectedProvider }),
         onSuccess: (res) => {
-            const url = res.data?.checkout_url || res.data?.payment_url
-            if (url) {
-                setCheckoutUrl(url)
-                setStep('webview')
+            if (res.data?.cash) {
+                // Paiement en espèces — pas de redirection
+                setStep('success')
+                qc.invalidateQueries({ queryKey: ['orders-buyer'] })
+                qc.invalidateQueries({ queryKey: ['orders-seller'] })
             } else {
-                // Paiement simulé en dev (pas d'URL de checkout)
-                Alert.alert(
-                    '💰 Paiement simulé',
-                    'Mode test : le paiement est enregistré comme effectué.',
-                    [{ text: 'OK', onPress: () => { qc.invalidateQueries({ queryKey: ['orders-buyer'] }); navigation.goBack() } }]
-                )
+                const url = res.data?.checkout_url || res.data?.payment_url
+                if (url) {
+                    setCheckoutUrl(url)
+                    setStep('webview')
+                } else {
+                    // Mode test sans URL de checkout
+                    setStep('success')
+                    qc.invalidateQueries({ queryKey: ['orders-buyer'] })
+                }
             }
         },
         onError: (e) => {
@@ -47,59 +55,77 @@ export default function PaymentScreen({ route, navigation }) {
         },
     })
 
-    // Surveillez les URLs de retour depuis la WebView
+    const handlePay = (selectedProvider) => {
+        setProvider(selectedProvider)
+        setStep('init')
+        initMutation.mutate(selectedProvider)
+    }
+
+    // Surveille les URLs de retour depuis la WebView
     const handleNavigationChange = (navState) => {
         const url = navState.url
-
-        // URL succès — ChaChaP redirige vers notre domaine après paiement confirmé
-        if (url.includes('/payment/success') || url.includes('payment_success=1') || url.includes('/orders/') && url.includes('paid')) {
+        if (url.includes('/payment/success') || url.includes('payment_success=1') || (url.includes('/orders/') && url.includes('paid'))) {
             setStep('success')
             qc.invalidateQueries({ queryKey: ['orders-buyer'] })
             qc.invalidateQueries({ queryKey: ['orders-seller'] })
         }
-
-        // URL annulation
         if (url.includes('/payment/cancel') || url.includes('payment_cancel=1')) {
             setStep('failed')
         }
     }
 
-    // ── Écran initial : résumé + bouton payer ──
-    if (step === 'init') {
+    // ── En-tête commun ────────────────────────────────────────────────────────
+    const Header = ({ title, onBack }) => (
+        <View style={styles.header}>
+            <TouchableOpacity onPress={onBack} style={styles.backBtn}>
+                <Text style={styles.backIcon}>‹</Text>
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>{title}</Text>
+            <View style={{ width: 40 }} />
+        </View>
+    )
+
+    // ── Choix du mode de paiement ─────────────────────────────────────────────
+    if (step === 'method') {
         return (
             <SafeAreaView style={styles.container}>
-                <View style={styles.header}>
-                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
-                        <Text style={styles.backIcon}>‹</Text>
-                    </TouchableOpacity>
-                    <Text style={styles.headerTitle}>Paiement sécurisé</Text>
-                    <View style={{ width: 40 }} />
-                </View>
+                <Header title="Mode de paiement" onBack={() => navigation.goBack()} />
 
                 <View style={styles.body}>
-                    <Text style={styles.secureIcon}>🔒</Text>
-                    <Text style={styles.secureTitle}>Paiement sécurisé</Text>
+                    <Text style={styles.secureIcon}>💳</Text>
+                    <Text style={styles.secureTitle}>Choisissez votre mode de paiement</Text>
                     <Text style={styles.secureDesc}>
-                        Votre paiement est sécurisé par ChaChaP Pay, plateforme agréée BCRG.
-                        Vos fonds sont conservés en séquestre jusqu'à confirmation de réception.
+                        Sélectionnez comment vous souhaitez régler votre commande.
                     </Text>
 
-                    <View style={styles.infoCard}>
-                        <Text style={styles.infoRow}>🛡️ Commande protégée par escrow</Text>
-                        <Text style={styles.infoRow}>💸 Paiement via Orange Money / MTN MoMo</Text>
-                        <Text style={styles.infoRow}>✅ Remboursement si litige</Text>
-                    </View>
-
+                    {/* Mobile Money */}
                     <TouchableOpacity
-                        style={[styles.payBtn, initMutation.isPending && styles.payBtnDisabled]}
-                        onPress={() => initMutation.mutate()}
-                        disabled={initMutation.isPending}
+                        style={styles.methodCard}
+                        onPress={() => handlePay('chachap')}
                         activeOpacity={0.85}
                     >
-                        {initMutation.isPending
-                            ? <ActivityIndicator color="#fff" />
-                            : <Text style={styles.payBtnText}>💳 Procéder au paiement</Text>
-                        }
+                        <Text style={styles.methodIcon}>📱</Text>
+                        <View style={styles.methodInfo}>
+                            <Text style={styles.methodTitle}>Mobile Money</Text>
+                            <Text style={styles.methodDesc}>Orange Money · MTN MoMo · PayCard</Text>
+                            <Text style={styles.methodBadge}>🔒 Paiement sécurisé par escrow</Text>
+                        </View>
+                        <Text style={styles.methodArrow}>›</Text>
+                    </TouchableOpacity>
+
+                    {/* En espèces */}
+                    <TouchableOpacity
+                        style={styles.methodCard}
+                        onPress={() => handlePay('cash')}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={styles.methodIcon}>💵</Text>
+                        <View style={styles.methodInfo}>
+                            <Text style={styles.methodTitle}>En espèces</Text>
+                            <Text style={styles.methodDesc}>Paiement à la livraison ou au retrait</Text>
+                            <Text style={styles.methodBadge}>⚠️ Sans protection escrow</Text>
+                        </View>
+                        <Text style={styles.methodArrow}>›</Text>
                     </TouchableOpacity>
 
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.cancelLink}>
@@ -110,7 +136,19 @@ export default function PaymentScreen({ route, navigation }) {
         )
     }
 
-    // ── WebView ChaChaP ──
+    // ── Initiation en cours ───────────────────────────────────────────────────
+    if (step === 'init') {
+        return (
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                <ActivityIndicator size="large" color={colors.primary} />
+                <Text style={{ marginTop: spacing.md, color: colors.textMuted, fontSize: font.sm }}>
+                    {provider === 'cash' ? 'Confirmation en cours…' : 'Connexion au paiement…'}
+                </Text>
+            </SafeAreaView>
+        )
+    }
+
+    // ── WebView ChaChap ───────────────────────────────────────────────────────
     if (step === 'webview' && checkoutUrl) {
         return (
             <SafeAreaView style={styles.container}>
@@ -143,24 +181,29 @@ export default function PaymentScreen({ route, navigation }) {
                     onNavigationStateChange={handleNavigationChange}
                     javaScriptEnabled
                     domStorageEnabled
-                    startInLoadingState={false}
                     style={{ flex: 1 }}
                 />
             </SafeAreaView>
         )
     }
 
-    // ── Succès ──
+    // ── Succès ────────────────────────────────────────────────────────────────
     if (step === 'success') {
+        const isCash = provider === 'cash'
         return (
-            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+            <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: spacing.xl }]}>
                 <Text style={{ fontSize: 72, marginBottom: spacing.lg }}>✅</Text>
-                <Text style={styles.resultTitle}>Paiement réussi !</Text>
+                <Text style={styles.resultTitle}>
+                    {isCash ? 'Commande confirmée !' : 'Paiement réussi !'}
+                </Text>
                 <Text style={styles.resultDesc}>
-                    Votre paiement a été reçu. Les fonds sont conservés en séquestre jusqu'à ce que vous confirmiez la réception de votre article.
+                    {isCash
+                        ? 'Votre commande est confirmée. Le paiement en espèces sera effectué lors de la remise de l\'article.'
+                        : 'Votre paiement a été reçu. Les fonds sont conservés en séquestre jusqu\'à confirmation de la réception.'
+                    }
                 </Text>
                 <TouchableOpacity
-                    onPress={() => { navigation.navigate('Orders') }}
+                    onPress={() => navigation.navigate('Orders')}
                     style={[styles.payBtn, { marginTop: spacing.xl }]}
                 >
                     <Text style={styles.payBtnText}>Voir mes commandes</Text>
@@ -169,16 +212,16 @@ export default function PaymentScreen({ route, navigation }) {
         )
     }
 
-    // ── Échec / annulation ──
+    // ── Échec / annulation ────────────────────────────────────────────────────
     return (
-        <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+        <SafeAreaView style={[styles.container, { justifyContent: 'center', alignItems: 'center', padding: spacing.xl }]}>
             <Text style={{ fontSize: 72, marginBottom: spacing.lg }}>❌</Text>
             <Text style={styles.resultTitle}>Paiement annulé</Text>
             <Text style={styles.resultDesc}>
                 Le paiement n'a pas abouti. Aucun montant n'a été débité.
             </Text>
             <TouchableOpacity
-                onPress={() => setStep('init')}
+                onPress={() => setStep('method')}
                 style={[styles.payBtn, { marginTop: spacing.xl }]}
             >
                 <Text style={styles.payBtnText}>Réessayer</Text>
@@ -200,15 +243,19 @@ const styles = StyleSheet.create({
     secureIcon:        { fontSize: 56, marginBottom: spacing.md },
     secureTitle:       { fontSize: font.xl, fontWeight: font.bold, color: colors.text, marginBottom: spacing.sm, textAlign: 'center' },
     secureDesc:        { fontSize: font.sm, color: colors.textMuted, textAlign: 'center', lineHeight: 20, marginBottom: spacing.xl },
-    infoCard:          { backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg, width: '100%', marginBottom: spacing.xl, gap: 10, shadowColor: '#000', shadowOpacity: 0.05, shadowRadius: 4, elevation: 2 },
-    infoRow:           { fontSize: font.sm, color: colors.text },
+    methodCard:        { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.white, borderRadius: radius.xl, padding: spacing.lg, width: '100%', marginBottom: spacing.md, shadowColor: '#000', shadowOpacity: 0.06, shadowRadius: 6, elevation: 3 },
+    methodIcon:        { fontSize: 32, marginRight: spacing.md },
+    methodInfo:        { flex: 1 },
+    methodTitle:       { fontSize: font.base, fontWeight: font.bold, color: colors.text, marginBottom: 2 },
+    methodDesc:        { fontSize: font.sm, color: colors.textMuted, marginBottom: 4 },
+    methodBadge:       { fontSize: 11, color: colors.primary },
+    methodArrow:       { fontSize: 22, color: colors.textMuted, marginLeft: spacing.sm },
     payBtn:            { width: '100%', backgroundColor: colors.primary, borderRadius: radius.md, padding: spacing.md + 2, alignItems: 'center' },
-    payBtnDisabled:    { opacity: 0.6 },
     payBtnText:        { color: '#fff', fontWeight: font.bold, fontSize: font.base },
     cancelLink:        { marginTop: spacing.md, padding: spacing.sm },
     cancelText:        { color: colors.textMuted, fontSize: font.sm },
     webViewLoader:     { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(249,250,251,0.95)', zIndex: 10, gap: spacing.md },
     webViewLoaderText: { fontSize: font.sm, color: colors.textMuted },
     resultTitle:       { fontSize: font.xl, fontWeight: font.bold, color: colors.text, marginBottom: spacing.sm, textAlign: 'center' },
-    resultDesc:        { fontSize: font.sm, color: colors.textMuted, textAlign: 'center', lineHeight: 20, paddingHorizontal: spacing.lg },
+    resultDesc:        { fontSize: font.sm, color: colors.textMuted, textAlign: 'center', lineHeight: 20 },
 })

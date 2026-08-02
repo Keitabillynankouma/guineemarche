@@ -11,10 +11,12 @@ const useAuthStore = create((set, get) => ({
     login: async (phone, password) => {
         set({ loading: true })
         const { data } = await authAPI.login(phone, password)
-        await SecureStore.setItemAsync('access_token',  data.access)
-        await SecureStore.setItemAsync('refresh_token', data.refresh)
-        set({ token: data.access, isAuthenticated: true, loading: false })
-        await get().fetchMe()
+        // Le backend renvoie { tokens: { access, refresh }, user }
+        const access  = data.tokens?.access  || data.access
+        const refresh = data.tokens?.refresh || data.refresh
+        await SecureStore.setItemAsync('access_token',  access)
+        await SecureStore.setItemAsync('refresh_token', refresh)
+        set({ token: access, user: data.user || null, isAuthenticated: true, loading: false })
     },
 
     fetchMe: async () => {

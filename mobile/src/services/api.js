@@ -4,7 +4,7 @@ import * as SecureStore from 'expo-secure-store'
 // ── Base URL — à changer selon l'env ──────────────────────────────────────────
 // Dev local   : 'http://192.168.X.X:8000/api/v1'  (IP de votre machine)
 // Production  : 'https://votre-app.onrender.com/api/v1'
-export const BASE_URL = 'https://api.guimatrix.com/api/v1'
+export const BASE_URL = 'https://guineemarche.onrender.com/api/v1'
 
 const api = axios.create({ baseURL: BASE_URL })
 

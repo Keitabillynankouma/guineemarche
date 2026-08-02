@@ -20,7 +20,12 @@ export default function LoginScreen({ navigation }) {
         try {
             await login(phone, password)
         } catch (e) {
-            const msg = e.response?.data?.detail || 'Identifiants incorrects.'
+            const d = e.response?.data
+            const msg = d?.detail
+                || d?.non_field_errors?.[0]
+                || d?.phone_number?.[0]
+                || d?.password?.[0]
+                || 'Identifiants incorrects.'
             Alert.alert('Connexion échouée', msg)
         }
     }
