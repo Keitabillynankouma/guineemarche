@@ -48,7 +48,22 @@
           "locationAlwaysAndWhenInUsePermission": "Guimatrix utilise votre localisation pour le suivi de livraison."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#16a34a",
+          "defaultChannel": "default"
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Guimatrix accède à vos photos pour illustrer vos annonces.",
+          "cameraPermission": "Guimatrix utilise la caméra pour photographier vos articles."
+        }
+      ]
     ],
     "scheme": "guimatrix",
     "extra": {
