@@ -353,8 +353,17 @@ CELERY_TIMEZONE    = 'Africa/Conakry'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'filters': {
+        # Suppress CancelledError log spam from client disconnects on Python 3.12+
+        'suppress_cancelled': {
+            '()': 'config.logging_filters.SuppressCancelledError',
+        },
+    },
     'handlers': {
-        'console': {'class': 'logging.StreamHandler'},
+        'console': {
+            'class': 'logging.StreamHandler',
+            'filters': ['suppress_cancelled'],
+        },
     },
     'root': {'handlers': ['console'], 'level': 'INFO'},
     'loggers': {
