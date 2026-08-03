@@ -524,9 +524,13 @@ def _verify_chachap_signature(request):
             "Configurez CHACHAP_HMAC_KEY dans Railway / .env"
         )
         return False
-    sig_header = request.headers.get('CCP-Signature', '')
+    # ChaChap utilise Ccp-Hmac-Signature (ou CCP-Signature selon la version)
+    sig_header = (request.headers.get('Ccp-Hmac-Signature')
+                  or request.headers.get('CCP-Hmac-Signature')
+                  or request.headers.get('CCP-Signature')
+                  or '')
     if not sig_header:
-        logger.warning("[CHACHAP] Webhook sans header CCP-Signature")
+        logger.warning("[CHACHAP] Webhook sans header de signature (Ccp-Hmac-Signature / CCP-Signature)")
         return False
     body     = request.body
     expected = hmac.new(hmac_key.encode(), body, hashlib.sha256).hexdigest()
@@ -614,11 +618,27 @@ class PaymentWebhookView(APIView):
                 logger.warning("[CHACHAP] Webhook signature invalide — on traite quand même (mode debug)")
                 # NB: On traite quand même pour diagnostiquer. Remettre le rejet une fois
                 # la signature confirmée.
-            operation_id = data.get('operation_id', data.get('order_id', ''))
-            success      = data.get('status', '').lower() == 'success'
-            ref          = operation_id
-            logger.info("[CHACHAP] Webhook — operation_id=%s status=%s method=%s sig_ok=%s",
-                        operation_id, data.get('status'), data.get('payment_method', ''), sig_ok)
+
+            # ChaChap envoie parfois la body comme une STRING JSON (double-encodée).
+            # DRF la parse alors en str, pas en dict → on dé-encode manuellement.
+            if isinstance(data, str):
+                import json as _json
+                try:
+                    data = _json.loads(data)
+                except (ValueError, TypeError):
+                    logger.error("[CHACHAP] Webhook body non-parsable : %r", data[:200])
+                    return Response({'error': 'body invalide'}, status=status.HTTP_400_BAD_REQUEST)
+
+            operation_id = data.get('operation_id') or data.get('order_id') or ''
+            # status peut être une string ('success') OU un dict {'code': 'success', 'description': '...'}
+            raw_status = data.get('status', '')
+            if isinstance(raw_status, dict):
+                success = raw_status.get('code', '').lower() == 'success'
+            else:
+                success = str(raw_status).lower() == 'success'
+            ref = operation_id
+            logger.info("[CHACHAP] Webhook — operation_id=%s success=%s method=%s sig_ok=%s",
+                        operation_id, success, data.get('transaction', {}).get('payment_method', ''), sig_ok)
 
         elif provider == 'orange':
             if not _verify_orange_signature(request):

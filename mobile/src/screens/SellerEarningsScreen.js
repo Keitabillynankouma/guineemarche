@@ -24,12 +24,17 @@ const fmt = n => new Intl.NumberFormat('fr-GN').format(n || 0) + ' GNF'
 
 function PayoutInfoModal({ visible, onClose, user }) {
     const qc = useQueryClient()
+    const { setUser } = useAuthStore()
     const [phone, setPhone] = useState(user?.payout_phone || '')
     const [provider, setProvider] = useState(user?.payout_provider || 'orange_money')
 
     const saveMut = useMutation({
         mutationFn: () => ordersAPI.updatePayoutInfo({ payout_phone: phone, payout_provider: provider }),
         onSuccess: () => {
+            // Mettre à jour le store local immédiatement pour que le warning disparaisse
+            if (setUser) {
+                setUser({ ...user, payout_phone: phone, payout_provider: provider })
+            }
             qc.invalidateQueries({ queryKey: ['me'] })
             Alert.alert('✅ Enregistré', 'Votre compte de paiement a été mis à jour.')
             onClose()
@@ -110,8 +115,8 @@ export default function SellerEarningsScreen({ navigation }) {
                     <Text style={styles.backIcon}>‹</Text>
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Mes gains</Text>
-                <TouchableOpacity onPress={() => setShowModal(true)} style={styles.settingsBtn}>
-                    <Text style={{ fontSize: 20 }}>⚙️</Text>
+                <TouchableOpacity onPress={() => setShowModal(true)} style={styles.infoBtn}>
+                    <Text style={styles.infoBtnText}>💳 Infos paiement</Text>
                 </TouchableOpacity>
             </View>
 
@@ -210,6 +215,8 @@ const styles = StyleSheet.create({
     backIcon:         { fontSize: 28, color: colors.text, fontWeight: '300' },
     headerTitle:      { fontSize: font.lg, fontWeight: font.bold, color: colors.text },
     settingsBtn:      { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
+    infoBtn:          { backgroundColor: colors.primary, borderRadius: radius.md, paddingHorizontal: spacing.sm, paddingVertical: 6 },
+    infoBtnText:      { color: '#fff', fontSize: font.xs, fontWeight: font.semi },
     warningBanner:    { backgroundColor: '#fff7ed', borderRadius: radius.md, borderWidth: 1, borderColor: '#fed7aa', padding: spacing.md, marginBottom: spacing.md },
     warningText:      { fontSize: font.sm, color: '#92400e', lineHeight: 18 },
     summaryRow:       { flexDirection: 'row', gap: spacing.md, marginBottom: spacing.sm },
