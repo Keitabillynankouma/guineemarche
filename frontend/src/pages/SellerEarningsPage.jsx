@@ -12,6 +12,10 @@ const STATUS = {
 const PROVIDER = {
   orange_money: { label: 'Orange Money', color: 'text-orange-600', icon: '🟠' },
   mtn_momo:     { label: 'MTN MoMo',     color: 'text-yellow-600', icon: '🟡' },
+  paycard:      { label: 'PayCard',      color: 'text-blue-600',   icon: '💳' },
+  kulu:         { label: 'Kulu',         color: 'text-sky-600',    icon: '🔵' },
+  soutra_money: { label: 'Soutra Money', color: 'text-green-600',  icon: '🟢' },
+  akiba:        { label: 'Akiba',        color: 'text-purple-600', icon: '💜' },
   manual:       { label: 'Manuel',       color: 'text-gray-600',   icon: '💼' },
 }
 
@@ -64,6 +68,10 @@ function PayoutInfoModal({ current, onClose, onSaved }) {
               {[
                 { value: 'orange_money', label: '🟠 Orange Money' },
                 { value: 'mtn_momo',     label: '🟡 MTN MoMo' },
+                { value: 'paycard',      label: '💳 PayCard' },
+                { value: 'kulu',         label: '🔵 Kulu' },
+                { value: 'soutra_money', label: '🟢 Soutra Money' },
+                { value: 'akiba',        label: '💜 Akiba' },
               ].map(op => (
                 <button
                   key={op.value}
