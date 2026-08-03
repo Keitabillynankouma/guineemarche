@@ -1,7 +1,7 @@
 import React from 'react'
 import {
     View, Text, ScrollView, TouchableOpacity,
-    StyleSheet, ActivityIndicator, Alert, Share, Clipboard,
+    StyleSheet, ActivityIndicator, Alert, Share, Clipboard, Linking,
 } from 'react-native'
 import { useQuery } from '@tanstack/react-query'
 import useAuthStore from '../store/authStore'
@@ -152,7 +152,7 @@ export default function ProfileScreen({ navigation }) {
                 )}
 
                 {user.role === 'admin' && (
-                    <TouchableOpacity onPress={() => Alert.alert('Admin', 'Accédez à l\'administration via guimatrix.com/admin')} style={[styles.menuItem, styles.adminItem]}>
+                    <TouchableOpacity onPress={() => Linking.openURL('https://guimatrix.com/admin')} style={[styles.menuItem, styles.adminItem]}>
                         <Text style={styles.menuIcon}>🛡️</Text>
                         <Text style={[styles.menuLabel, { color: '#dc2626' }]}>Administration</Text>
                         <Text style={[styles.menuArrow, { color: '#dc2626' }]}>›</Text>

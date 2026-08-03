@@ -1,0 +1,1073 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Manuel d'utilisation — GuinéeMarché</title>
+<style>
+  :root {
+    --green: #16a34a;
+    --green-light: #dcfce7;
+    --green-dark: #14532d;
+    --gray: #374151;
+    --gray-light: #f9fafb;
+    --border: #e5e7eb;
+    --orange: #ea580c;
+    --blue: #2563eb;
+    --purple: #7c3aed;
+    --red: #dc2626;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    color: var(--gray);
+    background: #fff;
+  }
+  /* ── Cover ── */
+  .cover {
+    background: linear-gradient(135deg, #14532d 0%, #16a34a 60%, #4ade80 100%);
+    color: #fff;
+    padding: 80px 60px 60px;
+    min-height: 300px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .cover-logo { font-size: 48px; margin-bottom: 16px; }
+  .cover h1 { font-size: 42px; font-weight: 800; margin-bottom: 8px; }
+  .cover .subtitle { font-size: 20px; opacity: 0.85; margin-bottom: 24px; }
+  .cover .meta { font-size: 14px; opacity: 0.7; }
+
+  /* ── Layout ── */
+  .container { max-width: 860px; margin: 0 auto; padding: 40px 40px 80px; }
+
+  /* ── TOC ── */
+  .toc { background: var(--gray-light); border: 1px solid var(--border); border-radius: 12px; padding: 32px; margin: 40px 0; }
+  .toc h2 { font-size: 18px; color: var(--green-dark); margin-bottom: 20px; }
+  .toc ol { counter-reset: toc-main; padding-left: 0; list-style: none; }
+  .toc > ol > li { counter-increment: toc-main; margin-bottom: 8px; }
+  .toc > ol > li::before { content: counter(toc-main) ". "; font-weight: 700; color: var(--green); }
+  .toc a { color: var(--green-dark); text-decoration: none; font-weight: 600; }
+  .toc a:hover { text-decoration: underline; }
+  .toc .sub { padding-left: 22px; margin-top: 4px; list-style: disc; color: var(--gray); font-size: 13px; }
+  .toc .sub li { margin-bottom: 2px; }
+  .toc .sub a { font-weight: 400; color: var(--gray); }
+
+  /* ── Sections ── */
+  .chapter {
+    border-left: 5px solid var(--green);
+    padding-left: 20px;
+    margin: 48px 0 24px;
+  }
+  .chapter-num { font-size: 12px; font-weight: 700; color: var(--green); letter-spacing: 1px; text-transform: uppercase; }
+  .chapter h2 { font-size: 28px; font-weight: 800; color: var(--green-dark); margin-top: 4px; }
+
+  h3 { font-size: 18px; font-weight: 700; color: var(--gray); margin: 28px 0 10px; border-bottom: 2px solid var(--green-light); padding-bottom: 6px; }
+  h4 { font-size: 15px; font-weight: 700; color: var(--green-dark); margin: 20px 0 6px; }
+  p { margin-bottom: 12px; }
+
+  /* ── Cards ── */
+  .card { background: var(--gray-light); border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin: 16px 0; }
+  .card.green { background: var(--green-light); border-color: #86efac; }
+  .card.orange { background: #fff7ed; border-color: #fed7aa; }
+  .card.blue { background: #eff6ff; border-color: #bfdbfe; }
+  .card.red { background: #fef2f2; border-color: #fecaca; }
+  .card.purple { background: #f5f3ff; border-color: #ddd6fe; }
+
+  .card .card-title { font-weight: 700; font-size: 14px; margin-bottom: 8px; display: flex; align-items: center; gap: 8px; }
+  .card.green .card-title { color: #15803d; }
+  .card.orange .card-title { color: var(--orange); }
+  .card.blue .card-title { color: var(--blue); }
+  .card.red .card-title { color: var(--red); }
+  .card.purple .card-title { color: var(--purple); }
+
+  /* ── Steps ── */
+  .steps { counter-reset: step; margin: 16px 0; }
+  .step { counter-increment: step; display: flex; gap: 16px; margin-bottom: 16px; align-items: flex-start; }
+  .step-num {
+    width: 32px; height: 32px; min-width: 32px;
+    background: var(--green); color: #fff;
+    border-radius: 50%; font-weight: 800; font-size: 14px;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step-content { flex: 1; padding-top: 5px; }
+  .step-content strong { display: block; margin-bottom: 4px; }
+
+  /* ── Role badges ── */
+  .roles { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0; }
+  .role { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 600; }
+  .role.acheteur { background: #eff6ff; color: var(--blue); border: 1px solid #bfdbfe; }
+  .role.vendeur  { background: var(--green-light); color: #15803d; border: 1px solid #86efac; }
+  .role.livreur  { background: #fff7ed; color: var(--orange); border: 1px solid #fed7aa; }
+  .role.admin    { background: #f5f3ff; color: var(--purple); border: 1px solid #ddd6fe; }
+
+  /* ── Table ── */
+  table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 14px; }
+  th { background: var(--green); color: #fff; padding: 10px 14px; text-align: left; font-weight: 700; }
+  td { padding: 10px 14px; border-bottom: 1px solid var(--border); }
+  tr:nth-child(even) td { background: var(--gray-light); }
+
+  /* ── Status badges ── */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 600; }
+  .badge.pending   { background: #fef3c7; color: #92400e; }
+  .badge.confirmed { background: #dbeafe; color: var(--blue); }
+  .badge.completed { background: var(--green-light); color: #15803d; }
+  .badge.cancelled { background: #fee2e2; color: var(--red); }
+  .badge.disputed  { background: #f5f3ff; color: var(--purple); }
+
+  /* ── Timeline ── */
+  .timeline { border-left: 3px solid var(--green-light); padding-left: 24px; margin: 16px 0; }
+  .tl-item { position: relative; margin-bottom: 20px; }
+  .tl-item::before {
+    content: '';
+    width: 12px; height: 12px;
+    background: var(--green);
+    border-radius: 50%;
+    position: absolute;
+    left: -30px;
+    top: 5px;
+  }
+  .tl-item .tl-time { font-size: 12px; color: var(--green); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+  .tl-item .tl-text { font-size: 14px; margin-top: 2px; }
+
+  /* ── Tips ── */
+  .tip { border-left: 4px solid var(--green); background: var(--green-light); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 14px; }
+  .warn { border-left: 4px solid #f59e0b; background: #fffbeb; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 14px; }
+  .danger { border-left: 4px solid var(--red); background: #fef2f2; padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 12px 0; font-size: 14px; }
+
+  /* ── Screenshot boxes ── */
+  .screen-box {
+    border: 2px dashed var(--border);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin: 12px 0;
+    background: var(--gray-light);
+    font-size: 13px;
+    color: #6b7280;
+    font-style: italic;
+    text-align: center;
+  }
+
+  /* ── Code / path ── */
+  code { background: #f3f4f6; border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-family: 'Courier New', monospace; font-size: 13px; color: var(--green-dark); }
+
+  /* ── Page break for print ── */
+  @media print {
+    .cover { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .chapter { page-break-before: always; }
+    .no-break { page-break-inside: avoid; }
+  }
+
+  /* ── Footer ── */
+  .footer { border-top: 1px solid var(--border); padding: 24px 40px; text-align: center; font-size: 13px; color: #9ca3af; margin-top: 60px; }
+  hr { border: none; border-top: 1px solid var(--border); margin: 32px 0; }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════ COUVERTURE ═══════════════════════════ -->
+<div class="cover">
+  <div class="cover-logo">🛒</div>
+  <h1>GuinéeMarché</h1>
+  <div class="subtitle">Manuel d'utilisation complet</div>
+  <div class="meta">
+    Version 2.0 · Août 2026 · Tous profils : Acheteur · Vendeur · Livreur · Administrateur
+  </div>
+</div>
+
+<div class="container">
+
+<!-- ═══════════════════════════ TABLE DES MATIÈRES ═══════════════════ -->
+<div class="toc">
+  <h2>📋 Table des matières</h2>
+  <ol>
+    <li><a href="#s1">Présentation de la plateforme</a></li>
+    <li><a href="#s2">Inscription et connexion</a>
+      <ul class="sub">
+        <li><a href="#s2a">Créer un compte</a></li>
+        <li><a href="#s2b">Vérification OTP</a></li>
+        <li><a href="#s2c">Connexion et mot de passe oublié</a></li>
+      </ul>
+    </li>
+    <li><a href="#s3">Profil utilisateur</a></li>
+    <li><a href="#s4">Achat — Recherche et commande</a>
+      <ul class="sub">
+        <li><a href="#s4a">Rechercher une annonce</a></li>
+        <li><a href="#s4b">Passer une commande</a></li>
+        <li><a href="#s4c">Modes de livraison</a></li>
+        <li><a href="#s4d">Confirmer la réception</a></li>
+      </ul>
+    </li>
+    <li><a href="#s5">Paiement</a>
+      <ul class="sub">
+        <li><a href="#s5a">ChaChaP (mobile money)</a></li>
+        <li><a href="#s5b">En espèces (cash)</a></li>
+        <li><a href="#s5c">Statuts de paiement</a></li>
+      </ul>
+    </li>
+    <li><a href="#s6">Vente — Publier et gérer des annonces</a>
+      <ul class="sub">
+        <li><a href="#s6a">Créer une annonce</a></li>
+        <li><a href="#s6b">Confirmer une commande reçue</a></li>
+        <li><a href="#s6c">Gains et virements automatiques</a></li>
+      </ul>
+    </li>
+    <li><a href="#s7">Livraison</a>
+      <ul class="sub">
+        <li><a href="#s7a">S'inscrire comme livreur</a></li>
+        <li><a href="#s7b">Tableau de bord livreur</a></li>
+        <li><a href="#s7c">Rémunération et salaires automatiques</a></li>
+      </ul>
+    </li>
+    <li><a href="#s8">Escrow — Protection des fonds</a></li>
+    <li><a href="#s9">Litiges</a></li>
+    <li><a href="#s10">Notifications</a></li>
+    <li><a href="#s11">Parrainage</a></li>
+    <li><a href="#s12">Administration</a>
+      <ul class="sub">
+        <li><a href="#s12a">Tableau de bord admin</a></li>
+        <li><a href="#s12b">Gestion des utilisateurs</a></li>
+        <li><a href="#s12c">Virements et comptabilité</a></li>
+        <li><a href="#s12d">Litiges admin</a></li>
+      </ul>
+    </li>
+    <li><a href="#s13">Statuts des commandes — Référence</a></li>
+    <li><a href="#s14">Questions fréquentes</a></li>
+  </ol>
+</div>
+
+<!-- ═══════════════════════════ 1. PRÉSENTATION ═══════════════════════ -->
+<div id="s1" class="chapter">
+  <div class="chapter-num">Chapitre 1</div>
+  <h2>Présentation de la plateforme</h2>
+</div>
+
+<p>GuinéeMarché est une place de marché en ligne guinéenne permettant à des particuliers et commerçants de vendre et acheter des biens de manière sécurisée, avec un système de paiement escrow, une livraison intégrée et des virements automatiques.</p>
+
+<div class="roles">
+  <span class="role acheteur">🛍️ Acheteur</span>
+  <span class="role vendeur">🏪 Vendeur</span>
+  <span class="role livreur">🚗 Livreur</span>
+  <span class="role admin">🛡️ Administrateur</span>
+</div>
+
+<table>
+  <tr><th>Profil</th><th>Ce qu'il peut faire</th></tr>
+  <tr><td><strong>Acheteur</strong></td><td>Parcourir les annonces, passer des commandes, payer, confirmer la réception</td></tr>
+  <tr><td><strong>Vendeur</strong></td><td>Publier des annonces, confirmer les commandes, recevoir des virements automatiques</td></tr>
+  <tr><td><strong>Livreur</strong></td><td>Accepter des missions de livraison, suivre les commandes GPS, recevoir un salaire hebdomadaire automatique</td></tr>
+  <tr><td><strong>Administrateur</strong></td><td>Gérer tous les utilisateurs, résoudre les litiges, piloter la comptabilité</td></tr>
+</table>
+
+<div class="card green">
+  <div class="card-title">🌐 Accès à la plateforme</div>
+  <p><strong>Web :</strong> <code>guimatrix.com</code> (navigateur PC ou mobile)</p>
+  <p><strong>Application mobile :</strong> Android — disponible sur demande (APK)</p>
+  <p><strong>Administration :</strong> <code>guimatrix.com/admin</code> (comptes admin uniquement)</p>
+</div>
+
+<!-- ═══════════════════════════ 2. INSCRIPTION ════════════════════════ -->
+<div id="s2" class="chapter">
+  <div class="chapter-num">Chapitre 2</div>
+  <h2>Inscription et connexion</h2>
+</div>
+
+<h3 id="s2a">2.1 Créer un compte</h3>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Ouvrir la page d'inscription</strong>
+      Sur le web : cliquer sur « S'inscrire » depuis la page d'accueil. Sur l'appli mobile : appuyer sur « Créer un compte » dans l'écran de connexion.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Remplir le formulaire</strong>
+      Nom complet · Numéro de téléphone guinéen (ex : 620 000 000) · Mot de passe (min. 8 caractères) · Confirmation du mot de passe.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Code de parrainage (facultatif)</strong>
+      Si un ami vous a donné son code de parrainage, le saisir ici pour bénéficier d'avantages mutuels.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <strong>Déclarer la possession légale des biens</strong>
+      Cocher la case d'attestation anti-recel. Cette déclaration est obligatoire.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <strong>Valider et recevoir le code OTP</strong>
+      Un SMS est envoyé sur le numéro fourni. Saisir ce code dans les 10 minutes pour activer le compte.
+    </div>
+  </div>
+</div>
+
+<div class="warn">⚠️ Un seul compte par numéro de téléphone. Si le numéro est déjà enregistré, utiliser « Mot de passe oublié » pour récupérer l'accès.</div>
+
+<h3 id="s2b">2.2 Vérification OTP</h3>
+
+<p>Après l'inscription, un code à 6 chiffres est envoyé par SMS. Saisir ce code dans le champ prévu. Si le code n'arrive pas après 60 secondes, utiliser le bouton <strong>« Renvoyer le code »</strong>.</p>
+
+<div class="card orange">
+  <div class="card-title">⏱️ Validité du code OTP</div>
+  Le code expire après <strong>10 minutes</strong>. Au-delà, demander un nouveau code. Le système limite les tentatives pour éviter les abus.
+</div>
+
+<h3 id="s2c">2.3 Connexion et mot de passe oublié</h3>
+
+<p>Pour se connecter : saisir le numéro de téléphone et le mot de passe, puis appuyer sur « Se connecter ».</p>
+
+<p><strong>Mot de passe oublié :</strong></p>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Cliquer sur « Mot de passe oublié » sous le formulaire de connexion.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Saisir le numéro de téléphone enregistré. Un SMS avec un code de réinitialisation est envoyé.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Saisir le code, puis choisir un nouveau mot de passe.</div>
+  </div>
+</div>
+
+<!-- ═══════════════════════════ 3. PROFIL ════════════════════════════ -->
+<div id="s3" class="chapter">
+  <div class="chapter-num">Chapitre 3</div>
+  <h2>Profil utilisateur</h2>
+</div>
+
+<p>Accessible depuis le menu principal (icône profil), la page profil regroupe toutes les informations personnelles et les paramètres du compte.</p>
+
+<h3>3.1 Modifier le profil</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Cliquer sur <strong>« ✏️ Modifier »</strong> dans la carte profil.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Mettre à jour l'adresse e-mail, la <strong>ville</strong> (liste déroulante de toutes les villes guinéennes), et le <strong>quartier</strong> (liste mise à jour automatiquement selon la ville choisie).</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Cliquer sur <strong>« Enregistrer »</strong>. Le profil est mis à jour immédiatement.</div>
+  </div>
+</div>
+
+<h3>3.2 Informations de paiement (Vendeurs)</h3>
+<p>Pour recevoir des virements ChaChaP, le vendeur doit renseigner son numéro de téléphone ChaChaP dans la section <strong>« 💰 Mes gains »</strong> ou <strong>« Infos de paiement »</strong>.</p>
+
+<div class="card blue">
+  <div class="card-title">ℹ️ Opérateurs acceptés pour le payout</div>
+  Orange Money · MTN MoMo · Skrill · PayPal · Virement bancaire (BNI, Ecobank, Bicigui…) · Wave
+</div>
+
+<h3>3.3 Abonnement et quota d'annonces</h3>
+<table>
+  <tr><th>Plan</th><th>Annonces gratuites</th><th>Fonctionnalités</th></tr>
+  <tr><td>Gratuit</td><td>Quota défini par l'admin</td><td>Publication standard</td></tr>
+  <tr><td>Pro</td><td>Illimité</td><td>Mise en avant, statistiques avancées</td></tr>
+</table>
+
+<h3>3.4 Mes annonces</h3>
+<p>La section « Mes annonces » liste toutes les annonces publiées avec leur statut (Active, Expirée, Brouillon). Les annonces expirées sont automatiquement désactivées.</p>
+
+<h3>3.5 Historique et statistiques</h3>
+<p>Le profil affiche des graphiques d'activité (commandes, annonces) pour les 6 derniers mois, ainsi que le nombre d'avis reçus et la note moyenne.</p>
+
+<!-- ═══════════════════════════ 4. ACHAT ═════════════════════════════ -->
+<div id="s4" class="chapter">
+  <div class="chapter-num">Chapitre 4</div>
+  <h2>Achat — Recherche et commande</h2>
+</div>
+
+<div class="roles"><span class="role acheteur">🛍️ Acheteur</span></div>
+
+<h3 id="s4a">4.1 Rechercher une annonce</h3>
+<p>Depuis la page d'accueil, utiliser la barre de recherche ou les filtres :</p>
+<ul style="padding-left:24px; margin-bottom:12px;">
+  <li>Catégorie (Électronique, Vêtements, Véhicules…)</li>
+  <li>Ville et quartier</li>
+  <li>Fourchette de prix</li>
+  <li>État de l'article (Neuf, Bon état, Usagé)</li>
+</ul>
+<p>Les annonces récentes apparaissent en tête. Les articles consultés récemment sont visibles dans « Consultés récemment ».</p>
+
+<h3 id="s4b">4.2 Passer une commande</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Ouvrir la page de l'annonce</strong> et vérifier les détails (prix, description, photos, ville du vendeur).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Cliquer sur « 🛒 Acheter »</strong> (web) ou appuyer sur le bouton d'achat (mobile). Une fenêtre modale s'ouvre.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Choisir le mode de livraison</strong> (voir section 4.3), renseigner l'adresse ou le lieu, puis choisir le mode de paiement.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <strong>Si prix négociable</strong> : saisir le prix proposé. Le vendeur pourra accepter ou refuser.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">
+      <strong>Confirmer la commande.</strong> Un code de vérification unique est généré et affiché — le conserver pour la livraison.
+    </div>
+  </div>
+</div>
+
+<div class="tip">💡 La commande apparaît immédiatement dans « Mes commandes » avec le statut <span class="badge pending">En attente</span>.</div>
+
+<h3 id="s4c">4.3 Modes de livraison</h3>
+
+<table>
+  <tr><th>Mode</th><th>Description</th><th>Champ requis</th></tr>
+  <tr>
+    <td>🤝 Main propre</td>
+    <td>Rencontre physique avec le vendeur dans un lieu convenu</td>
+    <td>Lieu de rencontre (ex : Marché Madina)</td>
+  </tr>
+  <tr>
+    <td>🏪 Point de retrait</td>
+    <td>Retrait dans un point relais du réseau GuinéeMarché</td>
+    <td>Point de retrait souhaité</td>
+  </tr>
+  <tr>
+    <td>🚗 Livraison domicile</td>
+    <td>Un livreur apporte l'article à votre adresse. Des frais de livraison peuvent s'appliquer.</td>
+    <td>Adresse complète (quartier, rue, repère)</td>
+  </tr>
+</table>
+
+<div class="card orange">
+  <div class="card-title">🚗 Livraison à domicile — Code de vérification</div>
+  Un code à 6 chiffres est généré à la commande. Ce code est remis au livreur lors de la livraison pour confirmer la remise en main propre. <strong>Ne pas le communiquer avant d'avoir reçu l'article.</strong>
+</div>
+
+<h3 id="s4d">4.4 Confirmer la réception</h3>
+
+<p>Après la livraison, l'acheteur doit confirmer la réception dans un délai de <strong>24 heures</strong> (72 heures pour les commandes importantes).</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Ouvrir « Mes commandes » et localiser la commande au statut <span class="badge confirmed">Confirmée</span>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Cliquer sur <strong>« ✅ Confirmer réception »</strong>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Les fonds en escrow sont automatiquement virés au vendeur. La commande passe au statut <span class="badge completed">Terminée</span>.</div>
+  </div>
+</div>
+
+<div class="warn">⚠️ Si vous ne confirmez pas dans le délai imparti, les fonds sont automatiquement libérés et virés au vendeur. En cas de problème, ouvrir un <strong>litige</strong> avant expiration du délai.</div>
+
+<!-- ═══════════════════════════ 5. PAIEMENT ═══════════════════════════ -->
+<div id="s5" class="chapter">
+  <div class="chapter-num">Chapitre 5</div>
+  <h2>Paiement</h2>
+</div>
+
+<h3 id="s5a">5.1 ChaChaP — Mobile Money</h3>
+
+<p>ChaChaP est le système de paiement principal de GuinéeMarché. Il prend en charge les principaux opérateurs guinéens.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Depuis la commande, cliquer sur <strong>« 💳 Payer »</strong>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Choisir l'opérateur : <strong>Orange Money · MTN MoMo · Skrill · PayPal · Wave</strong>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Saisir le numéro de téléphone lié au portefeuille mobile.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">Confirmer le paiement. Une notification de confirmation est envoyée par SMS et dans l'application.</div>
+  </div>
+</div>
+
+<div class="tip">💡 Les fonds sont placés en <strong>escrow</strong> (séquestre sécurisé) jusqu'à la confirmation de réception par l'acheteur.</div>
+
+<h3 id="s5b">5.2 En espèces (Cash)</h3>
+
+<p>Pour les commandes avec remise en main propre ou chez un livreur, le paiement en espèces est possible.</p>
+
+<div class="card">
+  <div class="card-title">💵 Processus paiement cash</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-time">Acheteur</div>
+      <div class="tl-text">Sélectionne « En espèces » lors de la commande. La commande reste en attente.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Vendeur</div>
+      <div class="tl-text">Reçoit la commande, organise la rencontre et collecte l'argent en main propre.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Vendeur</div>
+      <div class="tl-text">Appuie sur <strong>« ✅ Confirmer »</strong> dans « Mes ventes » pour indiquer que le paiement a été reçu. La commande passe au statut <span class="badge confirmed">Confirmée</span>.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Acheteur</div>
+      <div class="tl-text">Confirme la réception de l'article pour finaliser la transaction.</div>
+    </div>
+  </div>
+</div>
+
+<h3 id="s5c">5.3 Statuts de paiement</h3>
+<table>
+  <tr><th>Statut</th><th>Signification</th></tr>
+  <tr><td>En attente</td><td>Paiement non encore effectué</td></tr>
+  <tr><td>En cours</td><td>Paiement en cours de traitement</td></tr>
+  <tr><td>Réussi</td><td>Paiement confirmé — fonds en escrow</td></tr>
+  <tr><td>Échoué</td><td>Paiement rejeté (solde insuffisant, numéro invalide…)</td></tr>
+  <tr><td>Remboursé</td><td>Fonds restitués à l'acheteur (litige résolu en sa faveur)</td></tr>
+</table>
+
+<!-- ═══════════════════════════ 6. VENTE ══════════════════════════════ -->
+<div id="s6" class="chapter">
+  <div class="chapter-num">Chapitre 6</div>
+  <h2>Vente — Publier et gérer des annonces</h2>
+</div>
+
+<div class="roles"><span class="role vendeur">🏪 Vendeur</span></div>
+
+<h3 id="s6a">6.1 Créer une annonce</h3>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">
+      <strong>Accéder à « Publier »</strong> depuis le menu (bouton + ou icône crayon).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">
+      <strong>Renseigner les informations :</strong> Titre · Catégorie · Description détaillée · Photos (jusqu'à plusieurs images) · Prix en GNF · Type de prix (Fixe / Négociable / Gratuit) · État (Neuf / Bon état / Usagé).
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">
+      <strong>Sélectionner la ville et le quartier</strong> de retrait ou de livraison.
+    </div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content">
+      <strong>Publier.</strong> L'annonce est visible immédiatement par tous les acheteurs.
+    </div>
+  </div>
+</div>
+
+<div class="card orange">
+  <div class="card-title">⚠️ Quota d'annonces</div>
+  Le compte gratuit a un quota d'annonces actives simultanées. Au-delà, passer au Plan Pro ou supprimer des annonces existantes.
+</div>
+
+<h3 id="s6b">6.2 Confirmer une commande reçue</h3>
+
+<p>Quand un acheteur passe une commande, le vendeur reçoit une notification et doit <strong>confirmer la commande</strong> pour l'accepter.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Ouvrir <strong>« Mes ventes »</strong> (web) ou onglet « 🏪 Ventes » dans « Mes commandes » (mobile).</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Localiser la commande au statut <span class="badge pending">En attente</span>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Cliquer sur <strong>« ✅ Confirmer la commande »</strong> (ou « ✅ Confirmer » pour les paiements en espèces après réception de l'argent).</div>
+  </div>
+</div>
+
+<div class="tip">💡 Si le vendeur n'accepte pas la commande, l'acheteur peut l'annuler. Il est recommandé de confirmer rapidement.</div>
+
+<h3 id="s6c">6.3 Gains et virements automatiques</h3>
+
+<p>GuinéeMarché applique une commission de <strong>4 %</strong> sur chaque vente complétée. Le reste est versé automatiquement sur le compte ChaChaP du vendeur.</p>
+
+<div class="card green">
+  <div class="card-title">💸 Processus de virement automatique</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-time">Acheteur confirme réception</div>
+      <div class="tl-text">Les fonds sont libérés de l'escrow.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Immédiat (automatique)</div>
+      <div class="tl-text">96 % du montant est viré via ChaChaP B2C sur le numéro renseigné par le vendeur.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Notification</div>
+      <div class="tl-text">Le vendeur reçoit une notification de confirmation du virement.</div>
+    </div>
+  </div>
+</div>
+
+<h4>Si le numéro de paiement n'est pas renseigné</h4>
+<p>Le virement reste en attente (<span class="badge pending">Pending</span>) et l'administrateur est notifié. Le vendeur doit renseigner son numéro ChaChaP dans son profil pour recevoir ses fonds.</p>
+
+<h4>Consulter ses gains</h4>
+<p>Dans le profil → <strong>« 💰 Mes gains »</strong> : tableau de bord avec les gains complétés, en attente et échoués, ainsi que l'historique de chaque virement.</p>
+
+<!-- ═══════════════════════════ 7. LIVRAISON ═════════════════════════ -->
+<div id="s7" class="chapter">
+  <div class="chapter-num">Chapitre 7</div>
+  <h2>Livraison</h2>
+</div>
+
+<div class="roles"><span class="role livreur">🚗 Livreur</span></div>
+
+<h3 id="s7a">7.1 S'inscrire comme livreur</h3>
+<p>Lors de l'inscription ou depuis les paramètres du profil, sélectionner le rôle <strong>« Livreur »</strong>. L'administrateur valide les livreurs avant activation.</p>
+
+<h3 id="s7b">7.2 Tableau de bord livreur</h3>
+
+<p>L'écran <strong>« Mes livraisons »</strong> (mobile) ou le tableau de bord livreur (web) affiche :</p>
+<ul style="padding-left:24px; margin-bottom:12px;">
+  <li>Les missions en attente d'acceptation</li>
+  <li>Les missions en cours avec le suivi GPS</li>
+  <li>L'historique des livraisons complétées</li>
+  <li>Le toggle de disponibilité (disponible / indisponible)</li>
+</ul>
+
+<h4>Workflow de livraison</h4>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content"><strong>Recevoir une mission</strong> : notification push dès qu'une commande à livrer est disponible dans sa zone.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content"><strong>Accepter la mission</strong> en appuyant sur « Accepter » — la mission est alors réservée pour ce livreur.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content"><strong>Aller chercher l'article</strong> chez le vendeur. Appuyer sur <strong>« Démarrer la livraison »</strong> pour activer le suivi GPS.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">4</div>
+    <div class="step-content"><strong>Livrer à l'acheteur.</strong> Demander le code de vérification à 6 chiffres et le saisir dans l'application pour confirmer la remise.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">5</div>
+    <div class="step-content">La livraison est marquée comme <span class="badge completed">Terminée</span> et les gains sont enregistrés.</div>
+  </div>
+</div>
+
+<div class="tip">💡 L'acheteur peut suivre la position du livreur en temps réel sur la carte depuis « Mes commandes ».</div>
+
+<h3 id="s7c">7.3 Rémunération et salaires automatiques</h3>
+
+<div class="card green">
+  <div class="card-title">💰 Salaire hebdomadaire automatique</div>
+  <p>Chaque <strong>lundi matin</strong>, le système calcule automatiquement le salaire de la semaine écoulée pour chaque livreur :</p>
+  <ul style="padding-left:20px; margin-top:8px;">
+    <li>Total des gains bruts (commissions par livraison)</li>
+    <li>Déduction des éventuelles amendes (retards, annulations)</li>
+    <li>Virement automatique via ChaChaP B2C sur le numéro renseigné</li>
+  </ul>
+</div>
+
+<h4>Renseigner son numéro de paiement</h4>
+<p>Dans le profil → <strong>« Infos de paiement livreur »</strong> : saisir le numéro de téléphone ChaChaP pour recevoir le salaire automatiquement. Sans ce numéro, le salaire reste en attente et l'admin est notifié.</p>
+
+<h4>Amendes</h4>
+<table>
+  <tr><th>Motif</th><th>Conséquence</th></tr>
+  <tr><td>Livraison annulée sans motif</td><td>Amende déduite du salaire de la semaine</td></tr>
+  <tr><td>Retard répété</td><td>Amende variable décidée par l'admin</td></tr>
+</table>
+
+<!-- ═══════════════════════════ 8. ESCROW ════════════════════════════ -->
+<div id="s8" class="chapter">
+  <div class="chapter-num">Chapitre 8</div>
+  <h2>Escrow — Protection des fonds</h2>
+</div>
+
+<p>Le système d'<strong>escrow</strong> (séquestre) est le mécanisme central de sécurité de GuinéeMarché. Il garantit que l'acheteur est livré avant que le vendeur soit payé.</p>
+
+<div class="card blue">
+  <div class="card-title">🔒 Comment fonctionne l'escrow</div>
+  <div class="timeline">
+    <div class="tl-item">
+      <div class="tl-time">Paiement</div>
+      <div class="tl-text">L'acheteur paie. Les fonds sont <strong>bloqués</strong> en escrow (ni chez l'acheteur, ni chez le vendeur).</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Livraison</div>
+      <div class="tl-text">Le vendeur expédie ou remet l'article. Le livreur effectue la livraison.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Confirmation de réception</div>
+      <div class="tl-text">L'acheteur confirme avoir reçu l'article en bon état.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Libération automatique</div>
+      <div class="tl-text">Les fonds sont virés au vendeur (96 %) et la commission de 4 % revient à GuinéeMarché.</div>
+    </div>
+    <div class="tl-item">
+      <div class="tl-time">Expiration (24h / 72h)</div>
+      <div class="tl-text">Si l'acheteur ne confirme pas dans le délai, les fonds sont automatiquement libérés et virés au vendeur. Ouvrir un litige AVANT expiration pour bloquer ce processus.</div>
+    </div>
+  </div>
+</div>
+
+<div class="danger">⛔ Les fonds en escrow ne peuvent pas être retirés directement. Toute fraude (faux paiement, fausse confirmation) est détectée et peut entraîner la suspension du compte.</div>
+
+<!-- ═══════════════════════════ 9. LITIGES ═══════════════════════════ -->
+<div id="s9" class="chapter">
+  <div class="chapter-num">Chapitre 9</div>
+  <h2>Litiges</h2>
+</div>
+
+<h3>9.1 Quand ouvrir un litige</h3>
+<p>Un litige doit être ouvert si :</p>
+<ul style="padding-left:24px; margin-bottom:12px;">
+  <li>L'article reçu ne correspond pas à la description</li>
+  <li>L'article est endommagé ou incomplet</li>
+  <li>Le vendeur ne répond plus et l'article n'est pas arrivé</li>
+  <li>Tout autre désaccord commercial</li>
+</ul>
+
+<div class="warn">⚠️ Ouvrir le litige <strong>avant</strong> de confirmer la réception et <strong>avant</strong> l'expiration du délai d'escrow. Passé ce délai, les fonds sont libérés et le litige ne peut plus bloquer le paiement.</div>
+
+<h3>9.2 Comment ouvrir un litige</h3>
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Ouvrir « Mes commandes » et localiser la commande concernée.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Appuyer sur <strong>« ⚠️ Litige »</strong> (disponible au statut <span class="badge pending">En attente</span> ou <span class="badge confirmed">Confirmée</span>).</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Confirmer l'ouverture du litige. Les fonds sont immédiatement bloqués en attendant la décision de l'administrateur.</div>
+  </div>
+</div>
+
+<h3>9.3 Résolution du litige</h3>
+<table>
+  <tr><th>Décision admin</th><th>Conséquence</th></tr>
+  <tr><td>En faveur de l'acheteur</td><td>Remboursement complet à l'acheteur</td></tr>
+  <tr><td>En faveur du vendeur</td><td>Fonds virés au vendeur (96 % habituel)</td></tr>
+  <tr><td>Partage</td><td>Fonds répartis selon la décision de l'admin</td></tr>
+</table>
+
+<div class="tip">💡 L'équipe GuinéeMarché peut vous contacter pour recueillir des preuves (photos, captures d'écran, messages). Conservez toutes les preuves pertinentes.</div>
+
+<!-- ═══════════════════════════ 10. NOTIFICATIONS ═══════════════════ -->
+<div id="s10" class="chapter">
+  <div class="chapter-num">Chapitre 10</div>
+  <h2>Notifications</h2>
+</div>
+
+<p>GuinéeMarché envoie des notifications en temps réel pour chaque événement important :</p>
+
+<table>
+  <tr><th>Événement</th><th>Destinataire</th><th>Canal</th></tr>
+  <tr><td>Nouvelle commande reçue</td><td>Vendeur</td><td>Push + notification in-app</td></tr>
+  <tr><td>Commande confirmée par le vendeur</td><td>Acheteur</td><td>Push + notification in-app</td></tr>
+  <tr><td>Paiement reçu</td><td>Vendeur</td><td>Push + e-mail</td></tr>
+  <tr><td>Mission de livraison disponible</td><td>Livreur</td><td>Push</td></tr>
+  <tr><td>Livraison démarrée</td><td>Acheteur</td><td>Push</td></tr>
+  <tr><td>Litige ouvert</td><td>Vendeur + Admin</td><td>Push + e-mail</td></tr>
+  <tr><td>Virement effectué</td><td>Vendeur / Livreur</td><td>Push + e-mail</td></tr>
+  <tr><td>Salaire hebdomadaire versé</td><td>Livreur</td><td>Push + e-mail</td></tr>
+  <tr><td>Annonce expirée</td><td>Vendeur</td><td>Push + e-mail</td></tr>
+</table>
+
+<p>Le <strong>centre de notifications</strong> (icône cloche 🔔) affiche toutes les notifications reçues. Les non-lues sont indiquées par un badge rouge. Appuyer sur « Tout marquer comme lu » pour effacer le compteur.</p>
+
+<!-- ═══════════════════════════ 11. PARRAINAGE ══════════════════════ -->
+<div id="s11" class="chapter">
+  <div class="chapter-num">Chapitre 11</div>
+  <h2>Parrainage</h2>
+</div>
+
+<p>Le programme de parrainage permet de gagner des avantages en invitant des amis à rejoindre GuinéeMarché.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Ouvrir le profil → <strong>« 🎁 Parrainage »</strong>.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Copier votre <strong>code de parrainage unique</strong> et le partager avec vos amis.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Lorsqu'un ami s'inscrit avec votre code, vous gagnez tous les deux des avantages selon la politique en vigueur.</div>
+  </div>
+</div>
+
+<p>Le tableau de bord de parrainage indique le nombre de filleuls actifs et les gains cumulés.</p>
+
+<!-- ═══════════════════════════ 12. ADMINISTRATION ══════════════════ -->
+<div id="s12" class="chapter">
+  <div class="chapter-num">Chapitre 12</div>
+  <h2>Administration</h2>
+</div>
+
+<div class="roles"><span class="role admin">🛡️ Administrateur</span></div>
+
+<p>Le panel d'administration est accessible à <strong><code>guimatrix.com/admin</code></strong> (comptes admin et super admin uniquement). Il est divisé en plusieurs onglets.</p>
+
+<h3 id="s12a">12.1 Tableau de bord principal</h3>
+<p>Affiche les indicateurs clés en temps réel :</p>
+<ul style="padding-left:24px; margin-bottom:12px;">
+  <li>Utilisateurs actifs (total, vendeurs, livreurs, acheteurs)</li>
+  <li>Commandes du jour / semaine / mois</li>
+  <li>Chiffre d'affaires et commissions</li>
+  <li>Litiges en cours</li>
+  <li>Virements en attente</li>
+</ul>
+
+<h3 id="s12b">12.2 Gestion des utilisateurs</h3>
+<p>L'onglet <strong>« Utilisateurs »</strong> liste tous les comptes avec leurs informations, statuts et rôles. L'admin peut :</p>
+<ul style="padding-left:24px; margin-bottom:12px;">
+  <li>Suspendre ou réactiver un compte</li>
+  <li>Changer le rôle (acheteur → vendeur, livreur…)</li>
+  <li>Valider les livreurs en attente de validation</li>
+  <li>Voir le profil complet et l'historique d'activité</li>
+</ul>
+
+<h3 id="s12c">12.3 Virements et comptabilité</h3>
+
+<p>L'onglet <strong>« Comptabilité »</strong> donne accès à :</p>
+
+<h4>Virements vendeurs (SellerPayouts)</h4>
+<table>
+  <tr><th>Action</th><th>Description</th></tr>
+  <tr><td>Filtrer par statut</td><td>Pending / Processing / Completed / Failed / All</td></tr>
+  <tr><td>🚀 Virer</td><td>Déclencher manuellement un virement ChaChaP pour un payout bloqué</td></tr>
+  <tr><td>✓ Manuel</td><td>Marquer un payout comme payé manuellement (ex : virement bancaire hors système)</td></tr>
+  <tr><td>Export CSV</td><td>Télécharger l'historique complet des virements</td></tr>
+</table>
+
+<h4>Salaires livreurs (Weekly Payouts)</h4>
+<table>
+  <tr><th>Action</th><th>Description</th></tr>
+  <tr><td>Vue par livreur</td><td>Détail des missions, amendes et net à payer</td></tr>
+  <tr><td>Virement manuel</td><td>Pour les livreurs sans numéro ChaChaP enregistré</td></tr>
+  <tr><td>Export CSV</td><td>Historique comptable hebdomadaire</td></tr>
+</table>
+
+<div class="card green">
+  <div class="card-title">⚙️ Automatisation complète</div>
+  <p>En fonctionnement normal, <strong>aucune intervention manuelle n'est requise</strong> :</p>
+  <ul style="padding-left:20px; margin-top:8px;">
+    <li>Virements vendeurs → automatiques à la confirmation de réception</li>
+    <li>Salaires livreurs → automatiques chaque lundi matin</li>
+    <li>Expiration escrow → automatique après 24h / 72h</li>
+    <li>Expiration annonces → automatique à minuit chaque jour</li>
+  </ul>
+  <p style="margin-top:8px;">L'admin n'intervient que pour les <strong>litiges</strong> et les <strong>cas d'échec</strong> de virement.</p>
+</div>
+
+<h3 id="s12d">12.4 Gestion des litiges</h3>
+
+<p>L'onglet <strong>« Litiges »</strong> liste tous les litiges ouverts.</p>
+
+<div class="steps">
+  <div class="step">
+    <div class="step-num">1</div>
+    <div class="step-content">Sélectionner le litige à traiter. Consulter les détails : montant, acheteur, vendeur, messages échangés.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">2</div>
+    <div class="step-content">Contacter les deux parties si nécessaire pour recueillir des preuves supplémentaires.</div>
+  </div>
+  <div class="step">
+    <div class="step-num">3</div>
+    <div class="step-content">Choisir la décision : <strong>Rembourser l'acheteur</strong> (fonds retournés manuellement) ou <strong>Libérer vers le vendeur</strong> (virement automatique).</div>
+  </div>
+</div>
+
+<div class="card orange">
+  <div class="card-title">⚠️ Remboursement acheteur</div>
+  En cas de remboursement décidé en faveur de l'acheteur, une notification est envoyée à l'équipe comptable avec les coordonnées de l'acheteur pour procéder au remboursement manuel via ChaChaP.
+</div>
+
+<h4>Autres fonctions admin</h4>
+<ul style="padding-left:24px; margin-bottom:12px;">
+  <li><strong>Annonces</strong> : supprimer ou désactiver des annonces non conformes</li>
+  <li><strong>Catégories</strong> : gérer les catégories et sous-catégories d'annonces</li>
+  <li><strong>Amendes livreurs</strong> : créer et suivre les amendes</li>
+  <li><strong>Retours</strong> : approuver ou rejeter les demandes de retour produit</li>
+  <li><strong>Notifications</strong> : envoyer des messages groupés aux utilisateurs</li>
+  <li><strong>Export comptabilité</strong> : télécharger l'ensemble des données en CSV</li>
+</ul>
+
+<!-- ═══════════════════════════ 13. STATUTS ══════════════════════════ -->
+<div id="s13" class="chapter">
+  <div class="chapter-num">Chapitre 13</div>
+  <h2>Statuts des commandes — Référence complète</h2>
+</div>
+
+<table>
+  <tr><th>Statut</th><th>Description</th><th>Prochaine action</th></tr>
+  <tr>
+    <td><span class="badge pending">En attente</span></td>
+    <td>Commande passée, en attente de confirmation du vendeur</td>
+    <td>Vendeur : confirmer ou laisser annuler par l'acheteur</td>
+  </tr>
+  <tr>
+    <td><span class="badge confirmed">Confirmée</span></td>
+    <td>Vendeur a accepté, paiement encaissé en escrow (ou cash reçu)</td>
+    <td>Acheteur : confirmer la réception après livraison</td>
+  </tr>
+  <tr>
+    <td><span class="badge completed">Terminée</span></td>
+    <td>Réception confirmée, fonds virés au vendeur</td>
+    <td>— (transaction close)</td>
+  </tr>
+  <tr>
+    <td><span class="badge cancelled">Annulée</span></td>
+    <td>Commande annulée par l'acheteur ou refusée par le vendeur</td>
+    <td>Si paiement effectué : remboursement automatique</td>
+  </tr>
+  <tr>
+    <td><span class="badge disputed">Litige</span></td>
+    <td>Litige ouvert, fonds bloqués en attente de décision admin</td>
+    <td>Admin : résoudre le litige</td>
+  </tr>
+</table>
+
+<h3>Tableau de transition des statuts</h3>
+<div class="card">
+<pre style="font-size:12px; line-height:1.8; overflow-x:auto;">
+  [COMMANDE CRÉÉE]
+       │
+       ▼
+  ┌─────────┐   Vendeur confirme   ┌───────────┐
+  │En attente│ ──────────────────▶ │ Confirmée │
+  └─────────┘                      └───────────┘
+       │                                 │
+       │ Acheteur annule                 │ Acheteur confirme réception
+       ▼                                 ▼
+  ┌─────────┐                      ┌──────────┐
+  │ Annulée │                      │ Terminée │ ──▶ Virement vendeur
+  └─────────┘                      └──────────┘
+
+  À tout moment (avant confirmation de réception) :
+  Acheteur ouvre litige ──▶ [Litige] ──▶ Décision admin
+</pre>
+</div>
+
+<!-- ═══════════════════════════ 14. FAQ ═══════════════════════════════ -->
+<div id="s14" class="chapter">
+  <div class="chapter-num">Chapitre 14</div>
+  <h2>Questions fréquentes</h2>
+</div>
+
+<h3>💬 Général</h3>
+
+<h4>Q : Pourquoi mon annonce n'apparaît-elle pas ?</h4>
+<p>Vérifiez que votre quota d'annonces n'est pas atteint et que l'annonce n'a pas expiré. Les annonces sont actives par défaut après publication.</p>
+
+<h4>Q : Comment contacter un vendeur ?</h4>
+<p>Depuis la page de l'annonce, utiliser le bouton <strong>« 💬 Message »</strong> pour envoyer un message direct.</p>
+
+<h4>Q : Puis-je modifier une annonce après publication ?</h4>
+<p>Oui, depuis « Mes annonces » → modifier l'annonce. Les prix et descriptions peuvent être mis à jour à tout moment.</p>
+
+<h3>💳 Paiement</h3>
+
+<h4>Q : Mon paiement a échoué. Que faire ?</h4>
+<p>Vérifier le solde du compte mobile money, que le numéro saisi est correct, et réessayer. Si le problème persiste, contacter le support.</p>
+
+<h4>Q : En combien de temps est viré mon argent (vendeur) ?</h4>
+<p>Le virement est <strong>immédiat et automatique</strong> dès que l'acheteur confirme la réception. En cas de non-confirmation, les fonds sont automatiquement libérés après 24 ou 72 heures.</p>
+
+<h4>Q : Je n'ai pas reçu mon virement. Que faire ?</h4>
+<p>Vérifier que le numéro ChaChaP est bien renseigné dans « Infos de paiement ». Si le virement est en statut « Échoué », contacter l'administrateur depuis le menu profil.</p>
+
+<h3>📦 Livraison</h3>
+
+<h4>Q : Comment suivre ma livraison ?</h4>
+<p>Dans « Mes commandes » → sélectionner la commande → le suivi GPS du livreur est visible en temps réel sur la carte (si mode livraison domicile).</p>
+
+<h4>Q : Je n'ai pas reçu mon code de vérification.</h4>
+<p>Le code est affiché dans les détails de la commande dans « Mes commandes ». Il est aussi envoyé par notification push.</p>
+
+<h4>Q : Mon livreur ne répond plus.</h4>
+<p>Ouvrir un litige depuis la commande. L'administrateur interviendra pour résoudre la situation.</p>
+
+<h3>⚖️ Litiges</h3>
+
+<h4>Q : J'ai confirmé la réception par erreur. Puis-je récupérer mon argent ?</h4>
+<p>Une fois la réception confirmée, les fonds sont virés au vendeur et la transaction est finalisée. Il n'est plus possible d'ouvrir un litige. Contacter directement le vendeur et l'équipe support en dernier recours.</p>
+
+<h4>Q : Le litige est ouvert depuis plusieurs jours, que se passe-t-il ?</h4>
+<p>L'équipe traite les litiges dans un délai de 2 à 5 jours ouvrés. Vous serez notifié dès qu'une décision est prise.</p>
+
+<h3>🚗 Livreurs</h3>
+
+<h4>Q : Quand suis-je payé ?</h4>
+<p>Chaque <strong>lundi matin</strong>, le salaire de la semaine écoulée est calculé et viré automatiquement.</p>
+
+<h4>Q : Une amende a été déduite de mon salaire sans raison. Que faire ?</h4>
+<p>Contacter l'administrateur depuis le profil pour contester l'amende. L'admin dispose d'un accès à l'historique complet.</p>
+
+<h4>Q : Comment modifier mon numéro de paiement ?</h4>
+<p>Profil → « Infos de paiement livreur » → modifier le numéro et enregistrer. Le changement prend effet au prochain calcul de salaire.</p>
+
+<hr/>
+
+<div class="card green" style="text-align:center; padding:24px;">
+  <div class="card-title" style="justify-content:center; font-size:18px;">🛒 GuinéeMarché</div>
+  <p>Pour toute question non couverte par ce manuel, contactez le support via le menu profil ou à l'adresse admin de la plateforme.</p>
+  <p style="margin-top:8px; font-size:13px; opacity:0.8;">Version 2.0 · Août 2026 · guimatrix.com</p>
+</div>
+
+</div><!-- end .container -->
+
+<div class="footer">
+  GuinéeMarché — Manuel d'utilisation v2.0 · Tous droits réservés
+</div>
+
+</body>
+</html>

@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import useAuthStore from '../store/authStore'
 import { authAPI, ordersAPI, listingsAPI, referralAPI } from '../services/api'
 import Logo from '../components/Logo'
+import { VILLES, COMMUNES_PAR_VILLE } from '../constants/communes'
 
 // ── Graphique barres SVG pur ──────────────────────────────────────────────────
 function BarChart({ data, color = '#16a34a', label = '' }) {
@@ -319,6 +320,7 @@ export default function ProfilePage() {
     const [editForm, setEditForm] = useState({ email: '', city: 'Conakry', quartier: '' })
     const [editLoading, setEditLoading] = useState(false)
     const [editSuccess, setEditSuccess] = useState(false)
+    const [editError, setEditError] = useState('')
 
     const openEdit = () => {
         setEditForm({ email: user.email || '', city: user.city || 'Conakry', quartier: user.quartier || '' })
@@ -329,20 +331,25 @@ export default function ProfilePage() {
     const handleSaveProfile = async (e) => {
         e.preventDefault()
         setEditLoading(true)
+        setEditError('')
         try {
             await authAPI.updateProfile(editForm)
             await fetchMe()
             setEditSuccess(true)
             setTimeout(() => setShowEdit(false), 1200)
-        } catch {
-            // erreur silencieuse — le champ email invalide sera refusé par Django
+        } catch (err) {
+            const msg = err?.response?.data?.email?.[0]
+                || err?.response?.data?.detail
+                || err?.response?.data?.non_field_errors?.[0]
+                || 'Erreur lors de la sauvegarde.'
+            setEditError(msg)
         } finally {
             setEditLoading(false)
         }
     }
 
-    const VILLES_EDIT = ['Conakry', 'Kankan', 'Labé', 'Kindia', 'Faranah', 'Nzérékoré', 'Siguiri', 'Mamou', 'Boké', 'Coyah']
-    const QUARTIERS_EDIT = ['Kaloum', 'Dixinn', 'Matam', 'Ratoma', 'Matoto']
+    // Villes & quartiers dynamiques depuis communes.js
+    const quartierOptions = COMMUNES_PAR_VILLE[editForm.city] || []
 
     if (!user) return (
         <div className="min-h-screen flex items-center justify-center">
@@ -630,26 +637,32 @@ export default function ProfilePage() {
                                         <label className="block text-xs font-medium text-gray-600 mb-1">Ville</label>
                                         <select
                                             value={editForm.city}
-                                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value })}
+                                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value, quartier: '' })}
                                             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
                                         >
-                                            {VILLES_EDIT.map(v => <option key={v}>{v}</option>)}
+                                            {VILLES.map(v => <option key={v}>{v}</option>)}
                                         </select>
                                     </div>
 
+                                    {quartierOptions.length > 0 && (
                                     <div>
                                         <label className="block text-xs font-medium text-gray-600 mb-1">Quartier</label>
-                                        <input
-                                            type="text"
-                                            placeholder="Hamdallaye, Kipé…"
+                                        <select
                                             value={editForm.quartier}
                                             onChange={(e) => setEditForm({ ...editForm, quartier: e.target.value })}
                                             className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                        />
+                                        >
+                                            <option value="">— Choisir un quartier —</option>
+                                            {quartierOptions.map(q => <option key={q}>{q}</option>)}
+                                        </select>
                                     </div>
+                                    )}
                                   </>
                                 )}
 
+                                {editError && (
+                                    <p className="text-red-600 text-xs bg-red-50 border border-red-200 rounded-lg px-3 py-2">{editError}</p>
+                                )}
                                 <button type="submit" disabled={editLoading}
                                     className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-lg transition disabled:opacity-50 text-sm">
                                     {editLoading ? 'Enregistrement…' : 'Enregistrer'}

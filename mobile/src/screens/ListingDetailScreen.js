@@ -28,6 +28,7 @@ function OrderModal({ listing, visible, onClose, onOrder }) {
     const [deliveryMode, setDeliveryMode]   = useState('meeting_point')
     const [paymentMethod, setPaymentMethod] = useState('chachap')
     const [meetLocation, setMeetLocation]   = useState('')
+    const [pickupPoint, setPickupPoint]     = useState('')
     const [deliveryAddress, setDeliveryAddress] = useState('')
     const [negotiatedPrice, setNegotiatedPrice] = useState(String(listing.price_gnf))
     const [loading, setLoading] = useState(false)
@@ -37,6 +38,9 @@ function OrderModal({ listing, visible, onClose, onOrder }) {
     const handleConfirm = async () => {
         if (deliveryMode === 'meeting_point' && !meetLocation.trim()) {
             Alert.alert('Erreur', 'Précisez le lieu de rencontre.'); return
+        }
+        if (deliveryMode === 'pickup_point' && !pickupPoint.trim()) {
+            Alert.alert('Erreur', 'Précisez le point de retrait.'); return
         }
         if (deliveryMode === 'home_delivery' && !deliveryAddress.trim()) {
             Alert.alert('Erreur', 'Précisez votre adresse de livraison.'); return
@@ -51,6 +55,7 @@ function OrderModal({ listing, visible, onClose, onOrder }) {
                 deliveryMode,
                 paymentMethod,
                 meetLocation: deliveryMode === 'meeting_point' ? meetLocation : '',
+                pickupPoint: deliveryMode === 'pickup_point' ? pickupPoint : '',
                 deliveryAddress: deliveryMode === 'home_delivery' ? deliveryAddress : '',
                 negotiatedPrice: isNegotiable ? parseInt(negotiatedPrice) : undefined,
             })
@@ -103,6 +108,13 @@ function OrderModal({ listing, visible, onClose, onOrder }) {
                                     <Text style={modal.label}>Lieu de rencontre</Text>
                                     <TextInput style={modal.input} value={meetLocation} onChangeText={setMeetLocation}
                                         placeholder="Ex : Marché Madina, face à la banque" placeholderTextColor={colors.textMuted} />
+                                </View>
+                            )}
+                            {deliveryMode === 'pickup_point' && (
+                                <View style={modal.field}>
+                                    <Text style={modal.label}>Point de retrait souhaité</Text>
+                                    <TextInput style={modal.input} value={pickupPoint} onChangeText={setPickupPoint}
+                                        placeholder="Ex : Boutique Kaloum, Agence Ratoma…" placeholderTextColor={colors.textMuted} />
                                 </View>
                             )}
                             {deliveryMode === 'home_delivery' && (
