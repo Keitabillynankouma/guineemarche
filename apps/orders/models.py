@@ -1,4 +1,5 @@
-from django.db import models
+from django.db import models, transaction
+from django.utils import timezone as _tz
 from core.models import BaseModel
 from apps.accounts.models import User
 from apps.listings.models import Listing
@@ -399,11 +400,11 @@ class DeliveryAssignment(BaseModel):
         return f"Livraison #{str(self.order.id)[:8]} → {self.livreur.full_name}"
 
     def save(self, *args, **kwargs):
-        import random
+        import secrets
         if not self.verification_code:
-            self.verification_code = str(random.randint(100000, 999999))
+            self.verification_code = str(secrets.randbelow(900000) + 100000)
         if not self.pickup_code:
-            self.pickup_code = str(random.randint(100000, 999999))
+            self.pickup_code = str(secrets.randbelow(900000) + 100000)
         super().save(*args, **kwargs)
 
 
@@ -601,33 +602,37 @@ class LivreurWeeklyPayout(BaseModel):
         livreurs_ids = pending_payments.values_list('livreur_id', flat=True).distinct()
 
         for livreur_id in livreurs_ids:
-            payments = pending_payments.filter(livreur_id=livreur_id)
-            fines    = LivreurFine.objects.filter(
-                livreur_id=livreur_id,
-                status=LivreurFine.Status.PENDING,
-            )
+            with transaction.atomic():
+                payments = pending_payments.filter(livreur_id=livreur_id)
+                fines    = LivreurFine.objects.select_for_update().filter(
+                    livreur_id=livreur_id,
+                    status=LivreurFine.Status.PENDING,
+                )
 
-            gross_gnf    = sum(p.net_gnf for p in payments)
-            fines_gnf    = sum(f.amount_gnf for f in fines)
-            net_gnf      = max(0, gross_gnf - fines_gnf)
+                gross_gnf    = sum(p.net_gnf for p in payments)
+                fines_gnf    = sum(f.amount_gnf for f in fines)
+                net_gnf      = max(0, gross_gnf - fines_gnf)
 
-            payout, created = cls.objects.get_or_create(
-                livreur_id=livreur_id,
-                week_start=week_start_date,
-                defaults={
-                    'week_end':         week_end,
-                    'deliveries_count': payments.count(),
-                    'gross_gnf':        gross_gnf,
-                    'fines_gnf':        fines_gnf,
-                    'net_gnf':          net_gnf,
-                }
-            )
-            if not created:
-                payout.deliveries_count = payments.count()
-                payout.gross_gnf  = gross_gnf
-                payout.fines_gnf  = fines_gnf
-                payout.net_gnf    = net_gnf
-                payout.save(update_fields=['deliveries_count', 'gross_gnf', 'fines_gnf', 'net_gnf', 'updated_at'])
+                payout, created = cls.objects.get_or_create(
+                    livreur_id=livreur_id,
+                    week_start=week_start_date,
+                    defaults={
+                        'week_end':         week_end,
+                        'deliveries_count': payments.count(),
+                        'gross_gnf':        gross_gnf,
+                        'fines_gnf':        fines_gnf,
+                        'net_gnf':          net_gnf,
+                    }
+                )
+                if not created:
+                    payout.deliveries_count = payments.count()
+                    payout.gross_gnf  = gross_gnf
+                    payout.fines_gnf  = fines_gnf
+                    payout.net_gnf    = net_gnf
+                    payout.save(update_fields=['deliveries_count', 'gross_gnf', 'fines_gnf', 'net_gnf', 'updated_at'])
+
+                # Marquer les amendes comme déduites pour éviter la double déduction
+                fines.update(status=LivreurFine.Status.DEDUCTED, deducted_at=_tz.now())
 
         return livreurs_ids.count()
 

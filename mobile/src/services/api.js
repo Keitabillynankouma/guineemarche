@@ -27,7 +27,7 @@ api.interceptors.response.use(
             try {
                 const refresh = await SecureStore.getItemAsync('refresh_token')
                 if (!refresh) return Promise.reject(err)
-                const { data } = await axios.post(`${BASE_URL}/auth/token/refresh/`, { refresh })
+                const { data } = await axios.post(`${BASE_URL}/accounts/token/refresh/`, { refresh })
                 await SecureStore.setItemAsync('access_token', data.access)
                 original.headers.Authorization = `Bearer ${data.access}`
                 return api(original)
@@ -42,17 +42,17 @@ api.interceptors.response.use(
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
 export const authAPI = {
-    login:              (phone, password) => api.post('/auth/login/', { phone_number: phone, password }),
-    register:           (data)            => api.post('/auth/register/', data),
-    verifyOTP:          (data)            => api.post('/auth/verify-otp/', data),
-    resendOTP:          (data)            => api.post('/auth/resend-otp/', data),
-    forgotPassword:     (data)            => api.post('/auth/forgot-password/', data),
-    resetPassword:      (data)            => api.post('/auth/reset-password/', data),
-    me:                 ()                => api.get('/auth/me/'),
-    logout:             (refresh)         => api.post('/auth/logout/', { refresh }),
-    updateMe:           (data)            => api.patch('/auth/me/', data),
-    toggleAvailability: ()                => api.post('/auth/toggle-availability/'),
-    registerFcmToken:   (token)           => api.post('/auth/fcm-token/', { fcm_token: token }),
+    login:              (phone, password) => api.post('/accounts/login/', { phone_number: phone, password }),
+    register:           (data)            => api.post('/accounts/register/', data),
+    verifyOTP:          (data)            => api.post('/accounts/verify-otp/', data),
+    resendOTP:          (data)            => api.post('/accounts/resend-otp/', data),
+    forgotPassword:     (data)            => api.post('/accounts/forgot-password/', data),
+    resetPassword:      (data)            => api.post('/accounts/reset-password/', data),
+    me:                 ()                => api.get('/accounts/me/'),
+    logout:             (refresh)         => api.post('/accounts/logout/', { refresh }),
+    updateMe:           (data)            => api.patch('/accounts/me/', data),
+    toggleAvailability: ()                => api.post('/accounts/livreur/toggle-availability/'),
+    registerFcmToken:   (token)           => api.patch('/accounts/me/fcm-token/', { fcm_token: token }),
 }
 
 // ── Listings ──────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export const listingsAPI = {
     create:    (data)    => api.post('/listings/', data),
     update:    (id, data)=> api.patch(`/listings/${id}/`, data),
     delete:    (id)      => api.delete(`/listings/${id}/`),
-    myListings:()        => api.get('/listings/my-listings/'),
+    myListings:()        => api.get('/listings/my/'),
     categories:()        => api.get('/listings/categories/'),
 }
 

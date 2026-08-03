@@ -396,5 +396,10 @@ CELERY_BEAT_SCHEDULE = {
         'task':     'apps.orders.tasks.weekly_livreur_payouts',
         'schedule': crontab(hour=7, minute=0, day_of_week=1),  # lundi 07h00
     },
+    # Expiration annonces — chaque nuit à minuit
+    'expire-listings': {
+        'task':     'apps.listings.tasks.expire_listings',
+        'schedule': crontab(hour=0, minute=0),                 # 00h00 chaque nuit
+    },
 }
 

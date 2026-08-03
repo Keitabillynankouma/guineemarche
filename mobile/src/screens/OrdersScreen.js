@@ -15,7 +15,7 @@ const STATUS_LABEL = {
     disputed:  { label: 'Litige',      color: '#7c3aed', bg: '#ede9fe' },
 }
 
-function OrderCard({ order, onAction }) {
+function OrderCard({ order, onAction, isSeller = false }) {
     const st = STATUS_LABEL[order.status] || STATUS_LABEL.pending
     const fmt = n => new Intl.NumberFormat('fr-GN').format(n) + ' GNF'
 
@@ -42,22 +42,37 @@ function OrderCard({ order, onAction }) {
                 📅 {new Date(order.created_at).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })}
             </Text>
             <Text style={styles.orderMeta}>
-                🚚 {order.delivery_mode === 'delivery' ? 'Livraison à domicile' : 'Retrait en main propre'}
+                🚚 {order.delivery_mode === 'home_delivery' ? 'Livraison à domicile' : 'Retrait en main propre'}
             </Text>
 
             {/* Actions */}
             <View style={styles.actions}>
-                {order.status === 'confirmed' && (
+                {/* Vendeur : confirmer une commande en attente */}
+                {isSeller && order.status === 'pending' && (
+                    <TouchableOpacity onPress={() => onAction(order.id, 'confirm')} style={styles.btnPrimary}>
+                        <Text style={styles.btnPrimaryText}>✅ Confirmer la commande</Text>
+                    </TouchableOpacity>
+                )}
+                {/* Acheteur : confirmer la réception */}
+                {!isSeller && order.status === 'confirmed' && (
                     <TouchableOpacity onPress={() => onAction(order.id, 'confirm-receipt')} style={styles.btnPrimary}>
                         <Text style={styles.btnPrimaryText}>✅ Confirmer réception</Text>
                     </TouchableOpacity>
                 )}
-                {order.status === 'pending' && (
+                {/* Acheteur : annuler */}
+                {!isSeller && order.status === 'pending' && (
                     <TouchableOpacity onPress={() => onAction(order.id, 'cancel')} style={styles.btnDanger}>
                         <Text style={styles.btnDangerText}>✕ Annuler</Text>
                     </TouchableOpacity>
                 )}
-                {order.status === 'confirmed' && !order.payments?.length && (
+                {/* Acheteur : litige */}
+                {!isSeller && ['pending', 'confirmed'].includes(order.status) && (
+                    <TouchableOpacity onPress={() => onAction(order.id, 'dispute')} style={styles.btnWarning}>
+                        <Text style={styles.btnWarningText}>⚠️ Litige</Text>
+                    </TouchableOpacity>
+                )}
+                {/* Acheteur : payer */}
+                {!isSeller && order.status === 'confirmed' && !order.payments?.length && (
                     <TouchableOpacity onPress={() => onAction(order.id, 'pay')} style={styles.btnAccent}>
                         <Text style={styles.btnAccentText}>💳 Payer</Text>
                     </TouchableOpacity>
@@ -107,6 +122,16 @@ export default function OrdersScreen({ navigation }) {
                 { text: 'Oui, confirmé', onPress: () => actionMut.mutate({ id, action }) },
                 { text: 'Annuler', style: 'cancel' },
             ])
+        } else if (action === 'confirm') {
+            Alert.alert('Confirmer la commande', 'Confirmez-vous avoir reçu le paiement ?', [
+                { text: 'Oui, confirmer', onPress: () => actionMut.mutate({ id, action }) },
+                { text: 'Annuler', style: 'cancel' },
+            ])
+        } else if (action === 'dispute') {
+            Alert.alert('Ouvrir un litige', 'Un litige bloque les fonds jusqu\'à résolution par notre équipe. Continuer ?', [
+                { text: 'Oui, ouvrir un litige', style: 'destructive', onPress: () => actionMut.mutate({ id, action }) },
+                { text: 'Annuler', style: 'cancel' },
+            ])
         } else {
             actionMut.mutate({ id, action })
         }
@@ -137,7 +162,7 @@ export default function OrdersScreen({ navigation }) {
                 <FlatList
                     data={orders}
                     keyExtractor={i => i.id}
-                    renderItem={({ item }) => <OrderCard order={item} onAction={handleAction} />}
+                    renderItem={({ item }) => <OrderCard order={item} onAction={handleAction} isSeller={tab === 'seller'} />}
                     contentContainerStyle={{ padding: spacing.lg }}
                     refreshControl={<RefreshControl refreshing={isRefetching} onRefresh={refetch} tintColor={colors.primary} />}
                     ListEmptyComponent={
@@ -177,6 +202,8 @@ const styles = StyleSheet.create({
     btnDangerText:   { color: colors.danger, fontWeight: font.semi, fontSize: font.sm },
     btnAccent:       { flex: 1, backgroundColor: '#fef3c7', borderRadius: radius.md, padding: spacing.sm, alignItems: 'center' },
     btnAccentText:   { color: '#92400e', fontWeight: font.semi, fontSize: font.sm },
+    btnWarning:      { flex: 1, backgroundColor: '#fef3c7', borderRadius: radius.md, padding: spacing.sm, alignItems: 'center', borderWidth: 1, borderColor: '#f59e0b' },
+    btnWarningText:  { color: '#92400e', fontWeight: font.semi, fontSize: font.sm },
     empty:           { alignItems: 'center', marginTop: spacing.xxl * 2 },
     emptyIcon:       { fontSize: 48, marginBottom: spacing.md },
     emptyText:       { fontSize: font.base, color: colors.textMuted },

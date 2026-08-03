@@ -40,6 +40,19 @@ def auto_release_escrow():
             released += 1
             logger.info("Escrow libéré automatiquement — commande %s (%s GNF)", order.id, order.amount_gnf)
 
+            # ── Virement automatique au vendeur ──────────────────────────────
+            try:
+                from .models import SellerPayout
+                from .payment_service import disburse_to_seller
+                payout = SellerPayout.objects.filter(
+                    order=order, status=SellerPayout.Status.PENDING
+                ).first()
+                if payout:
+                    result = disburse_to_seller(str(payout.id))
+                    logger.info("[ESCROW AUTO] Virement vendeur %s : %s", payout.id, result.message)
+            except Exception as _pe:
+                logger.warning("[ESCROW AUTO] Virement vendeur échoué commande %s : %s", order.id, _pe)
+
             # Notifier le vendeur
             try:
                 from apps.notifications.models import Notification
@@ -90,30 +103,66 @@ def weekly_livreur_payouts():
     count = LivreurWeeklyPayout.generate_for_week(last_monday)
     logger.info("weekly_livreur_payouts : %d récapitulatif(s) générés pour semaine du %s", count, last_monday)
 
+    # ── Virement automatique immédiat pour chaque livreur avec numéro ─────────
     if count > 0:
-        # Notifier les admins comptables
-        try:
-            from apps.notifications.models import Notification
-            from django.contrib.auth import get_user_model
-            User = get_user_model()
-            admins = User.objects.filter(
-                role__in=['admin', 'super_admin', 'admin_accounting'],
-                is_active=True,
-            )
-            pending_payouts = LivreurWeeklyPayout.objects.filter(
-                week_start=last_monday, status=LivreurWeeklyPayout.Status.PENDING
-            )
-            total_gnf = sum(p.net_gnf for p in pending_payouts)
-            for admin in admins:
-                Notification.send(
-                    user=admin,
-                    type=Notification.Type.SYSTEM,
-                    title='💸 Virements livreurs à effectuer',
-                    body=f'{count} livreur(s) à payer cette semaine — Total : {total_gnf:,} GNF.',
-                    data={'week_start': str(last_monday)},
+        from .payment_service import disburse_to_livreur
+        pending_payouts = LivreurWeeklyPayout.objects.filter(
+            week_start=last_monday, status=LivreurWeeklyPayout.Status.PENDING
+        ).select_related('livreur')
+
+        auto_ok = auto_fail = manual_needed = 0
+        total_gnf = 0
+
+        for payout in pending_payouts:
+            total_gnf += payout.net_gnf
+            try:
+                result = disburse_to_livreur(str(payout.id))
+                if result.success:
+                    auto_ok += 1
+                    logger.info("[WEEKLY PAYOUT] Livreur %s versé — réf %s", payout.livreur.full_name, result.reference)
+                    # Notifier le livreur
+                    try:
+                        from apps.notifications.models import Notification
+                        Notification.send(
+                            user=payout.livreur,
+                            type=Notification.Type.SYSTEM,
+                            title='💰 Salaire versé',
+                            body=f'Votre paiement de {payout.net_gnf:,} GNF a été envoyé sur votre compte mobile money.',
+                            data={'payout_id': str(payout.id)},
+                        )
+                    except Exception:
+                        pass
+                else:
+                    auto_fail += 1
+                    logger.warning("[WEEKLY PAYOUT] Échec virement livreur %s : %s", payout.livreur.full_name, result.message)
+            except Exception as _pe:
+                manual_needed += 1
+                logger.error("[WEEKLY PAYOUT] Exception virement livreur %s : %s", payout.id, _pe)
+
+        logger.info("[WEEKLY PAYOUT] Résultat : %d auto, %d échecs, %d manuels — total %s GNF",
+                    auto_ok, auto_fail, manual_needed, f"{total_gnf:,}")
+
+        # Notifier les admins seulement si des virements manuels sont nécessaires
+        if auto_fail > 0 or manual_needed > 0:
+            try:
+                from apps.notifications.models import Notification
+                from django.contrib.auth import get_user_model
+                User = get_user_model()
+                admins = User.objects.filter(
+                    role__in=['admin', 'super_admin', 'admin_accounting'],
+                    is_active=True,
                 )
-        except Exception as e:
-            logger.warning("Notification weekly payouts échouée : %s", e)
+                for admin in admins:
+                    Notification.send(
+                        user=admin,
+                        type=Notification.Type.SYSTEM,
+                        title='⚠️ Virements livreurs — action requise',
+                        body=f'{auto_ok} virement(s) automatique(s) OK. '
+                             f'{auto_fail + manual_needed} nécessitent une action manuelle.',
+                        data={'week_start': str(last_monday)},
+                    )
+            except Exception as e:
+                logger.warning("Notification weekly payouts admin échouée : %s", e)
 
     return count
 

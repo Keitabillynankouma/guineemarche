@@ -123,18 +123,16 @@ function StatCard({ label, value, icon, color = 'green' }) {
 // ── Onglet 1 : Stats + Litiges ────────────────────────────────────────────────
 
 async function downloadCSV(type) {
-  const token = localStorage.getItem('access_token')
-  const res   = await fetch(`/api/v1/orders/admin/export/?type=${type}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) { alert('Erreur export CSV'); return }
-  const blob = await res.blob()
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url
-  a.download = `${type}_export.csv`
-  a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const res = await api.get(`/orders/admin/export/?type=${type}`, { responseType: 'blob' })
+    const blob = res.data
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${type}_export.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  } catch(e) { alert('Erreur export CSV') }
 }
 
 function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
@@ -168,7 +166,7 @@ function TabOverview({ stats, disputes, isLoading, resolveMutation }) {
             <StatCard label="Livrées aujourd'hui"    value={stats.deliveries_today}      icon="🏁" color="green" />
             <StatCard
               label="Revenus plateforme (4%)"
-              value={Math.round((stats.revenue_gnf || 0) * 0.05).toLocaleString('fr-GN') + ' GNF'}
+              value={Math.round((stats.revenue_gnf || 0) * 0.04).toLocaleString('fr-GN') + ' GNF'}
               icon="💰" color="yellow"
             />
           </div>
@@ -2288,16 +2286,13 @@ function TabReturns() {
 // ── Onglet Comptabilité ──────────────────────────────────────────────────────
 
 async function downloadAccountingCSV(type) {
-  const token = localStorage.getItem('access_token')
-  const res = await fetch(`/api/v1/orders/admin/accounting/export/?type=${type}`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) { alert('Erreur export'); return }
-  const blob = await res.blob()
-  const url  = URL.createObjectURL(blob)
-  const a    = document.createElement('a')
-  a.href     = url; a.download = `${type}_${new Date().toISOString().slice(0,10)}.csv`; a.click()
-  URL.revokeObjectURL(url)
+  try {
+    const res  = await api.get(`/orders/admin/accounting/export/?type=${type}`, { responseType: 'blob' })
+    const url  = URL.createObjectURL(res.data)
+    const a    = document.createElement('a')
+    a.href     = url; a.download = `${type}_${new Date().toISOString().slice(0,10)}.csv`; a.click()
+    URL.revokeObjectURL(url)
+  } catch(e) { alert('Erreur export') }
 }
 
 function TabAccounting() {

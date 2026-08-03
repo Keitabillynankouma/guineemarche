@@ -3,8 +3,45 @@ Tâches Celery pour les annonces.
 """
 import logging
 from celery import shared_task
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def expire_listings():
+    """
+    Tâche quotidienne (minuit) : expire les annonces dont la date d'expiration est dépassée.
+    Notifie le vendeur pour qu'il renouvelle si souhaité.
+    """
+    from .models import Listing
+    from apps.notifications.models import Notification
+
+    now = timezone.now()
+    expired = Listing.objects.filter(
+        status=Listing.Status.ACTIVE,
+        expires_at__lt=now,
+        expires_at__isnull=False,
+    )
+    count = 0
+    for listing in expired.select_related('seller'):
+        listing.status = Listing.Status.EXPIRED
+        listing.save(update_fields=['status', 'updated_at'])
+        count += 1
+        try:
+            Notification.send(
+                user=listing.seller,
+                type=Notification.Type.SYSTEM,
+                title='⏰ Annonce expirée',
+                body=f'Votre annonce « {listing.title} » a expiré. Republiez-la pour continuer à vendre.',
+                data={'listing_id': str(listing.id)},
+            )
+        except Exception as _e:
+            logger.warning("Notification expiration annonce %s : %s", listing.id, _e)
+
+    if count:
+        logger.info("expire_listings : %d annonce(s) expirée(s)", count)
+    return count
 
 
 @shared_task(bind=True, max_retries=2, default_retry_delay=10)

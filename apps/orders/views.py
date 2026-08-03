@@ -292,8 +292,22 @@ class OrderListCreateView(generics.ListCreateAPIView):
         if order.delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
             try:
                 _auto_assign_livreur(order)
-            except Exception:
-                pass
+            except Exception as _ae:
+                logger.error("[AUTO ASSIGN] Échec affectation livreur commande %s: %s", order.id, _ae)
+                # Notifier les admins delivery
+                try:
+                    from apps.notifications.models import Notification as _Notif
+                    from django.contrib.auth import get_user_model as _gu
+                    for _adm in _gu().objects.filter(role__in=['admin', 'super_admin', 'admin_delivery'], is_active=True):
+                        _Notif.send(
+                            user=_adm,
+                            type=_Notif.Type.SYSTEM,
+                            title='⚠️ Livreur non assigné',
+                            body=f'Commande {str(order.id)[:8].upper()} ({order.listing.title}) — aucun livreur disponible.',
+                            data={'order_id': str(order.id)},
+                        )
+                except Exception:
+                    pass
 
 
 class SellerOrdersView(generics.ListAPIView):
@@ -627,9 +641,8 @@ class PaymentWebhookView(APIView):
                         dict(request.headers), request.body[:500])
             sig_ok = _verify_chachap_signature(request)
             if not sig_ok:
-                logger.warning("[CHACHAP] Webhook signature invalide — on traite quand même (mode debug)")
-                # NB: On traite quand même pour diagnostiquer. Remettre le rejet une fois
-                # la signature confirmée.
+                logger.warning("[CHACHAP] Webhook signature invalide — requête rejetée")
+                return Response({'error': 'Signature invalide'}, status=status.HTTP_401_UNAUTHORIZED)
 
             # ChaChap envoie parfois la body comme une STRING JSON (double-encodée).
             # DRF la parse alors en str, pas en dict → on dé-encode manuellement.
@@ -890,8 +903,9 @@ class AdminDisputeResolveView(APIView):
             Notification.send(
                 user=order.buyer,
                 type=Notification.Type.ORDER_UPDATE,
-                title='Litige résolu — remboursement',
-                body=f'Le litige pour « {order.listing.title} » a été résolu en votre faveur. Vous serez remboursé.',
+                title='Litige résolu — remboursement en cours',
+                body=f'Le litige pour « {order.listing.title} » a été résolu en votre faveur. '
+                     f'Le remboursement de {order.amount_gnf:,} GNF sera effectué sous 24–48h.',
                 data={'order_id': str(order.id)},
             )
             Notification.send(
@@ -901,6 +915,24 @@ class AdminDisputeResolveView(APIView):
                 body=f'Le litige pour « {order.listing.title} » a été résolu en faveur de l\'acheteur.',
                 data={'order_id': str(order.id)},
             )
+            # Notifier les admins comptables pour le remboursement manuel
+            from django.contrib.auth import get_user_model as _get_user_model
+            _User = _get_user_model()
+            _admins = _User.objects.filter(role__in=['admin', 'super_admin', 'admin_accounting'], is_active=True)
+            _refund_note = (
+                f"REMBOURSEMENT REQUIS — Litige #{str(order.id)[:8].upper()}\n"
+                f"Acheteur : {order.buyer.full_name} ({order.buyer.phone_number})\n"
+                f"Montant : {order.amount_gnf:,} GNF\n"
+                f"Article : {order.listing.title}"
+            )
+            for _admin in _admins:
+                Notification.send(
+                    user=_admin,
+                    type=Notification.Type.SYSTEM,
+                    title='💸 Remboursement acheteur requis',
+                    body=_refund_note,
+                    data={'order_id': str(order.id), 'action': 'refund'},
+                )
 
         # Email litige résolu — acheteur + vendeur
         try:
@@ -2156,14 +2188,22 @@ class SellerEarningsView(APIView):
 
     def get(self, request):
         from .models import SellerPayout
-        if request.user.role not in ('seller', 'admin', 'super_admin'):
+        from django.db.models import Sum, Q as _Q
+        # Accepter buyers qui ont des ventes, en plus des sellers/admins
+        has_sales = Order.objects.filter(seller=request.user).exists()
+        if request.user.role not in ('seller', 'admin', 'super_admin') and not has_sales:
             return Response({'error': 'Réservé aux vendeurs.'}, status=403)
 
         payouts = SellerPayout.objects.filter(seller=request.user).order_by('-created_at')
 
-        total_earned   = sum(p.amount_gnf for p in payouts if p.status == 'completed')
-        total_pending  = sum(p.amount_gnf for p in payouts if p.status in ('pending', 'processing'))
-        total_failed   = sum(p.amount_gnf for p in payouts if p.status == 'failed')
+        agg = payouts.aggregate(
+            earned  = Sum('amount_gnf', filter=_Q(status='completed')),
+            pending = Sum('amount_gnf', filter=_Q(status__in=['pending', 'processing'])),
+            failed  = Sum('amount_gnf', filter=_Q(status='failed')),
+        )
+        total_earned  = agg['earned']  or 0
+        total_pending = agg['pending'] or 0
+        total_failed  = agg['failed']  or 0
 
         payout_list = [
             {
