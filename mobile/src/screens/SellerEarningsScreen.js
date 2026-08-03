@@ -18,6 +18,10 @@ const PAYOUT_STATUS = {
 const PROVIDERS = [
     { v: 'orange_money', l: '🟠 Orange Money' },
     { v: 'mtn_momo',     l: '🟡 MTN MoMo' },
+    { v: 'paycard',      l: '💳 PayCard' },
+    { v: 'kulu',         l: '🔵 Kulu' },
+    { v: 'soutra_money', l: '🟢 Soutra Money' },
+    { v: 'akiba',        l: '💜 Akiba' },
 ]
 
 const fmt = n => new Intl.NumberFormat('fr-GN').format(n || 0) + ' GNF'

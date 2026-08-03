@@ -400,7 +400,7 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
     const pay = useMutation({
         mutationFn: ({ id, data }) => ordersAPI.pay(id, data),
-        onSuccess: () => { queryClient.invalidateQueries(['listing', listing.id]); onSuccess() },
+        // Pas de onSuccess ici : handleOrder gère cash vs ChaChap différemment
         onError: (err) => setError(err.response?.data?.error || 'Erreur paiement.'),
     })
 

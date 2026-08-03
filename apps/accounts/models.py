@@ -63,14 +63,18 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     class PayoutProvider(models.TextChoices):
         ORANGE_MONEY = 'orange_money', 'Orange Money'
         MTN_MOMO     = 'mtn_momo',     'MTN MoMo'
+        PAYCARD      = 'paycard',      'PayCard'
+        KULU         = 'kulu',         'Kulu'
+        SOUTRA_MONEY = 'soutra_money', 'Soutra Money'
+        AKIBA        = 'akiba',        'Akiba'
 
     payout_phone    = models.CharField(
         max_length=20, blank=True,
-        help_text="Numéro Orange Money ou MTN MoMo pour recevoir les paiements"
+        help_text="Numéro de compte pour recevoir les paiements (Mobile Money, PayCard…)"
     )
     payout_provider = models.CharField(
         max_length=15, choices=PayoutProvider.choices, blank=True,
-        help_text="Opérateur mobile money pour les virements"
+        help_text="Opérateur pour les virements"
     )
 
     objects = UserManager()
@@ -146,6 +150,10 @@ class UserProfile(BaseModel):
     class PayoutProvider(models.TextChoices):
         ORANGE_MONEY = 'orange_money', 'Orange Money'
         MTN_MOMO     = 'mtn_momo',     'MTN MoMo'
+        PAYCARD      = 'paycard',      'PayCard'
+        KULU         = 'kulu',         'Kulu'
+        SOUTRA_MONEY = 'soutra_money', 'Soutra Money'
+        AKIBA        = 'akiba',        'Akiba'
 
     user          = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile')
     avatar_url    = models.ImageField(upload_to='avatars/', blank=True, null=True)
@@ -157,11 +165,11 @@ class UserProfile(BaseModel):
     # Coordonnées de paiement sortant (pour recevoir les revenus de ventes)
     payout_phone    = models.CharField(
         max_length=20, blank=True,
-        help_text="Numéro Orange Money ou MTN MoMo pour recevoir vos paiements"
+        help_text="Numéro de compte pour recevoir vos paiements (Mobile Money, PayCard…)"
     )
     payout_provider = models.CharField(
         max_length=15, choices=PayoutProvider.choices, blank=True,
-        help_text="Opérateur mobile money pour les versements"
+        help_text="Opérateur pour les versements"
     )
 
     class Meta:

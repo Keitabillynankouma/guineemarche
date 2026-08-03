@@ -2097,8 +2097,9 @@ class LivreurUpdatePayoutInfoView(APIView):
 
         if not phone or not provider:
             return Response({'error': 'Numéro et opérateur requis.'}, status=400)
-        if provider not in ('orange_money', 'mtn_momo'):
-            return Response({'error': 'Opérateur invalide. Choisir orange_money ou mtn_momo.'}, status=400)
+        VALID_PROVIDERS = {'orange_money', 'mtn_momo', 'paycard', 'kulu', 'soutra_money', 'akiba'}
+        if provider not in VALID_PROVIDERS:
+            return Response({'error': f'Opérateur invalide. Valeurs acceptées : {", ".join(sorted(VALID_PROVIDERS))}'}, status=400)
 
         request.user.payout_phone    = phone
         request.user.payout_provider = provider
@@ -2193,8 +2194,9 @@ class SellerUpdatePayoutInfoView(APIView):
         if not phone or not provider:
             return Response({'error': 'Numéro et opérateur requis.'}, status=400)
 
-        if provider not in ('orange_money', 'mtn_momo'):
-            return Response({'error': 'Opérateur invalide. Choisir orange_money ou mtn_momo.'}, status=400)
+        VALID_PROVIDERS = {'orange_money', 'mtn_momo', 'paycard', 'kulu', 'soutra_money', 'akiba'}
+        if provider not in VALID_PROVIDERS:
+            return Response({'error': f'Opérateur invalide. Valeurs acceptées : {", ".join(sorted(VALID_PROVIDERS))}'}, status=400)
 
         # Écrire sur User (universel) + UserProfile (pour la rétro-compatibilité)
         request.user.payout_phone    = phone
