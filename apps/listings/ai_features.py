@@ -413,9 +413,9 @@ class SimilarListingsView(APIView):
 
         system = (
             "Tu es un moteur de recommandation pour une marketplace. "
-            "Retourne uniquement un JSON : { \"ids\": [\"uuid1\", \"uuid2\", ...] } "
-            "avec les UUIDs des 6 annonces les plus similaires à l'annonce de référence. "
-            "Classe-les du plus au moins similaire."
+            "Réponds UNIQUEMENT avec du JSON valide sur une seule ligne, sans markdown, "
+            "sans explication : {\"ids\":[\"uuid1\",\"uuid2\",...]} "
+            "avec les UUIDs (max 6) des annonces les plus similaires, du plus au moins similaire."
         )
         user = (
             f"Annonce de référence :\n"
@@ -425,7 +425,7 @@ class SimilarListingsView(APIView):
             f"Annonces disponibles :\n{pool_desc}"
         )
 
-        raw = _claude(system, user, max_tokens=150)
+        raw = _claude(system, user, max_tokens=350)  # 6 UUIDs × ~40 chars = ~240 chars ≈ 60 tokens, 350 pour marge
         if not raw:
             return sql_results
 
