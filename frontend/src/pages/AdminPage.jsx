@@ -20,6 +20,10 @@ const adminAPI = {
   getWeeklyPayouts:      (params) => api.get('/orders/admin/accounting/weekly-payouts/', { params }),
   markWeeklyPaid:        (data)   => api.post('/orders/admin/accounting/weekly-payouts/mark-paid/', data),
   generateWeeklyPayouts: (data)   => api.post('/orders/admin/accounting/weekly-payouts/generate/', data),
+  // Versements vendeurs
+  getSellerPayouts:      (params) => api.get('/orders/admin/seller-payouts/', { params }),
+  disburseSellerPayout:  (id)     => api.post(`/orders/admin/seller-payouts/${id}/disburse/`),
+  markSellerPayoutPaid:  (id, note) => api.post(`/orders/admin/seller-payouts/${id}/mark-paid/`, { note }),
 
   // Ordres / litiges
   getStats:    () => api.get('/orders/admin/stats/'),
@@ -2465,11 +2469,103 @@ function TabAccounting() {
         )}
       </div>
 
+      {/* ── Versements vendeurs ── */}
+      <SellerPayoutsSection />
+
       {/* ── Virements hebdomadaires ── */}
       <WeeklyPayoutsSection />
 
       {/* ── Amendes livreurs ── */}
       <FinesSection />
+    </div>
+  )
+}
+
+// ── Versements vendeurs ───────────────────────────────────────────────────────
+const PROVIDER_LABEL = {
+  orange_money: '🟠 Orange Money', mtn_momo: '🟡 MTN MoMo', paycard: '💳 PayCard',
+  kulu: '🔵 Kulu', soutra_money: '🟢 Soutra Money', akiba: '💜 Akiba', manual: '💼 Manuel',
+}
+
+function SellerPayoutsSection() {
+  const qc = useQueryClient()
+  const [statusFilter, setStatusFilter] = useState('pending')
+  const [msg, setMsg] = useState('')
+  const [busy, setBusy] = useState(null)  // payout id en cours
+
+  const { data: res = {}, isLoading } = useQuery({
+    queryKey: ['seller-payouts', statusFilter],
+    queryFn: () => adminAPI.getSellerPayouts({ status: statusFilter || undefined }).then(r => r.data),
+  })
+  const payouts = res.payouts || []
+
+  async function disburse(payout) {
+    if (!window.confirm(`Déclencher le virement de ${payout.amount_gnf?.toLocaleString('fr-FR')} GNF vers ${payout.payout_phone} ?`)) return
+    setBusy(payout.id); setMsg('')
+    try {
+      const r = await adminAPI.disburseSellerPayout(payout.id)
+      setMsg(r.data.success ? `✅ Virement déclenché — réf : ${r.data.reference}` : `⚠️ ${r.data.message}`)
+      qc.invalidateQueries({ queryKey: ['seller-payouts'] })
+    } catch(e) { setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`) }
+    finally { setBusy(null) }
+  }
+
+  async function markPaid(payout) {
+    const note = window.prompt('Note (ex: virement manuel, référence…)', '')
+    if (note === null) return
+    setBusy(payout.id); setMsg('')
+    try {
+      await adminAPI.markSellerPayoutPaid(payout.id, note)
+      setMsg('✅ Marqué comme versé.')
+      qc.invalidateQueries({ queryKey: ['seller-payouts'] })
+    } catch(e) { setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`) }
+    finally { setBusy(null) }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4 shadow-sm">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-bold text-gray-800">💸 Versements vendeurs</h2>
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm">
+          <option value="pending">En attente</option>
+          <option value="processing">En cours</option>
+          <option value="completed">Versés</option>
+          <option value="failed">Échoués</option>
+          <option value="">Tous</option>
+        </select>
+      </div>
+      {msg && <p className="text-sm px-3 py-2 rounded-xl bg-gray-50 text-gray-700">{msg}</p>}
+      {isLoading ? <p className="text-sm text-gray-400">Chargement...</p>
+      : payouts.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Aucun versement.</p>
+      : (
+        <div className="space-y-2">
+          {payouts.map(p => (
+            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
+              <div className="flex-1 min-w-0">
+                <p className="font-bold text-gray-800">{p.amount_gnf?.toLocaleString('fr-FR')} GNF</p>
+                <p className="text-xs text-gray-500">Vendeur : {p.seller || '—'} · Cde : {p.order_id?.slice(0,8).toUpperCase()}</p>
+                <p className="text-xs text-gray-500">{PROVIDER_LABEL[p.provider] || p.provider} · {p.payout_phone || 'Aucun numéro'}</p>
+                {p.admin_note && <p className="text-xs text-amber-700 mt-1">{p.admin_note}</p>}
+              </div>
+              <div className="flex gap-2 flex-shrink-0">
+                {(p.status === 'pending' || p.status === 'failed') && (
+                  <button onClick={() => disburse(p)} disabled={!!busy}
+                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
+                    {busy === p.id ? '...' : '🚀 Virer'}
+                  </button>
+                )}
+                {p.status !== 'completed' && (
+                  <button onClick={() => markPaid(p)} disabled={!!busy}
+                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl border border-blue-200 transition disabled:opacity-50">
+                    {busy === p.id ? '...' : '✓ Manuel'}
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

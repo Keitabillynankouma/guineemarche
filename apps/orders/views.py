@@ -409,6 +409,18 @@ class ConfirmReceiptView(APIView):
         except Exception:
             pass
 
+        # ── Virement automatique immédiat au vendeur ──────────────────────────
+        try:
+            from apps.orders.models import SellerPayout
+            from apps.orders.payment_service import disburse_to_seller
+            payout = SellerPayout.objects.filter(
+                order=order, status=SellerPayout.Status.PENDING
+            ).first()
+            if payout:
+                disburse_to_seller(str(payout.id))
+        except Exception as _exc:
+            logger.warning("[CONFIRM RECEIPT] Auto-virement échoué pour commande %s: %s", order.id, _exc)
+
         return Response(OrderSerializer(order).data)
 
 
