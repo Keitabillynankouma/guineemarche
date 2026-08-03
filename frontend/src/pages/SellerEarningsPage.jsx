@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import { ordersAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
 
+const OPERATORS = [
+  { value: 'orange_money', label: '🟠 Orange Money' },
+  { value: 'mtn_momo',     label: '🟡 MTN MoMo' },
+  { value: 'paycard',      label: '💳 PayCard' },
+  { value: 'kulu',         label: '🔵 Kulu' },
+  { value: 'soutra_money', label: '🟢 Soutra Money' },
+  { value: 'akiba',        label: '💜 Akiba' },
+]
+
 const STATUS = {
   pending:    { label: 'En attente',  color: 'bg-amber-100 text-amber-700 border-amber-200' },
   processing: { label: 'En cours',   color: 'bg-blue-100 text-blue-700 border-blue-200' },
@@ -31,16 +40,21 @@ function fmtDate(d) {
 
 // ── Modale mise à jour infos paiement ────────────────────────────────────────
 function PayoutInfoModal({ current, onClose, onSaved }) {
+  const { user, setUser } = useAuthStore()
   const [phone,    setPhone]    = useState(current?.phone    || '')
   const [provider, setProvider] = useState(current?.provider || 'orange_money')
   const [loading,  setLoading]  = useState(false)
   const [error,    setError]    = useState('')
 
   async function save() {
-    if (!phone.trim()) { setError('Entrez votre numéro mobile money.'); return }
+    if (!phone.trim()) { setError('Entrez votre numéro de compte.'); return }
     setLoading(true); setError('')
     try {
       await ordersAPI.updatePayoutInfo({ payout_phone: phone.trim(), payout_provider: provider })
+      // Mettre à jour le store Zustand immédiatement pour que le warning disparaisse
+      if (setUser && user) {
+        setUser({ ...user, payout_phone: phone.trim(), payout_provider: provider })
+      }
       onSaved({ phone: phone.trim(), provider })
       onClose()
     } catch (e) {
@@ -58,21 +72,14 @@ function PayoutInfoModal({ current, onClose, onSaved }) {
         </div>
 
         <p className="text-sm text-gray-600">
-          Renseignez le numéro mobile money sur lequel vous voulez recevoir vos gains après chaque vente.
+          Renseignez le numéro sur lequel vous voulez recevoir vos gains après chaque vente.
         </p>
 
         <div className="space-y-3">
           <div>
             <label className="block text-xs font-semibold text-gray-700 mb-1">Opérateur</label>
             <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: 'orange_money', label: '🟠 Orange Money' },
-                { value: 'mtn_momo',     label: '🟡 MTN MoMo' },
-                { value: 'paycard',      label: '💳 PayCard' },
-                { value: 'kulu',         label: '🔵 Kulu' },
-                { value: 'soutra_money', label: '🟢 Soutra Money' },
-                { value: 'akiba',        label: '💜 Akiba' },
-              ].map(op => (
+              {OPERATORS.map(op => (
                 <button
                   key={op.value}
                   onClick={() => setProvider(op.value)}
@@ -89,7 +96,7 @@ function PayoutInfoModal({ current, onClose, onSaved }) {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-gray-700 mb-1">Numéro de téléphone</label>
+            <label className="block text-xs font-semibold text-gray-700 mb-1">Numéro de compte</label>
             <input
               type="tel"
               value={phone}
@@ -127,8 +134,8 @@ export default function SellerEarningsPage() {
   const [error,     setError]     = useState('')
   const [showModal, setShowModal] = useState(false)
   const [payoutInfo, setPayoutInfo] = useState({
-    phone:    user?.profile?.payout_phone    || '',
-    provider: user?.profile?.payout_provider || 'orange_money',
+    phone:    user?.payout_phone    || '',
+    provider: user?.payout_provider || 'orange_money',
   })
 
   async function load() {
@@ -194,7 +201,7 @@ export default function SellerEarningsPage() {
               <div>
                 <p className="text-sm font-semibold text-amber-800">Numéro mobile money manquant</p>
                 <p className="text-xs text-amber-700 mt-0.5">
-                  Ajoutez votre numéro Orange Money ou MTN MoMo pour recevoir vos paiements automatiquement.
+                  Ajoutez votre numéro (Orange Money, MTN MoMo, PayCard, Kulu, Soutra Money ou Akiba) pour recevoir vos paiements automatiquement.
                 </p>
                 <button
                   onClick={() => setShowModal(true)}
