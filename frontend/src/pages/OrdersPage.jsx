@@ -381,6 +381,10 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
         mutationFn: () => ordersAPI.confirmReceipt(order.id),
         onSuccess:  onInvalidate,
     })
+    const sellerConfirmMutation = useMutation({
+        mutationFn: () => ordersAPI.updateStatus(order.id, 'confirm'),
+        onSuccess:  onInvalidate,
+    })
     const disputeMutation = useMutation({
         mutationFn: () => ordersAPI.dispute(order.id),
         onSuccess:  onInvalidate,
@@ -390,10 +394,11 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
         onSuccess:  () => { setReturnDone(true); setShowReturn(false); onInvalidate() },
     })
 
-    const canPay     = isBuyer && order.status === 'pending' && !order.payments?.length
-    const canConfirm = isBuyer && order.status === 'confirmed'
-    const canDispute = isBuyer && ['pending', 'confirmed'].includes(order.status)
-    const canReturn  = isBuyer && order.status === 'completed' && !returnDone
+    const canPay           = isBuyer  && order.status === 'pending'   && !order.payments?.length
+    const canConfirm       = isBuyer  && order.status === 'confirmed'
+    const canDispute       = isBuyer  && ['pending', 'confirmed'].includes(order.status)
+    const canReturn        = isBuyer  && order.status === 'completed' && !returnDone
+    const canSellerConfirm = !isBuyer && order.status === 'pending'
 
     // Notation : disponible seulement si commande terminée
     const isCompleted  = order.status === 'completed'
@@ -513,6 +518,17 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-1 flex-wrap">
+                    {/* Vendeur : confirmer une commande en espèces */}
+                    {canSellerConfirm && (
+                        <button onClick={() => {
+                            if (window.confirm('Confirmez-vous avoir reçu le paiement pour cette commande ?')) {
+                                sellerConfirmMutation.mutate()
+                            }
+                        }} disabled={sellerConfirmMutation.isPending}
+                            className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold py-2.5 rounded-xl transition disabled:opacity-50">
+                            ✅ Confirmer la commande
+                        </button>
+                    )}
                     {canPay && (
                         <button onClick={() => setPayOpen(true)}
                             className="flex-1 bg-green-600 hover:bg-green-700 text-white text-sm font-semibold py-2.5 rounded-xl transition">
