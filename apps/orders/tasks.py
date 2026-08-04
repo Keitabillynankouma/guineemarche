@@ -191,12 +191,15 @@ def notify_pending_escrow():
         try:
             from apps.notifications.models import Notification
             mins_left = int((order.escrow_release_at - now).total_seconds() / 60)
+            # Calcul du gain net estimé (96% du montant article, hors frais livraison)
+            item_amount = order.amount_gnf - (order.delivery_fee_gnf or 0)
+            estimated_payout = int(item_amount * 0.96)
             Notification.send(
                 user=order.seller,
                 type=Notification.Type.ORDER_UPDATE,
                 title='⏰ Fonds bientôt disponibles',
-                body=f'Vos fonds ({order.seller_payout_gnf:,} GNF) pour « {order.listing.title} » '
-                     f'seront libérés dans environ {mins_left} minutes.',
+                body=f'Votre gain estimé ({estimated_payout:,} GNF) pour « {order.listing.title} » '
+                     f'sera libéré dans environ {mins_left} minutes.',
                 data={'order_id': str(order.id)},
             )
         except Exception as e:

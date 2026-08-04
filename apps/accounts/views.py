@@ -60,10 +60,12 @@ class RegisterView(APIView):
                 if referrer.id != user.id:
                     user.referred_by = referrer
                     user.save(update_fields=['referred_by'])
-                    Referral.objects.create(referrer=referrer, referred=user)
+                    Referral.objects.get_or_create(referrer=referrer, referred=user)
                     # La récompense est déclenchée lors de la 1ère commande payée du filleul
             except User.DoesNotExist:
                 pass  # code invalide, on ignore silencieusement
+            except Exception:
+                pass  # IntegrityError sur double-inscription — on ignore
 
         return Response({
             'message': 'Compte créé. Vérifiez votre code OTP.',
@@ -89,10 +91,12 @@ class EmailRegisterView(APIView):
                 if referrer.id != user.id:
                     user.referred_by = referrer
                     user.save(update_fields=['referred_by'])
-                    Referral.objects.create(referrer=referrer, referred=user)
+                    Referral.objects.get_or_create(referrer=referrer, referred=user)
                     # La récompense est déclenchée lors de la 1ère commande payée du filleul
             except User.DoesNotExist:
                 pass
+            except Exception:
+                pass  # IntegrityError sur double-inscription — on ignore
 
         return Response({
             'message': 'Compte créé. Vérifiez votre email pour le code OTP.',
@@ -394,9 +398,10 @@ class SubscriptionView(APIView):
         from apps.orders.payment_service import initiate_orange_money
         from apps.orders.models import Payment
         from dateutil.relativedelta import relativedelta
+        import uuid as _uuid
 
         months   = int(request.data.get('months', 1))
-        provider = request.data.get('provider', Payment.Provider.CASH)
+        provider = request.data.get('provider', Payment.Provider.ORANGE_MONEY)
         phone    = request.data.get('phone', '')
 
         if months not in PRO_PRICES:
@@ -404,41 +409,68 @@ class SubscriptionView(APIView):
 
         amount = PRO_PRICES[months]
 
-        # Initier le paiement
+        # ── Paiement Orange Money (initiation immédiate) ──────────────────────
         if provider == Payment.Provider.ORANGE_MONEY:
+            if not phone:
+                return Response({'error': 'Numéro de téléphone requis pour Orange Money.'}, status=400)
             result = initiate_orange_money(phone, amount, f'pro-{request.user.id}')
-        else:
-            result = type('R', (), {'success': True, 'reference': '', 'message': 'Plan Pro activé'})()
+            if not result.success:
+                return Response({'error': result.message}, status=502)
 
-        if not result.success:
-            return Response({'error': result.message}, status=502)
+            # Activer immédiatement après paiement OM validé
+            sub, _ = Subscription.objects.get_or_create(user=request.user)
+            now  = timezone.now()
+            base = sub.valid_until if (sub.valid_until and sub.valid_until > now) else now
+            sub.plan        = Subscription.Plan.PRO
+            sub.valid_until = base + relativedelta(months=months)
+            sub.save(update_fields=['plan', 'valid_until'])
+            Badge.award(request.user, Badge.Type.PRO)
+            try:
+                from apps.notifications.models import Notification
+                Notification.send(
+                    user=request.user,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='💎 Plan Pro activé !',
+                    body=f'Votre abonnement Pro est actif pour {months} mois. Publiez des annonces illimitées.',
+                    data={},
+                )
+            except Exception:
+                pass
+            return Response({
+                'message':      f'Plan Pro activé pour {months} mois.',
+                'subscription': SubscriptionSerializer(sub).data,
+            })
 
-        # Activer automatiquement
-        sub, _ = Subscription.objects.get_or_create(user=request.user)
-        now = timezone.now()
-        # Si déjà Pro, prolonger depuis la date d'expiration
-        base = sub.valid_until if (sub.valid_until and sub.valid_until > now) else now
-        sub.plan        = Subscription.Plan.PRO
-        sub.valid_until = base + relativedelta(months=months)
-        sub.save(update_fields=['plan', 'valid_until'])
-        Badge.award(request.user, Badge.Type.PRO)
-
+        # ── Autres méthodes (espèces, virement, ChaChaP…) ────────────────────
+        # Créer une demande en attente — l'admin valide manuellement après réception.
+        ref = f'SUB-{request.user.id}-{_uuid.uuid4().hex[:8].upper()}'
         try:
             from apps.notifications.models import Notification
-            Notification.send(
-                user=request.user,
-                type=Notification.Type.ORDER_UPDATE,
-                title='💎 Plan Pro activé !',
-                body=f'Votre abonnement Pro est actif pour {months} mois. Publiez des annonces illimitées.',
-                data={},
-            )
+            # Notifier l'équipe admin
+            admins = User.objects.filter(role__in=['admin', 'super_admin', 'admin_accounting'], is_active=True)
+            for adm in admins[:3]:
+                Notification.send(
+                    user=adm,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='💳 Demande abonnement Pro',
+                    body=f'{request.user.full_name} souhaite activer {months} mois de Pro ({amount:,} GNF) '
+                         f'via {provider}. Réf : {ref}. Vérifiez le paiement et activez manuellement.',
+                    data={'user_id': str(request.user.id), 'months': months, 'ref': ref},
+                )
         except Exception:
             pass
 
+        sub, _ = Subscription.objects.get_or_create(user=request.user)
         return Response({
-            'message':      f'Plan Pro activé pour {months} mois.',
+            'message':      (
+                f'Demande reçue (réf : {ref}). Votre Plan Pro ({months} mois — {amount:,} GNF) '
+                f'sera activé après validation du paiement par notre équipe sous 24h.'
+            ),
+            'reference':    ref,
+            'amount_gnf':   amount,
+            'months':       months,
             'subscription': SubscriptionSerializer(sub).data,
-        })
+        }, status=202)
 
 
 class BadgeListView(generics.ListAPIView):
@@ -669,28 +701,45 @@ class AdminUserUpdateView(APIView):
 
     def patch(self, request, pk):
         from django.shortcuts import get_object_or_404
-        user = get_object_or_404(User, pk=pk)
+        target_user = get_object_or_404(User, pk=pk)
+        requester   = request.user
+
+        # Seul super_admin peut modifier les rôles ou is_staff
+        # Un admin ordinaire ne peut que (dés)activer is_active / is_available
+        is_super = requester.role == 'super_admin'
+        sensitive_fields = {'role', 'is_staff'}
+
+        for sf in sensitive_fields:
+            if sf in request.data and not is_super:
+                return Response(
+                    {'error': f'Seul un super_admin peut modifier le champ « {sf} ».'},
+                    status=403,
+                )
+
+        # Empêcher l'auto-promotion (même pour super_admin)
+        if str(target_user.id) == str(requester.id) and 'role' in request.data:
+            return Response({'error': 'Vous ne pouvez pas modifier votre propre rôle.'}, status=403)
 
         allowed_fields = {'role', 'is_active', 'is_available', 'is_staff'}
         update_fields  = []
 
         for field in allowed_fields:
             if field in request.data:
-                setattr(user, field, request.data[field])
+                setattr(target_user, field, request.data[field])
                 update_fields.append(field)
 
         if not update_fields:
             return Response({'error': 'Aucun champ à modifier'}, status=400)
 
         update_fields.append('updated_at')
-        user.save(update_fields=update_fields)
+        target_user.save(update_fields=update_fields)
 
         return Response({
-            'id':           str(user.id),
-            'role':         user.role,
-            'is_active':    user.is_active,
-            'is_available': user.is_available,
-            'is_staff':     user.is_staff,
+            'id':           str(target_user.id),
+            'role':         target_user.role,
+            'is_active':    target_user.is_active,
+            'is_available': target_user.is_available,
+            'is_staff':     target_user.is_staff,
         })
 
 

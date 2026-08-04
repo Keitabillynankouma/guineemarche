@@ -26,10 +26,17 @@ except ImportError:
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get(
-    'SECRET_KEY',
-    env('SECRET_KEY', default='dev-secret-key-guimatrix-local-2024-xK9mP2nQ')
-)
+_secret_key = os.environ.get('SECRET_KEY') or env('SECRET_KEY', default='')
+if not _secret_key:
+    if DEBUG:
+        # Dev local uniquement — jamais utilisé en production
+        _secret_key = 'dev-only-key-NOT-for-production-' + os.urandom(16).hex()
+    else:
+        raise RuntimeError(
+            "SECRET_KEY must be set in environment variables. "
+            "Set it in the Render dashboard under Environment > Add secret file."
+        )
+SECRET_KEY = _secret_key
 
 # DEBUG : true si variable d'env présente, sinon lire .env, sinon False (sécurisé par défaut)
 _debug_env = os.environ.get('DEBUG') or env('DEBUG', default='False')
@@ -117,7 +124,7 @@ MIDDLEWARE = [
     'core.security_middleware.GuineeSecurityMiddleware',   # Sécurité active
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
-    #'django.middleware.csrf.CsrfViewMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',   # protège /admin/ — les vues DRF JWT sont exemptées automatiquement
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',

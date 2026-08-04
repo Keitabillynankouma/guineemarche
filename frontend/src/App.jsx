@@ -37,11 +37,17 @@ function PrivateRoute({ children }) {
 }
 
 function AdminRoute({ children }) {
-  const token = localStorage.getItem('access_token')
-  const user  = useAuthStore((s) => s.user)
+  const token     = localStorage.getItem('access_token')
+  const user      = useAuthStore((s) => s.user)
+  const isLoading = useAuthStore((s) => s.isLoading)
   if (!token) return <Navigate to="/login" />
-  // Si le token existe mais l'user n'est pas encore chargé, laisser passer (lazy load)
-  if (user && !ADMIN_ROLES.includes(user.role)) return <Navigate to="/" />
+  // Attendre la fin du chargement initial avant de décider
+  if (isLoading || !user) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-green-600 text-sm">Chargement…</div>
+    </div>
+  )
+  if (!ADMIN_ROLES.includes(user.role)) return <Navigate to="/" />
   return children
 }
 

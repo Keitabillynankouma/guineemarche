@@ -359,6 +359,38 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
     )
 
 
+def _notify_payout_failure(payout, error_msg: str) -> None:
+    """Notifie l'admin ET le vendeur quand un virement automatique échoue."""
+    try:
+        from apps.notifications.models import Notification
+        from apps.accounts.models import User
+        seller = payout.seller
+        # Notifier le vendeur
+        Notification.send(
+            user=seller,
+            type=Notification.Type.ORDER_UPDATE,
+            title='⚠️ Virement échoué',
+            body=f'Le virement de {payout.amount_gnf:,} GNF a échoué. '
+                 f'Vérifiez votre numéro de paiement dans votre profil ou contactez le support.',
+            data={'payout_id': str(payout.id)},
+        )
+        # Notifier les admins comptables
+        admins = User.objects.filter(
+            role__in=['admin', 'super_admin', 'admin_accounting'], is_active=True
+        )
+        for adm in admins[:3]:
+            Notification.send(
+                user=adm,
+                type=Notification.Type.ORDER_UPDATE,
+                title='❌ Payout vendeur échoué',
+                body=f'Virement {payout.id} ({payout.amount_gnf:,} GNF) pour {seller.full_name} '
+                     f'a échoué : {error_msg}. Action manuelle requise.',
+                data={'payout_id': str(payout.id)},
+            )
+    except Exception as exc:
+        logger.warning("[PAYOUT] Notification échec virement impossible : %s", exc)
+
+
 def disburse_to_seller(payout_id: str) -> PaymentResult:
     """
     Déclenche le versement au vendeur après libération de l'escrow.
@@ -425,10 +457,12 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
             err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
             logger.warning("[PAYOUT] ChaChaP B2C échoué: %s", err)
             payout.mark_failed(note=f"ChaChaP B2C: {err}")
+            _notify_payout_failure(payout, err)
             return PaymentResult(success=False, message=f"ChaChaP B2C: {err}")
         except Exception as exc:
             logger.error("[PAYOUT] ChaChaP B2C exception: %s", exc)
             payout.mark_failed(note=f"Exception: {exc}")
+            _notify_payout_failure(payout, str(exc))
             return PaymentResult(success=False, message=str(exc))
 
     # ── Cas 3 : Pas de clé API → simulation / attente manuelle ───────────────

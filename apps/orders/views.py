@@ -1553,6 +1553,17 @@ class AdminOrderListView(APIView):
                 Q(seller__full_name__icontains=search)
             )
 
+        # Pagination : page + page_size (max 200 par page)
+        try:
+            page      = max(1, int(request.query_params.get('page', 1)))
+            page_size = min(200, max(1, int(request.query_params.get('page_size', 50))))
+        except (ValueError, TypeError):
+            page, page_size = 1, 50
+
+        total  = qs.count()
+        offset = (page - 1) * page_size
+        orders = qs[offset: offset + page_size]
+
         data = [{
             'id':               str(o.id),
             'listing_title':    o.listing.title if o.listing else '—',
@@ -1565,9 +1576,15 @@ class AdminOrderListView(APIView):
             'delivery_mode':    o.delivery_mode,
             'delivery_address': o.delivery_address or '',
             'created_at':       o.created_at.isoformat(),
-        } for o in qs[:300]]
+        } for o in orders]
 
-        return Response(data)
+        return Response({
+            'count':     total,
+            'page':      page,
+            'page_size': page_size,
+            'pages':     (total + page_size - 1) // page_size,
+            'results':   data,
+        })
 
 
 # ── Retours ────────────────────────────────────────────────────────────────────

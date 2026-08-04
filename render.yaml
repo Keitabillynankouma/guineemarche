@@ -1,12 +1,12 @@
 services:
-  # ── Backend Django (ASGI / WebSockets via Daphne) ─────────────────────────
+  # ── Backend Django (ASGI / WebSockets via Uvicorn) ────────────────────────────
   - type: web
     name: guineemarche-backend
     runtime: python
     region: frankfurt
-    plan: free
+    plan: starter          # ← passer à "standard" ou "pro" pour la prod réelle
     buildCommand: "./build.sh"
-    startCommand: "gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --timeout 30 --graceful-timeout 10"
+    startCommand: "gunicorn config.asgi:application -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --workers 2 --timeout 60 --graceful-timeout 15"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
         value: config.settings
@@ -23,20 +23,77 @@ services:
           type: redis
           name: guineemarche-redis
           property: connectionString
-      # Secrets à ajouter manuellement dans le dashboard :
-      # SECRET_KEY, CLOUDINARY_URL, CHACHAP_API_KEY, BREVO_API_KEY,
-      # FIREBASE_PROJECT_ID, FIREBASE_SERVICE_ACCOUNT
+      # ── Secrets — à saisir manuellement dans le dashboard Render ──────────────
+      # SECRET_KEY              (obligatoire — clé secrète Django unique et longue)
+      # CLOUDINARY_URL          (obligatoire — stockage images)
+      # CHACHAP_API_KEY         (obligatoire — paiements ChaChaP)
+      # CHACHAP_HMAC_KEY        (obligatoire — validation signatures webhook)
+      # BREVO_API_KEY           (obligatoire — envoi emails)
+      # FIREBASE_PROJECT_ID     (obligatoire — notifications push FCM)
+      # FIREBASE_SERVICE_ACCOUNT (obligatoire — JSON du compte de service Firebase)
+      # ORANGE_WEBHOOK_SECRET   (optionnel  — webhook Orange Money)
+      # SENTRY_DSN              (optionnel  — monitoring Sentry)
 
-  # ── Redis (Django Channels) ────────────────────────────────────────────────
+  # ── Celery Worker (tâches asynchrones) ───────────────────────────────────────
+  - type: worker
+    name: guineemarche-celery-worker
+    runtime: python
+    region: frankfurt
+    plan: starter
+    buildCommand: "./build.sh"
+    startCommand: "celery -A config.celery worker --loglevel=info --concurrency=2 -E"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: guineemarche-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: guineemarche-redis
+          property: connectionString
+
+  # ── Celery Beat (planificateur de tâches périodiques) ────────────────────────
+  - type: worker
+    name: guineemarche-celery-beat
+    runtime: python
+    region: frankfurt
+    plan: starter
+    buildCommand: "./build.sh"
+    startCommand: "celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
+    envVars:
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings
+      - key: DEBUG
+        value: "False"
+      - key: PYTHON_VERSION
+        value: "3.11.9"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: guineemarche-db
+          property: connectionString
+      - key: REDIS_URL
+        fromService:
+          type: redis
+          name: guineemarche-redis
+          property: connectionString
+
+  # ── Redis (broker Celery + Django Channels WebSockets) ───────────────────────
   - type: redis
     name: guineemarche-redis
     region: frankfurt
-    plan: free
+    plan: starter          # ← "free" est éphémère (données perdues au redémarrage)
     ipAllowList: []
 
 databases:
-  # ── PostgreSQL ─────────────────────────────────────────────────────────────
+  # ── PostgreSQL ────────────────────────────────────────────────────────────────
   - name: guineemarche-db
     databaseName: guineemarche
     region: frankfurt
-    plan: free
+    plan: starter          # ← "free" limité à 1 Go — passer à "standard" en prod
