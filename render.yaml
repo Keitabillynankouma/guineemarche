@@ -104,4 +104,4 @@ databases:
   - name: guineemarche-db
     databaseName: guineemarche
     region: frankfurt
-    plan: starter          # ← "free" limité à 1 Go — passer à "standard" en prod
+    plan: basic            # ← plan actuel Render ($7/mo) — passer à "standard" en prod
