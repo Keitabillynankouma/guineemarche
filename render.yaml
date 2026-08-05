@@ -99,9 +99,6 @@ services:
     plan: starter          # ← "free" est éphémère (données perdues au redémarrage)
     ipAllowList: []
 
-databases:
-  # ── PostgreSQL ────────────────────────────────────────────────────────────────
-  - name: guineemarche-db
-    databaseName: guineemarche
-    region: frankfurt
-    plan: basic            # ← plan actuel Render ($7/mo) — passer à "standard" en prod
+# NOTE : La base de données guineemarche-db est gérée directement depuis le
+# dashboard Render (déjà créée). Elle n'est pas déclarée ici pour éviter
+# les conflits de plan lors du Blueprint Sync.
