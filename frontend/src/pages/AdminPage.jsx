@@ -96,6 +96,7 @@ const adminAPI = {
   // Utilisateurs
   getUsers:   (params)      => api.get('/accounts/admin/users/', { params }),
   updateUser: (id, data)    => api.patch(`/accounts/admin/users/${id}/`, data),
+  activateSub:(id, data)    => api.post(`/accounts/admin/users/${id}/subscription/`, data),
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -1680,6 +1681,40 @@ function TabUsers() {
     onSuccess:  () => qc.invalidateQueries(['admin-users']),
   })
 
+  const subMutation = useMutation({
+    mutationFn: ({ id, ...payload }) => adminAPI.activateSub(id, payload),
+    onSuccess: (res) => {
+      qc.invalidateQueries(['admin-users'])
+      alert(res.data?.message || 'Abonnement mis à jour.')
+    },
+    onError: (err) => alert(err.response?.data?.error || 'Erreur lors de la mise à jour.'),
+  })
+
+  const handleProAction = (u) => {
+    const choice = window.prompt(
+      `Abonnement Pro pour ${u.full_name}\n\n` +
+      '1 → Activer 1 mois (40 000 GNF)\n' +
+      '3 → Activer 3 mois (105 000 GNF)\n' +
+      '6 → Activer 6 mois (190 000 GNF)\n' +
+      '12 → Activer 12 mois (350 000 GNF)\n' +
+      '0 → Annuler le Plan Pro\n\n' +
+      'Entrez le chiffre correspondant :'
+    )
+    if (!choice) return
+    const n = parseInt(choice, 10)
+    if (n === 0) {
+      if (window.confirm(`Annuler le Plan Pro de ${u.full_name} ?`)) {
+        subMutation.mutate({ id: u.id, action: 'cancel', months: 1 })
+      }
+    } else if ([1, 3, 6, 12].includes(n)) {
+      if (window.confirm(`Activer ${n} mois Pro pour ${u.full_name} ?`)) {
+        subMutation.mutate({ id: u.id, action: 'activate', months: n })
+      }
+    } else {
+      alert('Choix invalide.')
+    }
+  }
+
   const ROLE_COLORS = {
     admin:             'bg-red-100 text-red-700',
     super_admin:       'bg-red-200 text-red-900',
@@ -1783,6 +1818,15 @@ function TabUsers() {
                   title={u.is_active ? 'Cliquer pour désactiver' : 'Cliquer pour activer'}
                 >
                   {u.is_active ? 'Actif' : 'Inactif'}
+                </button>
+                {/* Plan Pro */}
+                <button
+                  onClick={() => handleProAction(u)}
+                  disabled={subMutation.isPending}
+                  className="text-xs px-2 py-1 rounded-lg font-medium transition disabled:opacity-50 bg-yellow-50 text-yellow-700 hover:bg-yellow-100 border border-yellow-200"
+                  title="Gérer l'abonnement Pro"
+                >
+                  💎 Pro
                 </button>
                 {/* Changer rôle */}
                 <select

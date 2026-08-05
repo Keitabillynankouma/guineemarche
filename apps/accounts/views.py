@@ -382,13 +382,25 @@ class ResetPasswordView(APIView):
 PRO_PRICES = {1: 40_000, 3: 105_000, 6: 190_000, 12: 350_000}
 
 
+class SubscriptionRateThrottle(SimpleRateThrottle):
+    """10 demandes par heure par utilisateur sur l'endpoint abonnement."""
+    scope = 'subscription'
+    rate  = '10/hour'
+
+    def get_cache_key(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return None
+        return self.cache_format % {'scope': self.scope, 'ident': str(request.user.id)}
+
+
 class SubscriptionView(APIView):
     """
     GET  — statut de l'abonnement.
     POST — paiement réel + activation automatique du plan Pro.
     Body: { months: 1|3|6|12, provider: 'orange_money'|'cash', phone: '...' }
     """
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes  = [permissions.IsAuthenticated]
+    throttle_classes    = [SubscriptionRateThrottle]
 
     def get(self, request):
         sub, _ = Subscription.objects.get_or_create(user=request.user)
@@ -740,6 +752,75 @@ class AdminUserUpdateView(APIView):
             'is_active':    target_user.is_active,
             'is_available': target_user.is_available,
             'is_staff':     target_user.is_staff,
+        })
+
+
+# ── Admin — activer/désactiver le Plan Pro manuellement ───────────────────────
+
+class AdminActivateSubscriptionView(APIView):
+    """
+    Admin : activer ou annuler manuellement un abonnement Pro.
+    POST /accounts/admin/users/<uuid>/subscription/
+    Body: { months: 1|3|6|12, action: 'activate'|'cancel' }
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        from dateutil.relativedelta import relativedelta
+        from django.shortcuts import get_object_or_404
+
+        target_user = get_object_or_404(User, pk=pk)
+        action      = request.data.get('action', 'activate')
+        months      = int(request.data.get('months', 1))
+
+        sub, _ = Subscription.objects.get_or_create(user=target_user)
+
+        if action == 'cancel':
+            sub.plan        = Subscription.Plan.FREE
+            sub.valid_until = None
+            sub.save(update_fields=['plan', 'valid_until'])
+            try:
+                from apps.notifications.models import Notification
+                Notification.send(
+                    user=target_user,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='Abonnement Pro annulé',
+                    body="Votre abonnement Pro a été annulé par l'équipe GuinéeMarché.",
+                    data={},
+                )
+            except Exception:
+                pass
+            return Response({
+                'message':      f'Abonnement Pro annulé pour {target_user.full_name}.',
+                'subscription': SubscriptionSerializer(sub).data,
+            })
+
+        # action == 'activate'
+        if months not in PRO_PRICES:
+            return Response({'error': 'Durée invalide. Choisissez 1, 3, 6 ou 12 mois.'}, status=400)
+
+        now  = timezone.now()
+        base = sub.valid_until if (sub.valid_until and sub.valid_until > now) else now
+        sub.plan        = Subscription.Plan.PRO
+        sub.valid_until = base + relativedelta(months=months)
+        sub.save(update_fields=['plan', 'valid_until'])
+        Badge.award(target_user, Badge.Type.PRO)
+
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=target_user,
+                type=Notification.Type.ORDER_UPDATE,
+                title='Plan Pro activé !',
+                body=f'Votre abonnement Pro est actif pour {months} mois. Publiez des annonces illimitées.',
+                data={},
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'message':      f'Plan Pro activé pour {target_user.full_name} ({months} mois).',
+            'subscription': SubscriptionSerializer(sub).data,
         })
 
 

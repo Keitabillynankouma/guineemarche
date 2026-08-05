@@ -24,15 +24,23 @@ services:
           name: guineemarche-redis
           property: connectionString
       # ── Secrets — à saisir manuellement dans le dashboard Render ──────────────
-      # SECRET_KEY              (obligatoire — clé secrète Django unique et longue)
-      # CLOUDINARY_URL          (obligatoire — stockage images)
-      # CHACHAP_API_KEY         (obligatoire — paiements ChaChaP)
-      # CHACHAP_HMAC_KEY        (obligatoire — validation signatures webhook)
-      # BREVO_API_KEY           (obligatoire — envoi emails)
-      # FIREBASE_PROJECT_ID     (obligatoire — notifications push FCM)
-      # FIREBASE_SERVICE_ACCOUNT (obligatoire — JSON du compte de service Firebase)
-      # ORANGE_WEBHOOK_SECRET   (optionnel  — webhook Orange Money)
-      # SENTRY_DSN              (optionnel  — monitoring Sentry)
+      # SECRET_KEY                (OBLIGATOIRE — clé secrète Django unique et longue)
+      # CLOUDINARY_CLOUD_NAME     (OBLIGATOIRE — nom du cloud Cloudinary)
+      # CLOUDINARY_API_KEY        (OBLIGATOIRE — clé API Cloudinary)
+      # CLOUDINARY_API_SECRET     (OBLIGATOIRE — secret API Cloudinary)
+      # CHACHAP_API_KEY           (OBLIGATOIRE — paiements ChaChaP B2C)
+      # CHACHAP_HMAC_KEY          (OBLIGATOIRE — validation signatures webhook ChaChaP)
+      # BREVO_API_KEY             (OBLIGATOIRE — envoi emails transactionnels)
+      # BREVO_SENDER_EMAIL        (OBLIGATOIRE — adresse email expéditeur)
+      # FIREBASE_PROJECT_ID       (OBLIGATOIRE — notifications push FCM)
+      # FIREBASE_SERVICE_ACCOUNT  (OBLIGATOIRE — JSON du compte de service Firebase)
+      # JWT_SIGNING_KEY           (OBLIGATOIRE — clé de signature JWT dédiée)
+      # ORANGE_WEBHOOK_SECRET     (optionnel  — webhook Orange Money)
+      # NIMBA_SERVICE_ID          (optionnel  — SMS via Nimba)
+      # NIMBA_SECRET_TOKEN        (optionnel  — SMS via Nimba)
+      # DJANGO_ADMIN_URL          (optionnel  — URL personnalisée du panel admin)
+      # ANTHROPIC_API_KEY         (optionnel  — modération IA des annonces)
+      # SENTRY_DSN                (optionnel  — monitoring Sentry)
 
   # ── Celery Worker (tâches asynchrones) ───────────────────────────────────────
   - type: worker

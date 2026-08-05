@@ -1657,6 +1657,16 @@ class AdminReturnListView(APIView):
                 Q(order__buyer__full_name__icontains=search)
             )
 
+        try:
+            page      = max(1, int(request.query_params.get('page', 1)))
+            page_size = min(100, max(1, int(request.query_params.get('page_size', 50))))
+        except (ValueError, TypeError):
+            page, page_size = 1, 50
+
+        total   = qs.count()
+        offset  = (page - 1) * page_size
+        returns = qs[offset: offset + page_size]
+
         data = [{
             'id':             str(r.id),
             'order_id':       str(r.order.id),
@@ -1671,9 +1681,15 @@ class AdminReturnListView(APIView):
             'admin_note':     r.admin_note,
             'created_at':     r.created_at.isoformat(),
             'resolved_at':    r.resolved_at.isoformat() if r.resolved_at else None,
-        } for r in qs[:300]]
+        } for r in returns]
 
-        return Response(data)
+        return Response({
+            'count':     total,
+            'page':      page,
+            'page_size': page_size,
+            'pages':     (total + page_size - 1) // page_size,
+            'results':   data,
+        })
 
 
 class AdminReturnUpdateView(APIView):

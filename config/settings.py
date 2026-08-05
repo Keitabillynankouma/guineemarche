@@ -26,6 +26,10 @@ except ImportError:
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
+# DEBUG doit être défini EN PREMIER (utilisé dans le bloc SECRET_KEY ci-dessous)
+_debug_env = os.environ.get('DEBUG') or env('DEBUG', default='False')
+DEBUG = str(_debug_env).lower() in ('true', '1', 'yes')
+
 _secret_key = os.environ.get('SECRET_KEY') or env('SECRET_KEY', default='')
 if not _secret_key:
     if DEBUG:
@@ -37,10 +41,6 @@ if not _secret_key:
             "Set it in the Render dashboard under Environment > Add secret file."
         )
 SECRET_KEY = _secret_key
-
-# DEBUG : true si variable d'env présente, sinon lire .env, sinon False (sécurisé par défaut)
-_debug_env = os.environ.get('DEBUG') or env('DEBUG', default='False')
-DEBUG = str(_debug_env).lower() in ('true', '1', 'yes')
 
 # ALLOWED_HOSTS
 _allowed_hosts_env = os.environ.get('ALLOWED_HOSTS') or env('ALLOWED_HOSTS', default='')
@@ -72,6 +72,7 @@ THIRD_PARTY_APPS = [
     'django_filters',
     'phonenumber_field',
     'channels',
+    'django_celery_beat',
 ]
 
 LOCAL_APPS = [
@@ -330,8 +331,12 @@ DEFAULT_FROM_EMAIL = env('DEFAULT_FROM_EMAIL', default='Guimatrix <noreply@guima
 # Toutes les fonctions Django (send_mail, password_reset, admin) passent par Brevo
 EMAIL_BACKEND = 'core.brevo_backend.BrevoEmailBackend'
 
-CSRF_COOKIE_SECURE = True
-CSRF_USE_SESSIONS = False
+CSRF_COOKIE_SECURE   = True
+CSRF_USE_SESSIONS    = False
+SESSION_COOKIE_SECURE = not DEBUG        # cookies session uniquement en HTTPS en production
+SECURE_HSTS_SECONDS   = 0 if DEBUG else 31536000   # HSTS 1 an en production
+SECURE_HSTS_INCLUDE_SUBDOMAINS = not DEBUG
+SECURE_HSTS_PRELOAD   = not DEBUG
 CSRF_HEADER_NAME = 'HTTP_X_CSRFTOKEN'
 
 # Exempter les URLs API du CSRF

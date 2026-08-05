@@ -68,9 +68,10 @@ export const listingsAPI = {
 
 // ── Messages ──────────────────────────────────────────────────────────────────
 export const messagesAPI = {
-    conversations: ()          => api.get('/messages/conversations/'),
-    messages:      (userId)    => api.get(`/messages/${userId}/`),
-    send:          (userId, text) => api.post(`/messages/${userId}/`, { content: text }),
+    conversations:      ()                        => api.get('/messaging/'),
+    start:              (userId)                  => api.post('/messaging/start/', { recipient_id: userId }),
+    messages:           (conversationId)          => api.get(`/messaging/${conversationId}/messages/`),
+    send:               (conversationId, text)    => api.post(`/messaging/${conversationId}/send/`, { content: text }),
 }
 
 // ── Commandes ─────────────────────────────────────────────────────────────────
