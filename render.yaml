@@ -48,7 +48,7 @@ services:
     runtime: python
     region: frankfurt
     plan: starter
-    buildCommand: "./build.sh"
+    buildCommand: "./build_worker.sh"
     startCommand: "celery -A config.celery worker --loglevel=info --concurrency=2 -E"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
@@ -73,7 +73,7 @@ services:
     runtime: python
     region: frankfurt
     plan: starter
-    buildCommand: "./build.sh"
+    buildCommand: "./build_worker.sh"
     startCommand: "celery -A config.celery beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler"
     envVars:
       - key: DJANGO_SETTINGS_MODULE
