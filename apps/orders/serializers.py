@@ -175,10 +175,10 @@ class DeliveryAssignmentSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'order', 'order_detail',
             'livreur', 'livreur_name', 'livreur_phone',
-            'status', 'pickup_code', 'verification_code',
+            'status', 'pickup_code',
             'assigned_at', 'delivered_at', 'notes',
         )
-        read_only_fields = ('id', 'pickup_code', 'verification_code', 'assigned_at', 'delivered_at')
+        read_only_fields = ('id', 'pickup_code', 'assigned_at', 'delivered_at')
 
     def get_order_detail(self, obj):
         o = obj.order
