@@ -317,14 +317,28 @@ export default function ProfilePage() {
 
     // ── Modifier profil ───────────────────────────────────────────────────────
     const [showEdit, setShowEdit] = useState(false)
-    const [editForm, setEditForm] = useState({ email: '', city: 'Conakry', quartier: '' })
+    const [editForm, setEditForm] = useState({
+        email: '', city: 'Conakry', quartier: '',
+        payout_phone: '', payout_provider: '',
+    })
     const [editLoading, setEditLoading] = useState(false)
     const [editSuccess, setEditSuccess] = useState(false)
-    const [editError, setEditError] = useState('')
+    const [editError, setEditError]     = useState('')
 
-    const openEdit = () => {
-        setEditForm({ email: user.email || '', city: user.city || 'Conakry', quartier: user.quartier || '' })
+    // Ouvrir le modal sur l'onglet mobile money directement si besoin
+    const [payoutTab, setPayoutTab] = useState(false)
+
+    const openEdit = (goToPayout = false) => {
+        setEditForm({
+            email:           user.email           || '',
+            city:            user.city            || 'Conakry',
+            quartier:        user.quartier        || '',
+            payout_phone:    user.payout_phone    || '',
+            payout_provider: user.payout_provider || '',
+        })
         setEditSuccess(false)
+        setEditError('')
+        setPayoutTab(goToPayout)
         setShowEdit(true)
     }
 
@@ -339,6 +353,7 @@ export default function ProfilePage() {
             setTimeout(() => setShowEdit(false), 1200)
         } catch (err) {
             const msg = err?.response?.data?.email?.[0]
+                || err?.response?.data?.payout_phone?.[0]
                 || err?.response?.data?.detail
                 || err?.response?.data?.non_field_errors?.[0]
                 || 'Erreur lors de la sauvegarde.'
@@ -347,6 +362,9 @@ export default function ProfilePage() {
             setEditLoading(false)
         }
     }
+
+    // Bannière mobile money manquant
+    const missingPayout = !user?.payout_phone && (user?.profile?.total_sales > 0)
 
     // Villes & quartiers dynamiques depuis communes.js
     const quartierOptions = COMMUNES_PAR_VILLE[editForm.city] || []
@@ -367,6 +385,26 @@ export default function ProfilePage() {
             </nav>
 
             <div className="max-w-2xl mx-auto px-4 py-6 space-y-4">
+
+                {/* ── Alerte mobile money manquant ──────────────────────────── */}
+                {missingPayout && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex items-start gap-3">
+                        <span className="text-2xl shrink-0">💳</span>
+                        <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-amber-800 text-sm">Virement en attente — action requise</p>
+                            <p className="text-amber-700 text-xs mt-1 leading-relaxed">
+                                Vous avez des ventes dont les fonds sont prêts. Renseignez votre numéro Mobile Money pour recevoir votre argent.
+                            </p>
+                            <button
+                                onClick={() => openEdit(true)}
+                                className="mt-2 inline-block bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full transition"
+                            >
+                                Ajouter mon Mobile Money →
+                            </button>
+                        </div>
+                    </div>
+                )}
+
                 {/* Carte profil avec bannière */}
                 <div className="bg-white rounded-2xl shadow-card overflow-hidden">
                     {/* Bannière verte */}
@@ -383,7 +421,7 @@ export default function ProfilePage() {
                             <p className="text-xs text-green-600 mt-0.5">✉️ {user.email}</p>
                         )}
                         <p className="text-xs text-gray-400 mt-1">📍 {user.city}{user.quartier && ` · ${user.quartier}`}</p>
-                        <button onClick={openEdit}
+                        <button onClick={() => openEdit(false)}
                             className="mt-3 text-xs text-green-600 border border-green-200 rounded-full px-3 py-1 hover:bg-green-50 transition">
                             ✏️ Modifier mon profil
                         </button>
@@ -619,45 +657,115 @@ export default function ProfilePage() {
                             </div>
                         ) : (
                             <form onSubmit={handleSaveProfile} className="space-y-4">
-                                <div>
-                                    <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
-                                    <input
-                                        type="email"
-                                        placeholder="votre@email.com"
-                                        value={editForm.email}
-                                        onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
-                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                    />
-                                    <p className="text-xs text-gray-400 mt-1">Pour recevoir commandes et paiements par email</p>
+
+                                {/* Onglets */}
+                                <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm font-medium">
+                                    <button type="button"
+                                        onClick={() => setPayoutTab(false)}
+                                        className={`flex-1 py-2 transition ${!payoutTab ? 'bg-green-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        👤 Infos générales
+                                    </button>
+                                    <button type="button"
+                                        onClick={() => setPayoutTab(true)}
+                                        className={`flex-1 py-2 transition flex items-center justify-center gap-1 ${payoutTab ? 'bg-green-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50'}`}
+                                    >
+                                        💳 Mobile Money
+                                        {!user?.payout_phone && (
+                                            <span className="w-2 h-2 rounded-full bg-amber-400 inline-block" />
+                                        )}
+                                    </button>
                                 </div>
 
-                                {user.phone_number && (
-                                  <>
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">Ville</label>
-                                        <select
-                                            value={editForm.city}
-                                            onChange={(e) => setEditForm({ ...editForm, city: e.target.value, quartier: '' })}
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                        >
-                                            {VILLES.map(v => <option key={v}>{v}</option>)}
-                                        </select>
-                                    </div>
+                                {/* ── Onglet infos générales ── */}
+                                {!payoutTab && (
+                                    <>
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Email</label>
+                                            <input
+                                                type="email"
+                                                placeholder="votre@email.com"
+                                                value={editForm.email}
+                                                onChange={(e) => setEditForm({ ...editForm, email: e.target.value })}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            />
+                                            <p className="text-xs text-gray-400 mt-1">Pour recevoir commandes et paiements par email</p>
+                                        </div>
 
-                                    {quartierOptions.length > 0 && (
-                                    <div>
-                                        <label className="block text-xs font-medium text-gray-600 mb-1">Quartier</label>
-                                        <select
-                                            value={editForm.quartier}
-                                            onChange={(e) => setEditForm({ ...editForm, quartier: e.target.value })}
-                                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
-                                        >
-                                            <option value="">— Choisir un quartier —</option>
-                                            {quartierOptions.map(q => <option key={q}>{q}</option>)}
-                                        </select>
-                                    </div>
-                                    )}
-                                  </>
+                                        {user.phone_number && (
+                                            <>
+                                                <div>
+                                                    <label className="block text-xs font-medium text-gray-600 mb-1">Ville</label>
+                                                    <select
+                                                        value={editForm.city}
+                                                        onChange={(e) => setEditForm({ ...editForm, city: e.target.value, quartier: '' })}
+                                                        className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                    >
+                                                        {VILLES.map(v => <option key={v}>{v}</option>)}
+                                                    </select>
+                                                </div>
+                                                {quartierOptions.length > 0 && (
+                                                    <div>
+                                                        <label className="block text-xs font-medium text-gray-600 mb-1">Quartier</label>
+                                                        <select
+                                                            value={editForm.quartier}
+                                                            onChange={(e) => setEditForm({ ...editForm, quartier: e.target.value })}
+                                                            className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                                        >
+                                                            <option value="">— Choisir un quartier —</option>
+                                                            {quartierOptions.map(q => <option key={q}>{q}</option>)}
+                                                        </select>
+                                                    </div>
+                                                )}
+                                            </>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* ── Onglet Mobile Money ── */}
+                                {payoutTab && (
+                                    <>
+                                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-700 leading-relaxed">
+                                            💡 Ce numéro sera utilisé pour vous verser automatiquement vos gains après chaque vente. Il doit être enregistré chez l'opérateur choisi.
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Opérateur Mobile Money</label>
+                                            <select
+                                                value={editForm.payout_provider}
+                                                onChange={(e) => setEditForm({ ...editForm, payout_provider: e.target.value })}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500"
+                                            >
+                                                <option value="">— Choisir un opérateur —</option>
+                                                <option value="orange_money">🟠 Orange Money</option>
+                                                <option value="mtn_momo">🟡 MTN MoMo</option>
+                                                <option value="paycard">💳 PayCard</option>
+                                                <option value="kulu">🔵 Kulu</option>
+                                                <option value="soutra_money">🟢 Soutra Money</option>
+                                                <option value="akiba">🟣 Akiba</option>
+                                            </select>
+                                        </div>
+
+                                        <div>
+                                            <label className="block text-xs font-medium text-gray-600 mb-1">Numéro de compte Mobile Money</label>
+                                            <input
+                                                type="tel"
+                                                placeholder="ex : 622 00 00 00"
+                                                value={editForm.payout_phone}
+                                                onChange={(e) => setEditForm({ ...editForm, payout_phone: e.target.value.replace(/\s/g, '') })}
+                                                className="w-full border border-gray-300 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 font-mono"
+                                            />
+                                            <p className="text-xs text-gray-400 mt-1">Numéro sans espaces ni indicatif pays</p>
+                                        </div>
+
+                                        {/* Affichage si déjà configuré */}
+                                        {user.payout_phone && (
+                                            <div className="flex items-center gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                                                <span>✅</span>
+                                                <span>Actuellement : <strong>{user.payout_phone}</strong> ({user.payout_provider?.replace('_', ' ')})</span>
+                                            </div>
+                                        )}
+                                    </>
                                 )}
 
                                 {editError && (

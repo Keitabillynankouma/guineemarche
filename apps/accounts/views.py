@@ -206,6 +206,31 @@ class MeView(generics.RetrieveUpdateAPIView):
         Subscription.objects.get_or_create(user=user)
         return user
 
+    def perform_update(self, serializer):
+        user = self.request.user
+        had_payout = bool(user.payout_phone)
+        serializer.save()
+        user.refresh_from_db()
+        now_has_payout = bool(user.payout_phone)
+
+        # L'utilisateur vient d'ajouter son mobile money → relancer les virements en attente
+        if not had_payout and now_has_payout:
+            try:
+                from apps.orders.models import SellerPayout
+                from apps.orders.payment_service import disburse_to_seller
+                pending = SellerPayout.objects.filter(
+                    seller=user,
+                    status=SellerPayout.Status.PENDING,
+                    payout_phone='',
+                )
+                for payout in pending:
+                    payout.payout_phone = user.payout_phone
+                    payout.provider     = user.payout_provider or payout.provider
+                    payout.save(update_fields=['payout_phone', 'provider', 'updated_at'])
+                    disburse_to_seller(str(payout.id))
+            except Exception:
+                pass
+
 
 class RegisterFCMTokenView(APIView):
     """

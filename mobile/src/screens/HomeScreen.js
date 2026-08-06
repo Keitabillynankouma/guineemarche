@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react'
 import {
     View, Text, TextInput, FlatList, TouchableOpacity,
-    StyleSheet, ActivityIndicator, RefreshControl,
+    StyleSheet, ActivityIndicator, RefreshControl, Linking,
 } from 'react-native'
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query'
 import { listingsAPI } from '../services/api'
@@ -11,9 +11,10 @@ import { colors, spacing, radius, font } from '../theme'
 const CITIES = ['Toutes', 'Conakry', 'Kindia', 'Labé', 'Kankan', 'Nzérékoré']
 
 export default function HomeScreen({ navigation }) {
-    const [search, setSearch]   = useState('')
-    const [city, setCity]       = useState('')
-    const [catId, setCatId]     = useState(null)
+    const [search, setSearch]       = useState('')
+    const [city, setCity]           = useState('')
+    const [catId, setCatId]         = useState(null)
+    const [showWebBanner, setShowWebBanner] = useState(true)
 
     // Catégories
     const { data: cats = [] } = useQuery({
@@ -62,6 +63,26 @@ export default function HomeScreen({ navigation }) {
                     clearButtonMode="while-editing"
                 />
             </View>
+
+            {/* Bannière version web */}
+            {showWebBanner && (
+                <View style={styles.webBanner}>
+                    <TouchableOpacity
+                        style={styles.webBannerContent}
+                        onPress={() => Linking.openURL('https://guimatrix.com')}
+                        activeOpacity={0.8}
+                    >
+                        <Text style={styles.webBannerIcon}>🌐</Text>
+                        <View style={styles.webBannerTexts}>
+                            <Text style={styles.webBannerTitle}>Aussi disponible sur le web</Text>
+                            <Text style={styles.webBannerSub}>guimatrix.com — expérience complète</Text>
+                        </View>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={() => setShowWebBanner(false)} hitSlop={{ top:8, bottom:8, left:8, right:8 }}>
+                        <Text style={styles.webBannerClose}>✕</Text>
+                    </TouchableOpacity>
+                </View>
+            )}
 
             {/* Filtre villes */}
             <FlatList
@@ -155,4 +176,12 @@ const styles = StyleSheet.create({
     emptyText: { fontSize: font.base, color: colors.textMuted },
     fab:       { position: 'absolute', bottom: spacing.xl, right: spacing.xl, backgroundColor: colors.primary, borderRadius: radius.full, paddingHorizontal: spacing.xl, paddingVertical: spacing.md, shadowColor: '#000', shadowOffset: { width:0,height:4 }, shadowOpacity: 0.2, shadowRadius: 8, elevation: 8 },
     fabText:   { color: '#fff', fontWeight: font.bold, fontSize: font.base },
+    // Bannière web
+    webBanner:        { flexDirection: 'row', alignItems: 'center', backgroundColor: '#EAF4FB', borderBottomWidth: 1, borderBottomColor: '#B3D4E8', paddingHorizontal: spacing.lg, paddingVertical: spacing.sm },
+    webBannerContent: { flex: 1, flexDirection: 'row', alignItems: 'center' },
+    webBannerIcon:    { fontSize: 18, marginRight: spacing.sm },
+    webBannerTexts:   { flex: 1 },
+    webBannerTitle:   { fontSize: font.sm, fontWeight: font.semi, color: '#1A6FA0' },
+    webBannerSub:     { fontSize: font.xs ?? 11, color: '#4A8DB0' },
+    webBannerClose:   { fontSize: 14, color: '#7AAABF', paddingLeft: spacing.sm },
 })

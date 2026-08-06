@@ -279,6 +279,34 @@ class Order(BaseModel):
             )
         )
 
+        # ── Si le vendeur n'a pas de numéro mobile money → lui demander de le renseigner ──
+        if not payout_phone:
+            try:
+                from apps.notifications.models import Notification
+                Notification.send(
+                    user=self.seller,
+                    type=Notification.Type.SYSTEM,
+                    title='💳 Action requise — Renseignez votre mobile money',
+                    body=(
+                        f'Votre gain de {self.seller_payout_gnf:,} GNF pour '
+                        f'« {self.listing.title} » est prêt à être versé. '
+                        f'Ajoutez votre numéro Mobile Money dans votre profil pour recevoir le virement.'
+                    ),
+                    data={'order_id': str(self.id), 'action': 'add_payout_info'},
+                )
+            except Exception:
+                pass
+            try:
+                from core.sms import send_sms
+                send_sms(
+                    str(self.seller.phone_number),
+                    f'Guimatrix: Votre gain {self.seller_payout_gnf:,} GNF est pret! '
+                    f'Ajoutez votre numero Mobile Money dans votre profil pour le recevoir. '
+                    f'guimatrix.com/profil'
+                )
+            except Exception:
+                pass
+
     def refund_escrow(self):
         self.escrow_status = self.EscrowStatus.REFUNDED
         self.save(update_fields=['escrow_status', 'updated_at'])
