@@ -23,6 +23,11 @@ class ReviewListCreateView(generics.ListCreateAPIView):
         if not order:
             raise ValidationError("Une commande est requise pour laisser un avis.")
 
+        # ── Commande doit être terminée ───────────────────────────────────────
+        from apps.orders.models import Order as _Order
+        if order.status != _Order.Status.COMPLETED:
+            raise ValidationError("Vous ne pouvez laisser un avis que sur une commande terminée.")
+
         # ── Parties prenantes de cette commande ──────────────────────────────
         parties = {order.buyer, order.seller}
         livreur = None
