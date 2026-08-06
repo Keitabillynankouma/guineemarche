@@ -11,13 +11,17 @@ logger = logging.getLogger(__name__)
 @shared_task
 def expire_listings():
     """
-    Tâche quotidienne (minuit) : expire les annonces dont la date d'expiration est dépassée.
-    Notifie le vendeur pour qu'il renouvelle si souhaité.
+    Tâche quotidienne (minuit) :
+    1. Expire les annonces dont expires_at est dépassé.
+    2. Désactive le boost des annonces dont boost_expires_at est dépassé
+       (sans expirer l'annonce elle-même si elle est permanente).
     """
     from .models import Listing
     from apps.notifications.models import Notification
 
     now = timezone.now()
+
+    # ── 1. Expiration annonces avec date d'expiration explicite ──────────────
     expired = Listing.objects.filter(
         status=Listing.Status.ACTIVE,
         expires_at__lt=now,
@@ -41,6 +45,34 @@ def expire_listings():
 
     if count:
         logger.info("expire_listings : %d annonce(s) expirée(s)", count)
+
+    # ── 2. Fin de boost (boost_expires_at dépassé) — annonce reste ACTIVE ───
+    # On désactive uniquement le flag is_boosted sans toucher au statut.
+    boost_expired = Listing.objects.filter(
+        is_boosted=True,
+        boost_expires_at__lt=now,
+        boost_expires_at__isnull=False,
+    )
+    boost_count = 0
+    for listing in boost_expired.select_related('seller'):
+        listing.is_boosted = False
+        listing.save(update_fields=['is_boosted', 'updated_at'])
+        boost_count += 1
+        try:
+            Notification.send(
+                user=listing.seller,
+                type=Notification.Type.SYSTEM,
+                title='⚡ Boost terminé',
+                body=f'Le boost de votre annonce « {listing.title} » est terminé. '
+                     f'Relancez un boost pour rester en tête des résultats.',
+                data={'listing_id': str(listing.id)},
+            )
+        except Exception as _e:
+            logger.warning("Notification fin boost annonce %s : %s", listing.id, _e)
+
+    if boost_count:
+        logger.info("expire_listings : %d boost(s) terminé(s)", boost_count)
+
     return count
 
 

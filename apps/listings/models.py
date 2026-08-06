@@ -78,8 +78,12 @@ class Listing(BaseModel):
     attributes  = models.JSONField(default=dict, blank=True)
 
     # Stats & boost
-    view_count  = models.PositiveIntegerField(default=0)
-    is_boosted  = models.BooleanField(default=False, db_index=True)
+    view_count      = models.PositiveIntegerField(default=0)
+    is_boosted      = models.BooleanField(default=False, db_index=True)
+    boost_expires_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date de fin du boost payant (séparée de expires_at pour ne pas faire expirer les annonces permanentes)"
+    )
     expires_at  = models.DateTimeField(null=True, blank=True)
 
     class Meta:

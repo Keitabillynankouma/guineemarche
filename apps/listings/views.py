@@ -401,13 +401,25 @@ class BannerClickView(APIView):
 BOOST_PRICES = {3: 5_000, 7: 10_000, 14: 18_000, 30: 30_000}   # jours → GNF
 
 def _apply_boost(listing, days):
-    """Active le boost sur l'annonce (prolonge si déjà en cours)."""
+    """
+    Active le boost sur l'annonce (prolonge si déjà en cours).
+
+    IMPORTANT : n'écrase PAS expires_at des annonces permanentes (expires_at=None).
+    On utilise boost_expires_at (champ dédié) pour la durée du boost.
+    expires_at est réservé aux annonces payantes avec expiration explicite.
+    """
     from datetime import timedelta
     listing.is_boosted = True
-    now  = timezone.now()
-    base = listing.expires_at if (listing.expires_at and listing.expires_at > now) else now
-    listing.expires_at = base + timedelta(days=days)
-    listing.save(update_fields=['is_boosted', 'expires_at', 'updated_at'])
+    now = timezone.now()
+    # Calculer la date de fin de boost (prolonge si déjà en cours)
+    if hasattr(listing, 'boost_expires_at') and listing.boost_expires_at and listing.boost_expires_at > now:
+        listing.boost_expires_at = listing.boost_expires_at + timedelta(days=days)
+    else:
+        listing.boost_expires_at = now + timedelta(days=days)
+    # Ne jamais toucher à expires_at si l'annonce était permanente (None)
+    # Cela évite qu'un boost fasse expirer définitivement une annonce sans date.
+    update_fields = ['is_boosted', 'boost_expires_at', 'updated_at']
+    listing.save(update_fields=update_fields)
 
 
 class BoostListingView(APIView):
@@ -427,6 +439,14 @@ class BoostListingView(APIView):
         from .models import BoostPayment
 
         listing = get_object_or_404(Listing, pk=pk, seller=request.user)
+
+        # Interdire le boost sur une annonce non active (évite de facturer pour rien)
+        if listing.status != Listing.Status.ACTIVE:
+            return Response(
+                {'error': 'Seules les annonces actives peuvent être boostées.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         try:
             days = int(request.data.get('days', 7))
         except (TypeError, ValueError):

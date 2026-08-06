@@ -268,13 +268,30 @@ class OrderListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         from rest_framework.exceptions import PermissionDenied, ValidationError
+        from django.db import transaction
         listing = serializer.validated_data.get('listing')
         user    = self.request.user
         if listing and listing.seller == user:
             raise PermissionDenied("Vous ne pouvez pas acheter votre propre annonce.")
-        if listing and not listing.is_active:
-            raise ValidationError("Cette annonce n'est plus disponible.")
-        order = serializer.save(buyer=user)
+
+        # ── Protection race condition double-achat ────────────────────────────
+        # select_for_update() pose un verrou DB jusqu'à la fin de la transaction,
+        # empêchant deux acheteurs simultanés de créer deux commandes pour le même article.
+        if listing:
+            with transaction.atomic():
+                locked = Listing.objects.select_for_update().get(pk=listing.pk)
+                if not locked.is_active:
+                    raise ValidationError("Cette annonce n'est plus disponible.")
+                if Order.objects.filter(
+                    listing=locked,
+                    status__in=[Order.Status.PENDING, Order.Status.CONFIRMED, Order.Status.DISPUTED],
+                ).exists():
+                    raise ValidationError(
+                        "Cette annonce est déjà en cours d'achat. Réessayez dans quelques instants."
+                    )
+                order = serializer.save(buyer=user)
+        else:
+            order = serializer.save(buyer=user)
         # Email vendeur — nouvelle commande reçue
         try:
             from core.email_notifications import send_new_order_seller
@@ -558,6 +575,23 @@ def _verify_chachap_signature(request):
     if not sig_header:
         logger.warning("[CHACHAP] Webhook sans header de signature (Ccp-Hmac-Signature / CCP-Signature)")
         return False
+
+    # ── Protection replay attack : vérifier le timestamp ChaChap ─────────────
+    # ChaChap envoie optionnellement Ccp-Timestamp (Unix epoch secondes).
+    # Si présent, rejeter les webhooks vieux de plus de 5 minutes.
+    ts_header = (request.headers.get('Ccp-Timestamp')
+                 or request.headers.get('CCP-Timestamp')
+                 or '')
+    if ts_header:
+        try:
+            import time as _time
+            ts = int(ts_header)
+            if abs(_time.time() - ts) > 300:
+                logger.warning("[CHACHAP] Webhook trop ancien (replay attack?) ts=%s", ts_header)
+                return False
+        except (ValueError, TypeError):
+            logger.warning("[CHACHAP] Ccp-Timestamp invalide : %s", ts_header)
+
     body     = request.body
     expected = hmac.new(hmac_key.encode(), body, hashlib.sha256).hexdigest()
     ok = hmac.compare_digest(sig_header, expected)
