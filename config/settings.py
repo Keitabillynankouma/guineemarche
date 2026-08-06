@@ -306,7 +306,7 @@ CHACHAP_API_KEY      = env('CHACHAP_API_KEY', default='')
 # Accepte CHACHAP_HMAC_KEY ou CHACHAP_WEBHOOK_SECRET selon le nom choisi dans Railway
 CHACHAP_HMAC_KEY     = env('CHACHAP_HMAC_KEY', default='') or env('CHACHAP_WEBHOOK_SECRET', default='')
 CHACHAP_WEBHOOK_URL = env('CHACHAP_WEBHOOK_URL',
-                          default='https://api.guimatrix.com/api/v1/orders/webhook/chachap/')
+                          default='https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/')
 
 # ── Paycard Guinée — agrégateur Mobile Money (Orange Money GN + MTN MoMo GN) ─
 # Configurer dans Railway quand tu reçois les clés Paycard :
@@ -316,7 +316,7 @@ PAYCARD_MERCHANT_ID = env('PAYCARD_MERCHANT_ID', default='')
 PAYCARD_SANDBOX     = env('PAYCARD_SANDBOX', default=str(DEBUG)).lower() in ('true', '1', 'yes')
 # URL Railway à communiquer à Paycard comme callback webhook :
 # https://api.guimatrix.com/api/v1/orders/webhook/paycard/
-PAYCARD_WEBHOOK_URL = env('PAYCARD_WEBHOOK_URL', default='https://api.guimatrix.com/api/v1/orders/webhook/paycard/')
+PAYCARD_WEBHOOK_URL = env('PAYCARD_WEBHOOK_URL', default='https://guineemarche.onrender.com/api/v1/orders/webhook/paycard/')
 
 # ── Brevo — API HTTP (Railway bloque SMTP port 587) ──────────────────────────
 # Railway bloque les connexions SMTP sortantes → on utilise l'API REST Brevo (HTTPS)
