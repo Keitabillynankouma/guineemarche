@@ -19,6 +19,7 @@ class WebhookRateThrottle(AnonRateThrottle):
 logger = logging.getLogger(__name__)
 
 from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, DeliveryAssignment, IntraCityZoneRate, ReturnRequest, LivreurPayment
+from apps.listings.models import Listing
 from .serializers import OrderSerializer, CreatePaymentSerializer, PaymentSerializer, PickupPointSerializer, MeetingZoneSerializer, DeliveryZoneSerializer, DeliveryAssignmentSerializer, IntraCityZoneRateSerializer
 from .payment_service import initiate_chachap
 from core.permissions import IsAdmin
@@ -1135,6 +1136,9 @@ def _auto_assign_livreur(order):
         return  # Déjà assignée
 
     # 4. Notifier le livreur
+    # SÉCURITÉ : ne PAS envoyer le verification_code au livreur.
+    # Ce code est donné par l'ACHETEUR à la réception pour prouver la livraison.
+    # Si le livreur le reçoit à l'avance, il peut confirmer sans se déplacer.
     Notification.send(
         user=livreur,
         type=Notification.Type.ORDER_UPDATE,
@@ -1143,7 +1147,7 @@ def _auto_assign_livreur(order):
             f'Article : « {order.listing.title} »\n'
             f'Adresse : {order.delivery_address}\n'
             f'Code retrait (montrez au vendeur) : {assignment.pickup_code}\n'
-            f'Code livraison (acheteur vous le donne) : {assignment.verification_code}'
+            f'L\'acheteur vous donnera son code de confirmation à la livraison.'
         ),
         data={'assignment_id': str(assignment.id)},
     )
@@ -1156,7 +1160,7 @@ def _auto_assign_livreur(order):
             f'Adresse : {order.delivery_address}\n'
             f'Acheteur : {order.buyer.full_name} - {order.buyer.phone_number}\n'
             f'Code retrait vendeur : {assignment.pickup_code}\n'
-            f'Code confirm. acheteur : {assignment.verification_code}',
+            f'L\'acheteur vous donnera son code de confirmation a la livraison.',
         )
     except Exception:
         pass
@@ -1255,7 +1259,7 @@ class DeliveryCodeThrottle(SimpleRateThrottle):
     Empêche un livreur de deviner le code à 6 chiffres de ses propres assignations.
     """
     scope = 'delivery_confirm'
-    rate  = '5/hour'
+    rate  = '20/hour'
 
     def get_cache_key(self, request, view):
         if not request.user or not request.user.is_authenticated:
@@ -1405,7 +1409,10 @@ class DeliveryTrackingView(APIView):
         history = DeliveryPositionHistory.objects.filter(assignment=assignment).order_by('-recorded_at')[:50]
         route   = [{'lat': float(p.lat), 'lng': float(p.lng), 'at': p.recorded_at.isoformat()} for p in reversed(list(history))]
 
-        return Response({
+        # SÉCURITÉ : verification_code visible uniquement par l'acheteur (et admin).
+        # Le vendeur ne doit PAS voir ce code — sinon il peut le transmettre au livreur
+        # pour déclencher une libération d'escrow sans livraison réelle.
+        data = {
             'order_id':        str(order.id),
             'assignment_id':   str(assignment.id),
             'livreur':         assignment.livreur.full_name,
@@ -1416,9 +1423,11 @@ class DeliveryTrackingView(APIView):
                 'lng': float(assignment.current_lng)  if assignment.current_lng  else None,
                 'updated_at': assignment.position_updated_at.isoformat() if assignment.position_updated_at else None,
             },
-            'route':           route,
-            'verification_code': assignment.verification_code,
-        })
+            'route': route,
+        }
+        if order.buyer == user or is_admin:
+            data['verification_code'] = assignment.verification_code
+        return Response(data)
 
 
 class AdminAssignLivreurView(APIView):
@@ -1444,6 +1453,7 @@ class AdminAssignLivreurView(APIView):
         from apps.notifications.models import Notification
 
         # Notifier le livreur
+        # SÉCURITÉ : ne PAS envoyer le verification_code au livreur.
         Notification.send(
             user=livreur,
             type=Notification.Type.ORDER_UPDATE,
@@ -1451,7 +1461,7 @@ class AdminAssignLivreurView(APIView):
             body=(
                 f'Article : « {order.listing.title} » → {order.delivery_address}\n'
                 f'Code retrait (montrez au vendeur) : {assignment.pickup_code}\n'
-                f'Code confirm. (acheteur vous le donne) : {assignment.verification_code}'
+                f'L\'acheteur vous donnera son code de confirmation à la livraison.'
             ),
             data={'assignment_id': str(assignment.id)},
         )
@@ -1464,7 +1474,7 @@ class AdminAssignLivreurView(APIView):
                 f'Adresse : {order.delivery_address}\n'
                 f'Acheteur : {order.buyer.full_name} - {order.buyer.phone_number}\n'
                 f'Code retrait vendeur : {assignment.pickup_code}\n'
-                f'Code confirm. acheteur : {assignment.verification_code}',
+                f'L\'acheteur vous donnera son code de confirmation a la livraison.',
             )
         except Exception:
             pass
