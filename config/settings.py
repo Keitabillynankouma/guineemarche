@@ -200,7 +200,8 @@ REST_FRAMEWORK = {
         'otp':          '5/hour',
         'login':        '10/hour',
         'message_send': '60/hour',    # Anti-spam messagerie
-        'webhook':      '60/minute',  # Protection bruteforce webhooks
+        'webhook':           '60/minute',  # Protection bruteforce webhooks
+        'delivery_confirm':  '5/hour',     # Anti brute-force codes livraison (6 chiffres)
     },
 }
 

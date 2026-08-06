@@ -1,7 +1,7 @@
 from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.throttling import AnonRateThrottle
+from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
 from django.shortcuts import get_object_or_404
 from django.views.decorators.csrf import csrf_exempt
 from django.utils.decorators import method_decorator
@@ -406,7 +406,7 @@ class OrderUpdateStatusView(APIView):
         else:
             return Response({'error': 'Action non autorisée.'}, status=status.HTTP_403_FORBIDDEN)
 
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={'request': request}).data)
 
 
 class ConfirmReceiptView(APIView):
@@ -452,7 +452,7 @@ class ConfirmReceiptView(APIView):
         except Exception as _exc:
             logger.warning("[CONFIRM RECEIPT] Auto-virement échoué pour commande %s: %s", order.id, _exc)
 
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={'request': request}).data)
 
 
 class DisputeView(APIView):
@@ -462,9 +462,17 @@ class DisputeView(APIView):
     def post(self, request, pk):
         order = get_object_or_404(Order, pk=pk, buyer=request.user)
 
-        if order.status not in [Order.Status.CONFIRMED, Order.Status.PENDING]:
+        # SÉCURITÉ : bloquer les litiges sur commandes non payées (PENDING sans escrow).
+        # Sans escrow, un litige ne sert à rien (aucun fonds à bloquer) et laisse la
+        # commande bloquée en DISPUTED, impossible à annuler sans intervention admin.
+        if order.status != Order.Status.CONFIRMED:
             return Response(
-                {'error': 'Impossible d\'ouvrir un litige sur cette commande.'},
+                {'error': 'Un litige ne peut être ouvert que sur une commande confirmée par le vendeur.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if order.escrow_status != Order.EscrowStatus.HELD:
+            return Response(
+                {'error': 'Un litige ne peut être ouvert que si des fonds sont sécurisés en escrow.'},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -485,7 +493,7 @@ class DisputeView(APIView):
         except Exception:
             pass
 
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={'request': request}).data)
 
 
 class InitiatePaymentView(APIView):
@@ -976,7 +984,7 @@ class AdminDisputeResolveView(APIView):
         except Exception:
             pass
 
-        return Response(OrderSerializer(order).data)
+        return Response(OrderSerializer(order, context={'request': request}).data)
 
 
 class AdminStatsView(APIView):
@@ -1241,9 +1249,24 @@ class LivreurStartDeliveryView(APIView):
         return Response(DeliveryAssignmentSerializer(assignment).data)
 
 
+class DeliveryCodeThrottle(SimpleRateThrottle):
+    """
+    Anti brute-force : max 5 tentatives par heure par livreur sur la confirmation de livraison.
+    Empêche un livreur de deviner le code à 6 chiffres de ses propres assignations.
+    """
+    scope = 'delivery_confirm'
+    rate  = '5/hour'
+
+    def get_cache_key(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return None
+        return self.cache_format % {'scope': self.scope, 'ident': str(request.user.id)}
+
+
 class LivreurConfirmDeliveryView(APIView):
     """Livreur : confirme la livraison via le code de vérification fourni par l'acheteur."""
     permission_classes = [IsLivreur]
+    throttle_classes   = [DeliveryCodeThrottle]
 
     def post(self, request, pk):
         from django.utils import timezone

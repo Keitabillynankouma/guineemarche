@@ -78,17 +78,44 @@ class OrderSerializer(serializers.ModelSerializer):
     def get_delivery_assignment_detail(self, obj):
         try:
             da = obj.delivery_assignment
-            return {
-                'id':                str(da.id),
-                'status':            da.status,
-                'livreur_id':        str(da.livreur.id),
-                'livreur_name':      da.livreur.full_name,
-                'livreur_phone':     str(da.livreur.phone_number or ''),
-                'pickup_code':       da.pickup_code,        # vendeur le vérifie quand livreur arrive
-                'verification_code': da.verification_code,  # acheteur le donne au livreur à la réception
-            }
         except Exception:
             return None
+
+        # ── Contrôle d'accès aux codes secrets ───────────────────────────────
+        # verification_code : code que l'acheteur donne au livreur à la réception.
+        #   → visible seulement par l'ACHETEUR (et admin).
+        # pickup_code       : code que le livreur montre au VENDEUR pour récupérer le colis.
+        #   → visible seulement par le VENDEUR (et admin).
+        # Les deux codes ne doivent JAMAIS être dans la même réponse pour éviter
+        # qu'une partie les utilise pour contourner la vérification physique.
+        request = self.context.get('request')
+        user    = getattr(request, 'user', None)
+
+        show_verification_code = False  # acheteur seulement
+        show_pickup_code       = False  # vendeur seulement
+
+        if user:
+            if user.is_authenticated:
+                if user == obj.buyer:
+                    show_verification_code = True   # acheteur : son code à donner au livreur
+                elif user == obj.seller:
+                    show_pickup_code = True          # vendeur : code pour vérifier le livreur
+                elif getattr(user, 'is_admin', False):
+                    show_verification_code = True    # admin : voit les deux
+                    show_pickup_code       = True
+
+        result = {
+            'id':            str(da.id),
+            'status':        da.status,
+            'livreur_id':    str(da.livreur.id),
+            'livreur_name':  da.livreur.full_name,
+            'livreur_phone': str(da.livreur.phone_number or ''),
+        }
+        if show_verification_code:
+            result['verification_code'] = da.verification_code
+        if show_pickup_code:
+            result['pickup_code'] = da.pickup_code
+        return result
 
     def create(self, validated_data):
         listing = validated_data['listing']

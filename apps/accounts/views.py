@@ -425,11 +425,49 @@ class SubscriptionView(APIView):
         if provider == Payment.Provider.ORANGE_MONEY:
             if not phone:
                 return Response({'error': 'Numéro de téléphone requis pour Orange Money.'}, status=400)
+
+            # SÉCURITÉ : n'activer Pro qu'après un VRAI paiement confirmé.
+            # Sans ORANGE_MONEY_API_KEY, la fonction simule toujours success=True,
+            # ce qui permettrait d'obtenir Pro gratuitement.
+            # → Si pas de clé configurée, traiter comme paiement manuel (admin valide).
+            from django.conf import settings as _settings
+            om_key = getattr(_settings, 'ORANGE_MONEY_API_KEY', '').strip()
+            if not om_key:
+                # Simulation / pas de clé → flux manuel identique aux autres providers
+                ref = f'SUB-OM-{request.user.id}-{_uuid.uuid4().hex[:8].upper()}'
+                try:
+                    admins = User.objects.filter(
+                        role__in=['admin', 'super_admin', 'admin_accounting'], is_active=True
+                    )
+                    for adm in admins[:3]:
+                        from apps.notifications.models import Notification as _N
+                        _N.send(
+                            user=adm,
+                            type=_N.Type.ORDER_UPDATE,
+                            title='💳 Demande abonnement Pro (OM)',
+                            body=f'{request.user.full_name} souhaite {months} mois Pro ({amount:,} GNF) '
+                                 f'via Orange Money. Réf : {ref}. Vérifiez le virement puis activez.',
+                            data={'user_id': str(request.user.id), 'months': months, 'ref': ref},
+                        )
+                except Exception:
+                    pass
+                sub, _ = Subscription.objects.get_or_create(user=request.user)
+                return Response({
+                    'message': (
+                        f'Demande reçue (réf : {ref}). Votre Plan Pro ({months} mois — {amount:,} GNF) '
+                        f'sera activé après validation du paiement par notre équipe sous 24h.'
+                    ),
+                    'reference': ref,
+                    'amount_gnf': amount,
+                    'months': months,
+                    'subscription': SubscriptionSerializer(sub).data,
+                }, status=202)
+
             result = initiate_orange_money(phone, amount, f'pro-{request.user.id}')
             if not result.success:
                 return Response({'error': result.message}, status=502)
 
-            # Activer immédiatement après paiement OM validé
+            # Activer uniquement si paiement OM confirmé en temps réel
             sub, _ = Subscription.objects.get_or_create(user=request.user)
             now  = timezone.now()
             base = sub.valid_until if (sub.valid_until and sub.valid_until > now) else now
