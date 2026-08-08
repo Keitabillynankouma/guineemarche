@@ -312,9 +312,8 @@ export default function RegisterPage() {
                     <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Vous souhaitez…</label>
                     <div className="grid grid-cols-3 gap-2">
                       {[
-                        { value: 'buyer',   icon: '🛒', label: 'Acheter',  desc: 'Acheteur' },
-                        { value: 'seller',  icon: '🏪', label: 'Vendre',   desc: 'Vendeur'  },
-                        { value: 'livreur', icon: '🚚', label: 'Livrer',   desc: 'Livreur'  },
+                        { value: 'buyer',  icon: '🛒', label: 'Acheter', desc: 'Acheteur' },
+                        { value: 'seller', icon: '🏪', label: 'Vendre',  desc: 'Vendeur'  },
                       ].map(r => (
                         <button
                           key={r.value}
