@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, useLocation } from 'react-router-dom'
 import { listingsAPI } from '../services/api'
@@ -28,10 +29,122 @@ function SkeletonRow() {
     )
 }
 
+// ── Modal d'édition d'annonce ────────────────────────────────────────────────
+function EditModal({ listing, onClose, onSaved }) {
+    const [form, setForm] = useState({
+        title:       listing.title       || '',
+        description: listing.description || '',
+        price_gnf:   listing.price_gnf   || '',
+        price_type:  listing.price_type  || 'fixed',
+        condition:   listing.condition   || 'good',
+    })
+    const [saving, setSaving] = useState(false)
+    const [error,  setError]  = useState('')
+
+    const f = k => e => setForm(p => ({ ...p, [k]: e.target.value }))
+
+    const handleSave = async () => {
+        if (!form.title.trim()) { setError('Le titre est obligatoire.'); return }
+        setSaving(true); setError('')
+        try {
+            await listingsAPI.update(listing.id, {
+                title:       form.title.trim(),
+                description: form.description.trim(),
+                price_gnf:   form.price_type === 'free' ? 0 : Number(form.price_gnf),
+                price_type:  form.price_type,
+                condition:   form.condition,
+            })
+            onSaved()
+        } catch (err) {
+            const d = err.response?.data
+            setError(d?.detail || d?.error || Object.values(d || {})?.[0] || 'Erreur lors de la modification.')
+        } finally { setSaving(false) }
+    }
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+                {/* Header */}
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                    <div>
+                        <h2 className="font-bold text-gray-900">Modifier l'annonce</h2>
+                        <p className="text-xs text-amber-600 mt-0.5">⚠️ Un changement de titre ou description relance la modération</p>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition text-lg">✕</button>
+                </div>
+
+                <div className="p-5 space-y-4">
+                    {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl">⚠️ {error}</div>}
+
+                    {/* Titre */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Titre *</label>
+                        <input value={form.title} onChange={f('title')}
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-gray-50 focus:bg-white transition" />
+                    </div>
+
+                    {/* Description */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Description</label>
+                        <textarea value={form.description} onChange={f('description')} rows={4}
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-gray-50 focus:bg-white transition resize-none" />
+                    </div>
+
+                    {/* Type de prix */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Type de prix</label>
+                        <select value={form.price_type} onChange={f('price_type')}
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-gray-50">
+                            <option value="fixed">Prix fixe</option>
+                            <option value="negotiable">À débattre</option>
+                            <option value="free">Gratuit / Don</option>
+                        </select>
+                    </div>
+
+                    {/* Prix */}
+                    {form.price_type !== 'free' && (
+                        <div>
+                            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Prix (GNF)</label>
+                            <input type="number" min="0" value={form.price_gnf} onChange={f('price_gnf')}
+                                className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-gray-50 focus:bg-white transition" />
+                        </div>
+                    )}
+
+                    {/* État */}
+                    <div>
+                        <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">État de l'article</label>
+                        <select value={form.condition} onChange={f('condition')}
+                            className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-green-500/30 focus:border-green-500 bg-gray-50">
+                            <option value="new">Neuf</option>
+                            <option value="like_new">Comme neuf</option>
+                            <option value="good">Bon état</option>
+                            <option value="fair">État correct</option>
+                            <option value="poor">Usé</option>
+                        </select>
+                    </div>
+                </div>
+
+                {/* Footer */}
+                <div className="flex gap-3 px-5 pb-5">
+                    <button onClick={onClose}
+                        className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50 transition">
+                        Annuler
+                    </button>
+                    <button onClick={handleSave} disabled={saving}
+                        className="flex-1 py-3 rounded-xl bg-gradient-to-r from-green-600 to-emerald-500 text-white text-sm font-bold shadow-sm shadow-green-500/20 hover:from-green-700 hover:to-emerald-600 transition disabled:opacity-50 flex items-center justify-center gap-2">
+                        {saving ? <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Enregistrement...</> : '✓ Enregistrer'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    )
+}
+
 export default function MyListingsPage() {
     const queryClient = useQueryClient()
     const location    = useLocation()
     const moderationPending = location.state?.moderationPending
+    const [editingListing, setEditingListing] = useState(null)
 
     const { data, isLoading } = useQuery({
         queryKey: ['my-listings'],
@@ -50,6 +163,17 @@ export default function MyListingsPage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
+            {/* Modal d'édition */}
+            {editingListing && (
+                <EditModal
+                    listing={editingListing}
+                    onClose={() => setEditingListing(null)}
+                    onSaved={() => {
+                        setEditingListing(null)
+                        queryClient.invalidateQueries(['my-listings'])
+                    }}
+                />
+            )}
             {/* Nav */}
             <nav className="bg-white/95 backdrop-blur-md border-b border-gray-100 sticky top-0 z-20" style={{boxShadow:'0 1px 0 rgba(0,0,0,0.05)'}}>
                 <div className="max-w-3xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -174,6 +298,12 @@ export default function MyListingsPage() {
                                             className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition">
                                             Voir
                                         </Link>
+                                        <button
+                                            onClick={() => setEditingListing(listing)}
+                                            className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-600 font-semibold px-3 py-1.5 rounded-lg transition"
+                                        >
+                                            ✏️ Modifier
+                                        </button>
                                         <button
                                             onClick={() => {
                                                 if (window.confirm('Supprimer cette annonce définitivement ?')) {

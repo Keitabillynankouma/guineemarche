@@ -11,8 +11,18 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model  = User
-        fields = ('phone_number', 'full_name', 'email', 'password', 'password2', 'city', 'quartier')
-        extra_kwargs = {'email': {'required': False, 'allow_blank': True, 'allow_null': True}}
+        fields = ('phone_number', 'full_name', 'email', 'password', 'password2', 'city', 'quartier', 'role')
+        extra_kwargs = {
+            'email': {'required': False, 'allow_blank': True, 'allow_null': True},
+            'role':  {'required': False},
+        }
+
+    def validate_role(self, value):
+        # Seuls ces rôles sont autorisés à l'inscription publique
+        allowed = {User.Role.BUYER, User.Role.SELLER, User.Role.LIVREUR}
+        if value and value not in allowed:
+            raise serializers.ValidationError("Rôle non autorisé à l'inscription.")
+        return value or User.Role.BUYER
 
     def validate(self, attrs):
         if attrs['password'] != attrs['password2']:

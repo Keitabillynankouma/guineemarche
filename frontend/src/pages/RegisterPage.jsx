@@ -170,7 +170,7 @@ export default function RegisterPage() {
 
   const [form, setForm] = useState({
     full_name: '', city: 'Conakry', quartier: '', phone_number: '', email: '',
-    password: '', password2: '', referral_code: refCode,
+    password: '', password2: '', referral_code: refCode, role: 'buyer',
   })
 
   useEffect(() => { if (refCode) setForm(f => ({ ...f, referral_code: refCode })) }, [refCode])
@@ -190,13 +190,13 @@ export default function RegisterPage() {
           phone_number: form.phone_number, email: form.email || undefined,
           full_name: form.full_name, password: form.password, password2: form.password2,
           city: form.city, quartier: form.quartier || undefined,
-          referral_code: form.referral_code,
+          referral_code: form.referral_code, role: form.role,
         })
       } else {
         await authAPI.registerEmail({
           email: form.email, full_name: form.full_name,
           password: form.password, password2: form.password2,
-          city: form.city, referral_code: form.referral_code,
+          city: form.city, referral_code: form.referral_code, role: form.role,
         })
       }
       setStep(2)
@@ -307,6 +307,34 @@ export default function RegisterPage() {
                 )}
 
                 <form onSubmit={handleRegister} className="space-y-4">
+                  {/* ── Sélection du rôle ────────────────────────────────── */}
+                  <div>
+                    <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Vous souhaitez…</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { value: 'buyer',   icon: '🛒', label: 'Acheter',  desc: 'Acheteur' },
+                        { value: 'seller',  icon: '🏪', label: 'Vendre',   desc: 'Vendeur'  },
+                        { value: 'livreur', icon: '🚚', label: 'Livrer',   desc: 'Livreur'  },
+                      ].map(r => (
+                        <button
+                          key={r.value}
+                          type="button"
+                          onClick={() => setForm(p => ({ ...p, role: r.value }))}
+                          className={`flex flex-col items-center gap-1 py-3 px-2 rounded-xl border-2 text-center transition-all ${
+                            form.role === r.value
+                              ? 'border-green-500 bg-green-50 text-green-700'
+                              : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-gray-300'
+                          }`}
+                        >
+                          <span className="text-xl">{r.icon}</span>
+                          <span className="text-xs font-bold">{r.label}</span>
+                          <span className="text-[10px] opacity-70">{r.desc}</span>
+                        </button>
+                      ))}
+                    </div>
+                    <p className="text-[11px] text-gray-400 mt-1.5">Vous pouvez acheter ET vendre avec le même compte — choisissez votre rôle principal.</p>
+                  </div>
+
                   <Input icon={<UserIcon />} label="Nom complet" placeholder="Mamadou Diallo" value={form.full_name} onChange={f('full_name')} required />
 
                   <Input
@@ -415,7 +443,7 @@ export default function RegisterPage() {
                       text-white font-bold py-3.5 rounded-xl transition-all shadow-lg shadow-green-500/20
                       disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 mt-2"
                   >
-                    {loading ? <><Spinner /> Création du compte...</> : "S'inscrire sur Guimatrix →"}
+                    {loading ? <><Spinner /> Création du compte...</> : 'Créer mon compte →'}
                   </button>
                 </form>
               </>
