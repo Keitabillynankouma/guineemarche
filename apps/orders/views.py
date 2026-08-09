@@ -333,17 +333,20 @@ class OrderListCreateView(generics.ListCreateAPIView):
                 seller=order.seller,
             )
             # Message système d'ouverture de commande
+            # (guard anti-doublon : si un msg pour cet order_ref existe déjà, on skip)
             order_ref = str(order.id)[:8].upper()
-            Message.objects.create(
-                conversation=convo,
-                sender=order.buyer,
-                content=(
-                    f"📦 Commande #{order_ref} passée.\n"
-                    f"Bonjour, je viens de commander « {order.listing.title} ». "
-                    f"N'hésitez pas à me contacter ici pour coordonner la livraison."
-                ),
-                msg_type=Message.MsgType.TEXT,
-            )
+            _msg_marker = f"📦 Commande #{order_ref}"
+            if not convo.messages.filter(content__startswith=_msg_marker).exists():
+                Message.objects.create(
+                    conversation=convo,
+                    sender=order.buyer,
+                    content=(
+                        f"📦 Commande #{order_ref} passée.\n"
+                        f"Bonjour, je viens de commander « {order.listing.title} ». "
+                        f"N'hésitez pas à me contacter ici pour coordonner la livraison."
+                    ),
+                    msg_type=Message.MsgType.TEXT,
+                )
             from django.utils import timezone as _tz
             convo.last_message_at = _tz.now()
             convo.save(update_fields=['last_message_at'])

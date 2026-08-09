@@ -19,6 +19,23 @@ const DELIVERY = {
 }
 function fmt(n) { return new Intl.NumberFormat('fr-GN').format(n) + ' GNF' }
 
+const PAYMENT_LABELS = {
+    'chachap':      { icon: '💰', label: 'ChaChap Pay' },
+    'orange_money': { icon: '🟠', label: 'Orange Money' },
+    'mtn_momo':     { icon: '🟡', label: 'MTN MoMo' },
+    'mtn':          { icon: '🟡', label: 'MTN MoMo' },
+    'card':         { icon: '💳', label: 'Carte bancaire' },
+    'paycard':      { icon: '💳', label: 'PayCard' },
+    'kulu':         { icon: '🔵', label: 'Kulu' },
+    'soutra_money': { icon: '🔷', label: 'Soutra Money' },
+    'akiba':        { icon: '🟢', label: 'Akiba' },
+    'cash':         { icon: '💵', label: 'Espèces' },
+}
+function paymentLabel(provider) {
+    const p = PAYMENT_LABELS[provider]
+    return p ? `${p.icon} ${p.label}` : `💳 ${provider}`
+}
+
 // ── Countdown escrow ─────────────────────────────────────────────────────────
 function EscrowCountdown({ releaseAt, adminHold }) {
     const [now, setNow] = useState(() => Date.now())
@@ -398,7 +415,9 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
     const canConfirm       = isBuyer  && order.status === 'confirmed'
     const canDispute       = isBuyer  && ['pending', 'confirmed'].includes(order.status)
     const canReturn        = isBuyer  && order.status === 'completed' && !returnDone
-    const canSellerConfirm = !isBuyer && order.status === 'pending'
+    // "Confirmer la commande" uniquement pour un paiement espèces en attente
+    const hasCashPending   = order.payments?.some(p => p.provider === 'cash' && p.status === 'pending')
+    const canSellerConfirm = !isBuyer && order.status === 'pending' && hasCashPending
 
     // Notation : disponible seulement si commande terminée
     const isCompleted  = order.status === 'completed'
@@ -498,23 +517,29 @@ function OrderCard({ order, isBuyer, onInvalidate }) {
                 )}
 
                 {/* Paiements existants */}
-                {order.payments?.length > 0 && (
-                    <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 space-y-1">
-                        {order.payments.map(p => (
-                            <div key={p.id} className="flex justify-between">
-                                <span>{
-                                    p.provider === 'orange_money' ? '🟠 Orange Money' :
-                                    p.provider === 'mtn_momo'     ? '🟡 MTN MoMo' :
-                                    p.provider === 'card'         ? '💳 Carte Visa (Paycard)' :
-                                    '💵 Espèces'
-                                }</span>
-                                <span className={p.status === 'paid' ? 'text-green-600 font-medium' : 'text-yellow-600'}>
-                                    {p.status === 'paid' ? '✓ Payé' : p.status === 'pending' ? '⏳ En attente' : p.status}
-                                </span>
-                            </div>
-                        ))}
-                    </div>
-                )}
+                {order.payments?.length > 0 && (() => {
+                    // Vendeur : ne montrer que les paiements pertinents
+                    // (pas les ChapChap PENDING — le webhook les confirmera automatiquement)
+                    const visiblePayments = isBuyer
+                        ? order.payments
+                        : order.payments.filter(p =>
+                            p.status === 'paid' ||
+                            (p.provider === 'cash' && p.status === 'pending')
+                          )
+                    if (!visiblePayments.length) return null
+                    return (
+                        <div className="text-xs text-gray-400 bg-gray-50 rounded-lg px-3 py-2 space-y-1">
+                            {visiblePayments.map(p => (
+                                <div key={p.id} className="flex justify-between">
+                                    <span>{paymentLabel(p.provider)}</span>
+                                    <span className={p.status === 'paid' ? 'text-green-600 font-medium' : 'text-yellow-600'}>
+                                        {p.status === 'paid' ? '✓ Payé' : p.status === 'pending' ? '⏳ En attente' : p.status}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()}
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-1 flex-wrap">
