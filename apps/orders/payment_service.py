@@ -449,11 +449,11 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
         logger.warning("[PAYOUT] %s — numéro absent, versement manuel nécessaire", payout_id)
         return PaymentResult(success=False, message="Numéro mobile money manquant — versement manuel")
 
-    # ── Cas 2 : ChaChaP B2C (quand l'API B2C sera disponible) ─────────────────
+    # ── Cas 2 : ChaChaP B2C ───────────────────────────────────────────────────
     api_key = getattr(settings, 'CHACHAP_API_KEY', '')
     if api_key:
         try:
-            import requests as _req
+            import requests as _req, json as _json
             resp = _req.post(
                 f'{CHACHAP_API_URL}/b2c/transfer',
                 json={
@@ -469,13 +469,34 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
                 },
                 timeout=20,
             )
-            data = resp.json()
-            if resp.status_code in (200, 201) and data.get('status') in ('success', 'PENDING', 'PROCESSING'):
-                ext_ref = data.get('transaction_id', '')
-                payout.mark_completed(external_ref=ext_ref, note="Versement ChaChaP B2C automatique")
-                logger.info("[PAYOUT] %s versé via ChaChaP B2C — tx=%s", payout_id, ext_ref)
+            raw = resp.text.strip()
+            logger.info("[PAYOUT] B2C HTTP %s — raw: %.300s", resp.status_code, raw)
+
+            # ChaChaP peut répondre en JSON ou en texte simple ("true", "OK"…)
+            raw_lower = raw.lower().strip()
+            try:
+                data = _json.loads(raw)
+                # Si c'est un bool Python (json "true"), convertir en dict vide
+                if not isinstance(data, dict):
+                    data = {}
+            except _json.JSONDecodeError:
+                data = {}
+
+            http_ok = resp.status_code in (200, 201, 202)
+            # Réponse texte positive : true / ok / success (parfois avec chars résiduels)
+            text_ok = raw_lower.startswith(('true', 'ok', '"ok"', '"success"', 'success'))
+            # Réponse JSON positive
+            json_ok = bool(data) and data.get('status', '').lower() in ('success', 'pending', 'processing', 'ok')
+            # JSON sans clé d'erreur explicite (réponse vide ou opaque)
+            json_silent_ok = bool(data) and 'error' not in data and 'message' not in data and 'code' not in data
+
+            if http_ok and (text_ok or json_ok or json_silent_ok):
+                ext_ref = data.get('transaction_id') or data.get('reference') or data.get('operation_id') or ''
+                payout.mark_completed(external_ref=ext_ref, note=f"Versement ChaChaP B2C automatique (raw={raw[:60]})")
+                logger.info("[PAYOUT] %s versé via ChaChaP B2C — tx=%s raw=%s", payout_id, ext_ref, raw[:60])
                 return PaymentResult(success=True, reference=ext_ref, message="Versement ChaChaP B2C réussi")
-            err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
+
+            err = data.get('message') or data.get('error') or raw[:120] or f'HTTP {resp.status_code}'
             logger.warning("[PAYOUT] ChaChaP B2C échoué: %s", err)
             payout.mark_failed(note=f"ChaChaP B2C: {err}")
             _notify_payout_failure(payout, err)
