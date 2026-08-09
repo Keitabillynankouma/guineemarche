@@ -85,7 +85,7 @@ export default function CreateListingPage() {
         weight_kg: '',
         pickup_address: '',
     })
-    const [deliveryModes, setDeliveryModes] = useState(['home_delivery'])
+    const [deliveryModes, setDeliveryModes] = useState(['meeting_point', 'home_delivery'])
     const [files, setFiles]               = useState([])
     const [previews, setPreviews]         = useState([])
     const [videoFile, setVideoFile]       = useState(null)
@@ -173,7 +173,7 @@ export default function CreateListingPage() {
                 return
             }
             if (deliveryModes.includes('pickup') && !form.pickup_address.trim()) {
-                setError('Veuillez indiquer l\'adresse du point de retrait.')
+                setError('Veuillez indiquer votre adresse / lieu de retrait.')
                 setLoading(false)
                 return
             }
@@ -446,81 +446,75 @@ export default function CreateListingPage() {
 
                     {/* ── Section 5 : Modes de livraison ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="5" icon="🚚" title="Modes de livraison" subtitle="Comment l'acheteur peut-il récupérer l'article ?" />
+                        <SectionHeader number="5" icon="🚚" title="Modes de livraison" subtitle="Cochez comment l'acheteur peut récupérer l'article" />
 
                         <div className="space-y-3">
-                            {/* Livraison à domicile */}
-                            <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition ${
-                                deliveryModes.includes('home_delivery')
-                                    ? 'border-green-500 bg-green-50'
-                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                            }`}>
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 w-4 h-4 accent-green-600"
-                                    checked={deliveryModes.includes('home_delivery')}
-                                    onChange={e => {
-                                        setDeliveryModes(prev =>
-                                            e.target.checked
-                                                ? [...prev, 'home_delivery']
-                                                : prev.filter(m => m !== 'home_delivery')
-                                        )
-                                    }}
-                                />
-                                <div className="flex-1">
-                                    <p className={`text-sm font-bold ${deliveryModes.includes('home_delivery') ? 'text-green-800' : 'text-gray-700'}`}>
-                                        🏠 Livraison à domicile
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-0.5">Un livreur GuinéeMarché récupère le colis et le livre à l'adresse de l'acheteur.</p>
-                                </div>
-                            </label>
 
-                            {/* Point de retrait */}
-                            <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition ${
-                                deliveryModes.includes('pickup')
-                                    ? 'border-blue-500 bg-blue-50'
-                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                            }`}>
-                                <input
-                                    type="checkbox"
-                                    className="mt-0.5 w-4 h-4 accent-blue-600"
-                                    checked={deliveryModes.includes('pickup')}
-                                    onChange={e => {
-                                        setDeliveryModes(prev =>
-                                            e.target.checked
-                                                ? [...prev, 'pickup']
-                                                : prev.filter(m => m !== 'pickup')
-                                        )
-                                    }}
-                                />
-                                <div className="flex-1">
-                                    <p className={`text-sm font-bold ${deliveryModes.includes('pickup') ? 'text-blue-800' : 'text-gray-700'}`}>
-                                        📦 Point de retrait
-                                    </p>
-                                    <p className="text-xs text-gray-500 mt-0.5">L'acheteur vient chercher l'article directement chez vous.</p>
-                                </div>
-                            </label>
+                            {/* ① Remise en main propre */}
+                            {[
+                                {
+                                    key:   'meeting_point',
+                                    icon:  '🤝',
+                                    label: 'Remise en main propre',
+                                    desc:  'Vous vous retrouvez dans un lieu public convenu (marché, carrefour, mosquée…). Le plus courant en Guinée.',
+                                    color: 'amber',
+                                },
+                                {
+                                    key:   'pickup',
+                                    icon:  '🏪',
+                                    label: 'Retrait chez moi',
+                                    desc:  'L\'acheteur vient chercher l\'article à votre boutique ou domicile. Précisez l\'adresse ci-dessous.',
+                                    color: 'blue',
+                                },
+                                {
+                                    key:   'home_delivery',
+                                    icon:  '🚚',
+                                    label: 'Livraison à domicile',
+                                    desc:  'Un livreur GuinéeMarché récupère l\'article et le livre chez l\'acheteur.',
+                                    color: 'green',
+                                },
+                            ].map(({ key, icon, label, desc, color }) => {
+                                const checked = deliveryModes.includes(key)
+                                const border  = checked ? `border-${color}-500 bg-${color}-50` : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                                const accent  = `accent-${color}-600`
+                                const textC   = checked ? `text-${color}-800` : 'text-gray-700'
+                                return (
+                                    <label key={key} className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition ${border}`}>
+                                        <input
+                                            type="checkbox"
+                                            className={`mt-0.5 w-4 h-4 ${accent}`}
+                                            checked={checked}
+                                            onChange={e => setDeliveryModes(prev =>
+                                                e.target.checked ? [...prev, key] : prev.filter(m => m !== key)
+                                            )}
+                                        />
+                                        <div className="flex-1">
+                                            <p className={`text-sm font-bold ${textC}`}>{icon} {label}</p>
+                                            <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+                                        </div>
+                                    </label>
+                                )
+                            })}
 
-                            {/* Adresse de retrait — s'affiche seulement si pickup coché */}
+                            {/* Adresse de retrait — s'affiche uniquement si "Retrait chez moi" coché */}
                             {deliveryModes.includes('pickup') && (
-                                <div className="mt-1 ml-1">
+                                <div className="mt-1 pl-2 border-l-2 border-blue-200 space-y-1">
                                     <label className={labelClass}>
-                                        📍 Adresse du point de retrait <span className="text-red-500">*</span>
+                                        📍 Votre adresse / lieu de retrait <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
-                                        placeholder="Ex : Kaloum, en face de la mosquée centrale, Conakry"
+                                        placeholder="Ex : Kaloum, boutique N°12, en face de la mosquée centrale"
                                         value={form.pickup_address}
                                         onChange={e => setForm({ ...form, pickup_address: e.target.value })}
                                         className={inputClass}
-                                        required
                                     />
-                                    <p className="text-xs text-gray-400 mt-1">Soyez précis : quartier, repère, numéro de boutique…</p>
+                                    <p className="text-xs text-gray-400">Quartier + repère connu = moins d'appels de l'acheteur.</p>
                                 </div>
                             )}
 
                             {deliveryModes.length === 0 && (
-                                <p className="text-xs text-red-500 mt-1">⚠️ Sélectionnez au moins un mode de livraison.</p>
+                                <p className="text-xs text-red-500 mt-1">⚠️ Cochez au moins un mode de livraison.</p>
                             )}
                         </div>
                     </div>

@@ -317,8 +317,35 @@ function MeetingMap({ zones, selected, onSelect, city }) {
 }
 
 // ── Order Modal ────────────────────────────────────────────────────────────────
+// Modes vendeur → mode commande
+const SELLER_MODE_MAP = {
+    meeting_point: 'meeting_point',
+    pickup:        'seller_pickup',
+    home_delivery: 'home_delivery',
+}
+// Construit la liste des modes disponibles selon ce que le vendeur a autorisé
+function buildAvailableModes(listing) {
+    const allowed = Array.isArray(listing.allowed_delivery_modes) ? listing.allowed_delivery_modes : []
+    const modes = []
+    if (allowed.includes('meeting_point')) modes.push({ value: 'meeting_point', label: 'Main propre',       icon: '🤝', sub: 'Rencontre physique' })
+    if (allowed.includes('pickup'))        modes.push({ value: 'seller_pickup', label: 'Retrait vendeur',   icon: '🏪', sub: listing.pickup_address || 'Chez le vendeur' })
+    if (allowed.includes('home_delivery')) modes.push({ value: 'home_delivery', label: 'Domicile',          icon: '🚚', sub: 'Livraison chez vous' })
+    // Point retrait réseau GuinéeMarché — toujours disponible
+    modes.push({ value: 'pickup_point', label: 'Point retrait',  icon: '📦', sub: 'Réseau GuinéeMarché' })
+    // Si aucun mode vendeur → fallback tout afficher
+    if (allowed.length === 0) {
+        return [
+            { value: 'meeting_point', label: 'Main propre',     icon: '🤝', sub: 'Rencontre physique' },
+            { value: 'pickup_point',  label: 'Point retrait',   icon: '📦', sub: 'Réseau GuinéeMarché' },
+            { value: 'home_delivery', label: 'Domicile',        icon: '🚚', sub: 'Livraison chez vous' },
+        ]
+    }
+    return modes
+}
+
 function OrderModal({ listing, onClose, onSuccess }) {
-    const [deliveryMode, setDeliveryMode]   = useState('meeting_point')
+    const availableModes = buildAvailableModes(listing)
+    const [deliveryMode, setDeliveryMode]   = useState(availableModes[0]?.value || 'meeting_point')
     const [meetLocation, setMeetLocation]   = useState('')
     const [customLocation, setCustomLocation] = useState('')
     const [pickupPoint, setPickupPoint]     = useState('')
@@ -440,8 +467,9 @@ function OrderModal({ listing, onClose, onSuccess }) {
         try {
             const orderPayload = {
                 listing:          listing.id,
-                delivery_mode:    deliveryMode,
-                meet_location:    deliveryMode === 'meeting_point'  ? finalMeetLocation : '',
+                // seller_pickup → on envoie 'pickup' au backend avec l'adresse du vendeur
+                delivery_mode:    deliveryMode === 'seller_pickup' ? 'pickup' : deliveryMode,
+                meet_location:    deliveryMode === 'meeting_point'  ? finalMeetLocation : (deliveryMode === 'seller_pickup' ? listing.pickup_address : ''),
                 pickup_point:     deliveryMode === 'pickup_point'   ? pickupPoint       : null,
                 delivery_address: deliveryMode === 'home_delivery'  ? deliveryAddress   : '',
             }
@@ -486,11 +514,8 @@ function OrderModal({ listing, onClose, onSuccess }) {
         }
     }
 
-    const DELIVERY_MODES = [
-        { value: 'meeting_point', label: 'Main propre',     icon: '🤝', sub: 'Rencontre physique' },
-        { value: 'pickup_point',  label: 'Point retrait',   icon: '🏪', sub: 'Dans notre réseau' },
-        { value: 'home_delivery', label: 'Domicile',        icon: '🚗', sub: 'Livraison chez vous' },
-    ]
+    // Modes filtrés selon ce que le vendeur a autorisé
+    const DELIVERY_MODES = availableModes
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
@@ -576,7 +601,20 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Point de retrait */}
+                        {/* Retrait chez le vendeur */}
+                        {deliveryMode === 'seller_pickup' && (
+                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
+                                <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">📍 Adresse du vendeur</p>
+                                {listing.pickup_address ? (
+                                    <p className="text-sm text-blue-800 font-medium">{listing.pickup_address}</p>
+                                ) : (
+                                    <p className="text-sm text-blue-600">Le vendeur n'a pas précisé son adresse. Contactez-le via la messagerie.</p>
+                                )}
+                                <p className="text-xs text-blue-500 mt-1">Convenez d'un horaire avec le vendeur avant de vous déplacer.</p>
+                            </div>
+                        )}
+
+                        {/* Point de retrait réseau */}
                         {deliveryMode === 'pickup_point' && (
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Point de retrait</label>
