@@ -1001,7 +1001,8 @@ function TabSettings() {
             onChange={e => mutation.mutate({ max_free_listings: Number(e.target.value) })}
             className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
           >
-            {[3, 5, 10, 20, 50].map(n => <option key={n} value={n}>{n} annonces</option>)}
+            <option value={0}>0 annonce — tout payant</option>
+            {[1, 3, 5, 10, 20, 50].map(n => <option key={n} value={n}>{n} annonce{n > 1 ? 's' : ''}</option>)}
           </select>
         </div>
 

@@ -82,15 +82,24 @@ class ListingListCreateView(generics.ListCreateAPIView):
             site = None
 
         sub, _ = Subscription.objects.get_or_create(user=user)
-        # Vérifier quotas seulement si abonnements actifs ET gratuites désactivées
-        if site and not site.free_listings_enabled and site.subscriptions_enabled:
-            limit = site.max_free_listings
-            if not sub.can_post:
+        # Vérifier quotas dès que "Publications gratuites illimitées" est désactivé.
+        # NB : le toggle "Activer les abonnements payants" est indépendant — il
+        #      sert uniquement à afficher la page Tarifs. La limite s'applique
+        #      sans qu'il soit nécessaire d'activer les abonnements payants.
+        if site and not site.free_listings_enabled:
+            limit = site.max_free_listings  # valeur définie dans Paramètres admin
+            # Pro → illimité | Gratuit → vérifier le compteur contre la limite du site
+            if not sub.is_pro and sub.listings_used >= limit:
                 raise PermissionDenied(
                     detail={
                         'code': 'subscription_required',
-                        'message': f'Vous avez atteint la limite de {limit} annonces gratuites. '
-                                   'Passez au plan Pro pour publier des annonces illimitées.',
+                        'message': (
+                            f'Vous avez atteint la limite de {limit} annonce{"s" if limit != 1 else ""} gratuite{"s" if limit != 1 else ""}. '
+                            'Passez au plan Pro pour publier des annonces illimitées.'
+                            if limit > 0 else
+                            'La publication d\'annonces est réservée aux abonnés. '
+                            'Contactez l\'administrateur pour obtenir un accès Pro.'
+                        ),
                     }
                 )
 
