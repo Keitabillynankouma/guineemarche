@@ -428,8 +428,28 @@ class SubscriptionView(APIView):
     throttle_classes    = [SubscriptionRateThrottle]
 
     def get(self, request):
+        from core.site_settings import SiteSettings
         sub, _ = Subscription.objects.get_or_create(user=request.user)
-        return Response(SubscriptionSerializer(sub).data)
+        data = SubscriptionSerializer(sub).data
+        # Enrichir avec les paramètres du site pour que le frontend
+        # utilise la limite configurée dans l'admin (et non FREE_LIMIT=5 codé en dur)
+        try:
+            site = SiteSettings.get()
+            max_free = site.max_free_listings
+            free_enabled = site.free_listings_enabled
+        except Exception:
+            max_free = 5
+            free_enabled = True
+        data['max_free_listings']    = max_free
+        data['free_listings_enabled'] = free_enabled
+        # Recalcul can_post et remaining_free avec la vraie limite admin
+        if free_enabled or sub.is_pro:
+            data['can_post']       = True
+            data['remaining_free'] = None  # illimité
+        else:
+            data['can_post']       = sub.listings_used < max_free
+            data['remaining_free'] = max(0, max_free - sub.listings_used)
+        return Response(data)
 
     def post(self, request):
         from apps.orders.payment_service import initiate_orange_money

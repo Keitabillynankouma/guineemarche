@@ -513,7 +513,7 @@ export default function ProfilePage() {
                             <div className="flex items-center justify-between text-sm">
                                 <span className="text-gray-600">Annonces gratuites utilisées</span>
                                 <span className={`font-bold ${sub?.remaining_free === 0 ? 'text-red-500' : 'text-gray-800'}`}>
-                                    {sub?.listings_used ?? '…'} / 5
+                                    {sub?.listings_used ?? '…'} / {sub?.max_free_listings ?? 5}
                                 </span>
                             </div>
                             <div className="w-full bg-gray-100 rounded-full h-2">

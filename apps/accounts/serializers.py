@@ -316,7 +316,8 @@ class UserSerializer(serializers.ModelSerializer):
             return SubscriptionSerializer(sub).data
         except Exception:
             return {'plan': 'free', 'listings_used': 0, 'valid_until': None,
-                    'is_pro': False, 'can_post': True, 'remaining_free': 5}
+                    'is_pro': False, 'can_post': True, 'remaining_free': None,
+                    'max_free_listings': 5, 'free_listings_enabled': True}
 
     class Meta:
         model  = User

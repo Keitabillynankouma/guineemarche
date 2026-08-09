@@ -129,7 +129,7 @@ export default function CreateListingPage() {
                     <div>
                         <h2 className="text-xl font-black text-gray-900 mb-1">Limite atteinte</h2>
                         <p className="text-gray-500 text-sm leading-relaxed">
-                            Vous avez utilisé vos 5 annonces gratuites. Passez au plan Pro pour publier des annonces illimitées.
+                            Vous avez utilisé vos {sub.max_free_listings ?? 5} annonces gratuites. Passez au plan Pro pour publier des annonces illimitées.
                         </p>
                     </div>
                     <Link to="/upgrade"
