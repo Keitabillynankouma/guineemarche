@@ -779,21 +779,33 @@ class AdminUserUpdateView(APIView):
         target_user = get_object_or_404(User, pk=pk)
         requester   = request.user
 
-        # Seul super_admin peut modifier les rôles ou is_staff
-        # Un admin ordinaire ne peut que (dés)activer is_active / is_available
-        is_super = requester.role == 'super_admin'
-        sensitive_fields = {'role', 'is_staff'}
+        is_super = requester.role == User.Role.SUPER_ADMIN
 
-        for sf in sensitive_fields:
-            if sf in request.data and not is_super:
-                return Response(
-                    {'error': f'Seul un super_admin peut modifier le champ « {sf} ».'},
-                    status=403,
-                )
-
-        # Empêcher l'auto-promotion (même pour super_admin)
+        # Empêcher l'auto-modification de rôle
         if str(target_user.id) == str(requester.id) and 'role' in request.data:
             return Response({'error': 'Vous ne pouvez pas modifier votre propre rôle.'}, status=403)
+
+        # is_staff : super_admin uniquement
+        if 'is_staff' in request.data and not is_super:
+            return Response({'error': 'Seul un super_admin peut modifier is_staff.'}, status=403)
+
+        # Changement de rôle : admin peut gérer buyer/seller/livreur
+        # Promouvoir vers un rôle admin/* nécessite super_admin
+        if 'role' in request.data:
+            new_role = request.data['role']
+            admin_roles = {
+                User.Role.ADMIN, User.Role.SUPER_ADMIN,
+                User.Role.ADMIN_DELIVERY, User.Role.ADMIN_MARKETING, User.Role.ADMIN_ACCOUNTING,
+            }
+            if new_role in admin_roles and not is_super:
+                return Response(
+                    {'error': 'Seul un super_admin peut attribuer un rôle administrateur.'},
+                    status=403,
+                )
+            # Valider que le rôle existe
+            valid_roles = {r.value for r in User.Role}
+            if new_role not in valid_roles:
+                return Response({'error': f'Rôle invalide : {new_role}'}, status=400)
 
         allowed_fields = {'role', 'is_active', 'is_available', 'is_staff'}
         update_fields  = []
