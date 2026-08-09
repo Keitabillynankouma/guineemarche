@@ -4,7 +4,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-CHACHAP_API_URL = 'https://chapchappay.com'
+CHACHAP_API_URL = 'https://api.chapchappay.com'
 
 
 def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
@@ -294,15 +294,15 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
     phone   = livreur.payout_phone
     provider = livreur.payout_provider
 
-    # Normalisation : ChaChaP attend +224XXXXXXXXX
+    # Normalisation : ChaChaP PUSH API attend 224XXXXXXXXX (sans +)
     if phone:
         phone = phone.replace(' ', '').replace('-', '')
-        if phone.startswith('00224'):
-            phone = '+' + phone[2:]
-        elif phone.startswith('224') and len(phone) == 12:
-            phone = '+' + phone
-        elif not phone.startswith('+'):
-            phone = '+224' + phone
+        if phone.startswith('+'):
+            phone = phone[1:]
+        elif phone.startswith('00224'):
+            phone = phone[2:]
+        elif not phone.startswith('224'):
+            phone = '224' + phone
 
     logger.info("[LIVREUR PAYOUT] Démarrage virement %s → %s GNF sur %s (%s) pour %s",
                 weekly_payout_id, amount, phone, provider, livreur.full_name)
@@ -314,18 +314,16 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
         logger.warning("[LIVREUR PAYOUT] %s — numéro absent pour %s", weekly_payout_id, livreur.full_name)
         return PaymentResult(success=False, message=f"Numéro mobile money manquant pour {livreur.full_name}")
 
-    # ── Cas 2 : ChaChaP B2C (PUSH API) ──────────────────────────────────────
+    # ── Cas 2 : ChaChaP PUSH API ──────────────────────────────────────────────
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
     if api_key:
         try:
             import requests as _req, json as _json2, hmac as _hmac2, hashlib as _hs2
             _body2 = {
-                'recipient_phone': phone,
-                'amount':          amount,
-                'currency':        'GNF',
-                'reference':       str(payout.id),
-                'description':     f'Salaire livreur Guimatrix semaine du {payout.week_start}',
+                'account_number': phone,
+                'amount':         amount,
+                'description':    f'Salaire livreur Guimatrix semaine du {payout.week_start}',
             }
             _body2_bytes = _json2.dumps(_body2, separators=(',', ':')).encode()
             _headers2 = {
@@ -336,34 +334,38 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
                 _sig2 = _hmac2.new(encrypt_key.encode(), _body2_bytes, _hs2.sha256).hexdigest()
                 _headers2['CCP-HMAC-Signature'] = _sig2
             resp = _req.post(
-                f'{CHACHAP_API_URL}/api/push/transfer',
+                f'{CHACHAP_API_URL}/api/push/request',
                 data=_body2_bytes,
                 headers=_headers2,
                 timeout=20,
             )
             raw2 = resp.text.strip()
+            logger.info("[LIVREUR PAYOUT] PUSH HTTP %s — raw: %.300s", resp.status_code, raw2)
             try:
                 data = _json2.loads(raw2)
                 if not isinstance(data, dict):
                     data = {}
             except Exception:
                 data = {}
-            if resp.status_code in (200, 201) and data.get('status') in ('success', 'PENDING', 'PROCESSING'):
-                ext_ref = data.get('transaction_id', '')
+            http_ok = resp.status_code in (200, 201, 202)
+            has_id  = bool(data.get('request_id'))
+            json_ok = bool(data) and data.get('status', '').lower() in ('success', 'pending', 'processing', 'new')
+            if http_ok and (has_id or json_ok):
+                ext_ref = data.get('request_id') or data.get('transaction_id', '')
                 payout.status         = LivreurWeeklyPayout.Status.PAID
                 payout.paid_at        = timezone.now()
                 payout.payment_ref    = ext_ref
                 payout.payment_method = provider
-                payout.note           = "Virement ChaChaP B2C automatique"
+                payout.note           = f"Virement ChaChaP PUSH (request_id={ext_ref})"
                 payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
-                logger.info("[LIVREUR PAYOUT] %s versé via ChaChaP B2C — tx=%s", weekly_payout_id, ext_ref)
-                return PaymentResult(success=True, reference=ext_ref, message="Virement ChaChaP B2C réussi")
+                logger.info("[LIVREUR PAYOUT] %s versé via ChaChaP PUSH — request_id=%s", weekly_payout_id, ext_ref)
+                return PaymentResult(success=True, reference=ext_ref, message="Virement ChaChaP PUSH initié")
 
             err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
-            logger.warning("[LIVREUR PAYOUT] ChaChaP B2C échoué: %s", err)
-            payout.note = f"ChaChaP B2C échoué: {err}"
+            logger.warning("[LIVREUR PAYOUT] ChaChaP PUSH échoué: %s", err)
+            payout.note = f"ChaChaP PUSH échoué: {err}"
             payout.save(update_fields=['note', 'updated_at'])
-            return PaymentResult(success=False, message=f"ChaChaP B2C: {err}")
+            return PaymentResult(success=False, message=f"ChaChaP PUSH: {err}")
         except Exception as exc:
             logger.error("[LIVREUR PAYOUT] ChaChaP B2C exception: %s", exc)
             payout.note = f"Exception virement: {exc}"
@@ -442,15 +444,15 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
     amount = payout.amount_gnf
     phone  = payout.payout_phone
 
-    # Normalisation du numéro : ChaChaP attend +224XXXXXXXXX
+    # Normalisation : ChaChaP PUSH API attend 224XXXXXXXXX (sans +)
     if phone:
         phone = phone.replace(' ', '').replace('-', '')
-        if phone.startswith('00224'):
-            phone = '+' + phone[2:]
-        elif phone.startswith('224') and len(phone) == 12:
-            phone = '+' + phone
-        elif not phone.startswith('+'):
-            phone = '+224' + phone
+        if phone.startswith('+'):
+            phone = phone[1:]          # +224XXXXXX → 224XXXXXX
+        elif phone.startswith('00224'):
+            phone = phone[2:]          # 00224XXXXXX → 224XXXXXX
+        elif not phone.startswith('224'):
+            phone = '224' + phone      # 6XXXXXXXX → 224 6XXXXXXXX
 
     logger.info("[PAYOUT] Démarrage versement %s → %s GNF sur %s (%s)",
                 payout_id, amount, phone, payout.provider)
@@ -468,62 +470,57 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
     if api_key:
         try:
             import requests as _req, json as _json, hmac as _hmac, hashlib as _hs
+            # Endpoint officiel: POST /api/push/request
+            # Body minimal selon la doc: account_number + amount (+ description optionnel)
             _body = {
-                'recipient_phone': phone,
-                'amount':          amount,
-                'currency':        'GNF',
-                'reference':       str(payout.id),
-                'description':     f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
+                'account_number': phone,
+                'amount':         amount,
+                'description':    f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
             }
             _body_bytes = _json.dumps(_body, separators=(',', ':')).encode()
             _headers = {
                 'CCP-Api-Key':  api_key,
                 'Content-Type': 'application/json',
             }
-            # Signature HMAC requise par la PUSH API
+            # Signature HMAC-SHA256 requise par la PUSH API
             if encrypt_key:
                 _sig = _hmac.new(encrypt_key.encode(), _body_bytes, _hs.sha256).hexdigest()
                 _headers['CCP-HMAC-Signature'] = _sig
             resp = _req.post(
-                f'{CHACHAP_API_URL}/api/push/transfer',
+                f'{CHACHAP_API_URL}/api/push/request',
                 data=_body_bytes,
                 headers=_headers,
                 timeout=20,
             )
             raw = resp.text.strip()
-            logger.info("[PAYOUT] B2C HTTP %s — raw: %.300s", resp.status_code, raw)
+            logger.info("[PAYOUT] PUSH HTTP %s — raw: %.300s", resp.status_code, raw)
 
-            # ChaChaP peut répondre en JSON ou en texte simple ("true", "OK"…)
-            raw_lower = raw.lower().strip()
             try:
                 data = _json.loads(raw)
-                # Si c'est un bool Python (json "true"), convertir en dict vide
                 if not isinstance(data, dict):
                     data = {}
             except _json.JSONDecodeError:
                 data = {}
 
-            http_ok = resp.status_code in (200, 201, 202)
-            # Réponse texte positive : true / ok / success (parfois avec chars résiduels)
-            text_ok = raw_lower.startswith(('true', 'ok', '"ok"', '"success"', 'success'))
-            # Réponse JSON positive
-            json_ok = bool(data) and data.get('status', '').lower() in ('success', 'pending', 'processing', 'ok')
-            # JSON sans clé d'erreur explicite (réponse vide ou opaque)
-            json_silent_ok = bool(data) and 'error' not in data and 'message' not in data and 'code' not in data
+            # Succès : HTTP 201 + request_id présent (demande créée, traitement asynchrone)
+            # ou HTTP 200/202 avec status success/pending
+            http_ok  = resp.status_code in (200, 201, 202)
+            has_id   = bool(data.get('request_id'))
+            json_ok  = bool(data) and data.get('status', '').lower() in ('success', 'pending', 'processing', 'new')
 
-            if http_ok and (text_ok or json_ok or json_silent_ok):
-                ext_ref = data.get('transaction_id') or data.get('reference') or data.get('operation_id') or ''
-                payout.mark_completed(external_ref=ext_ref, note=f"Versement ChaChaP B2C automatique (raw={raw[:60]})")
-                logger.info("[PAYOUT] %s versé via ChaChaP B2C — tx=%s raw=%s", payout_id, ext_ref, raw[:60])
-                return PaymentResult(success=True, reference=ext_ref, message="Versement ChaChaP B2C réussi")
+            if http_ok and (has_id or json_ok):
+                ext_ref = data.get('request_id') or data.get('transaction_id') or data.get('operation_id') or ''
+                payout.mark_completed(external_ref=ext_ref, note=f"Versement ChaChaP PUSH (request_id={ext_ref})")
+                logger.info("[PAYOUT] %s versé via ChaChaP PUSH — request_id=%s", payout_id, ext_ref)
+                return PaymentResult(success=True, reference=ext_ref, message="Versement ChaChaP PUSH initié")
 
             err = data.get('message') or data.get('error') or raw[:120] or f'HTTP {resp.status_code}'
-            logger.warning("[PAYOUT] ChaChaP B2C échoué: %s", err)
-            payout.mark_failed(note=f"ChaChaP B2C: {err}")
+            logger.warning("[PAYOUT] ChaChaP PUSH échoué: %s", err)
+            payout.mark_failed(note=f"ChaChaP PUSH: {err}")
             _notify_payout_failure(payout, err)
-            return PaymentResult(success=False, message=f"ChaChaP B2C: {err}")
+            return PaymentResult(success=False, message=f"ChaChaP PUSH: {err}")
         except Exception as exc:
-            logger.error("[PAYOUT] ChaChaP B2C exception: %s", exc)
+            logger.error("[PAYOUT] ChaChaP PUSH exception: %s", exc)
             payout.mark_failed(note=f"Exception: {exc}")
             _notify_payout_failure(payout, str(exc))
             return PaymentResult(success=False, message=str(exc))
