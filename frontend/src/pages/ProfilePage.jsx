@@ -363,7 +363,7 @@ export default function ProfilePage() {
         }
     }
 
-    // Bannière mobile money manquant
+    // Bannière urgente : gain en attente mais pas de numéro payout
     const missingPayout = !user?.payout_phone && (user?.profile?.total_sales > 0)
 
     // Villes & quartiers dynamiques depuis communes.js
@@ -444,8 +444,41 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
-                {/* Dashboard vendeur */}
-                {user.role === 'seller' && <SellerDashboard userId={user.id} />}
+                {/* ── Carte Mobile Money — visible pour tous ─────────────────── */}
+                <div className="bg-white rounded-2xl shadow p-4">
+                    <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2">
+                            <span className="text-lg">💳</span>
+                            <h2 className="font-semibold text-gray-700 text-sm">Mobile Money (paiements)</h2>
+                        </div>
+                        <button
+                            onClick={() => openEdit(true)}
+                            className="text-xs text-green-600 border border-green-200 rounded-full px-3 py-1 hover:bg-green-50 transition"
+                        >
+                            {user.payout_phone ? '✏️ Modifier' : '+ Ajouter'}
+                        </button>
+                    </div>
+                    {user.payout_phone ? (
+                        <div className="flex items-center gap-3 bg-green-50 border border-green-200 rounded-xl px-4 py-3">
+                            <span className="text-green-600 text-xl">✅</span>
+                            <div>
+                                <p className="text-sm font-semibold text-green-800">{user.payout_phone}</p>
+                                <p className="text-xs text-green-600 capitalize">{user.payout_provider?.replace('_', ' ') || 'Opérateur non renseigné'}</p>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+                            <span className="text-amber-500 text-xl">⚠️</span>
+                            <div>
+                                <p className="text-sm font-semibold text-amber-800">Non configuré</p>
+                                <p className="text-xs text-amber-600">Requis pour recevoir vos gains si vous vendez un article.</p>
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Dashboard vendeur — visible si vendeur OU s'il a déjà des ventes */}
+                {(user.role === 'seller' || user.profile?.total_sales > 0) && <SellerDashboard userId={user.id} />}
 
                 {badges.length > 0 && (
                     <div className="bg-white rounded-2xl shadow p-4">

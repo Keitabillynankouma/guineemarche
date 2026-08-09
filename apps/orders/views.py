@@ -306,6 +306,41 @@ class OrderListCreateView(generics.ListCreateAPIView):
             send_order_sms_buyer(order)
         except Exception:
             pass
+        # ── Créer automatiquement la conversation vendeur↔acheteur ──────────────
+        try:
+            from apps.messaging.models import Conversation, Message
+            convo, _ = Conversation.objects.get_or_create(
+                listing=order.listing,
+                buyer=order.buyer,
+                seller=order.seller,
+            )
+            # Message système d'ouverture de commande
+            order_ref = str(order.id)[:8].upper()
+            Message.objects.create(
+                conversation=convo,
+                sender=order.buyer,
+                content=(
+                    f"📦 Commande #{order_ref} passée.\n"
+                    f"Bonjour, je viens de commander « {order.listing.title} ». "
+                    f"N'hésitez pas à me contacter ici pour coordonner la livraison."
+                ),
+                msg_type=Message.MsgType.TEXT,
+            )
+            from django.utils import timezone as _tz
+            convo.last_message_at = _tz.now()
+            convo.save(update_fields=['last_message_at'])
+            # Notifier le vendeur qu'un message l'attend
+            from apps.notifications.models import Notification as _Notif
+            _Notif.send(
+                user=order.seller,
+                type=_Notif.Type.MESSAGE,
+                title=f'💬 Nouveau message — {order.buyer.full_name}',
+                body=f'Commande #{order_ref} : « {order.listing.title} » — L\'acheteur vous a envoyé un message.',
+                data={'conversation_id': str(convo.id), 'order_id': str(order.id)},
+            )
+        except Exception as _ce:
+            logger.warning("[ORDER CREATE] Création conversation échouée: %s", _ce)
+
         # Auto-assign livreur pour les livraisons à domicile
         if order.delivery_mode == Order.DeliveryMode.HOME_DELIVERY:
             try:
