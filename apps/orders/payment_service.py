@@ -294,6 +294,16 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
     phone   = livreur.payout_phone
     provider = livreur.payout_provider
 
+    # Normalisation : ChaChaP attend +224XXXXXXXXX
+    if phone:
+        phone = phone.replace(' ', '').replace('-', '')
+        if phone.startswith('00224'):
+            phone = '+' + phone[2:]
+        elif phone.startswith('224') and len(phone) == 12:
+            phone = '+' + phone
+        elif not phone.startswith('+'):
+            phone = '+224' + phone
+
     logger.info("[LIVREUR PAYOUT] Démarrage virement %s → %s GNF sur %s (%s) pour %s",
                 weekly_payout_id, amount, phone, provider, livreur.full_name)
 
@@ -418,6 +428,17 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
 
     amount = payout.amount_gnf
     phone  = payout.payout_phone
+
+    # Normalisation du numéro : ChaChaP attend +224XXXXXXXXX
+    if phone:
+        phone = phone.replace(' ', '').replace('-', '')
+        if phone.startswith('00224'):
+            phone = '+' + phone[2:]
+        elif phone.startswith('224') and len(phone) == 12:
+            phone = '+' + phone
+        elif not phone.startswith('+'):
+            phone = '+224' + phone
+
     logger.info("[PAYOUT] Démarrage versement %s → %s GNF sur %s (%s)",
                 payout_id, amount, phone, payout.provider)
 

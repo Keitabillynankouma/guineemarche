@@ -636,11 +636,27 @@ def _verify_chachap_signature(request):
         except (ValueError, TypeError):
             logger.warning("[CHACHAP] Ccp-Timestamp invalide : %s", ts_header)
 
-    body     = request.body
-    expected = hmac.new(hmac_key.encode(), body, hashlib.sha256).hexdigest()
+    body = request.body
+    # ChapChap envoie parfois le body double-encodé : la payload JSON est
+    # sérialisée en string JSON (body = b'"{\\"key\\":\\"val\\"}"').
+    # ChapChap signe le JSON intérieur, pas l'enveloppe string.
+    # → Si le body commence par '"', on décode d'abord.
+    import json as _json_
+    body_for_hmac = body
+    if body.startswith(b'"'):
+        try:
+            inner = _json_.loads(body)
+            if isinstance(inner, str):
+                body_for_hmac = inner.encode()
+                logger.debug("[CHACHAP] Body double-encodé détecté — HMAC calculé sur le JSON intérieur (%d octets)", len(body_for_hmac))
+        except Exception as _je:
+            logger.debug("[CHACHAP] Tentative décodage double-encode échouée: %s — utilisation du body brut", _je)
+
+    expected = hmac.new(hmac_key.encode(), body_for_hmac, hashlib.sha256).hexdigest()
     ok = hmac.compare_digest(sig_header, expected)
     if not ok:
-        logger.warning("[CHACHAP] Signature invalide — reçue=%s attendue=%s", sig_header[:16], expected[:16])
+        logger.warning("[CHACHAP] Signature invalide — reçue=%s attendue=%s (body_len=%d body_for_hmac_len=%d)",
+                       sig_header[:16], expected[:16], len(body), len(body_for_hmac))
     return ok
 
 

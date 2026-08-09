@@ -74,6 +74,18 @@ class Listing(BaseModel):
     weight_kg   = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
                                       help_text="Poids en kg — utilisé pour calculer les frais de livraison")
 
+    # Modes de livraison autorisés par le vendeur
+    # Valeurs possibles dans la liste : 'home_delivery', 'pickup'
+    allowed_delivery_modes = models.JSONField(
+        default=list, blank=True,
+        help_text="Liste des modes de livraison autorisés : ['home_delivery', 'pickup']"
+    )
+    # Adresse du point de retrait (obligatoire si 'pickup' dans allowed_delivery_modes)
+    pickup_address = models.CharField(
+        max_length=300, blank=True,
+        help_text="Adresse/description du point de retrait (si mode retrait activé)"
+    )
+
     # Attributs dynamiques selon catégorie (ex: {"brand":"Toyota","year":"2020"})
     attributes  = models.JSONField(default=dict, blank=True)
 

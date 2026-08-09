@@ -1173,6 +1173,37 @@ export default function ListingDetailPage() {
                         </div>
                     )}
 
+                    {/* Modes de livraison */}
+                    {listing.allowed_delivery_modes && listing.allowed_delivery_modes.length > 0 && (
+                        <div className="bg-white rounded-2xl shadow-card p-5">
+                            <h2 className="font-semibold text-gray-700 text-sm mb-3">🚚 Modes de livraison disponibles</h2>
+                            <div className="space-y-2">
+                                {listing.allowed_delivery_modes.includes('home_delivery') && (
+                                    <div className="flex items-start gap-3 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
+                                        <span className="text-base">🏠</span>
+                                        <div>
+                                            <p className="text-sm font-semibold text-green-800">Livraison à domicile</p>
+                                            <p className="text-xs text-green-600 mt-0.5">Un livreur GuinéeMarché vous livre à votre adresse.</p>
+                                        </div>
+                                    </div>
+                                )}
+                                {listing.allowed_delivery_modes.includes('pickup') && (
+                                    <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
+                                        <span className="text-base">📦</span>
+                                        <div>
+                                            <p className="text-sm font-semibold text-blue-800">Point de retrait</p>
+                                            {listing.pickup_address ? (
+                                                <p className="text-xs text-blue-600 mt-0.5">📍 {listing.pickup_address}</p>
+                                            ) : (
+                                                <p className="text-xs text-blue-500 mt-0.5">Contactez le vendeur pour l'adresse.</p>
+                                            )}
+                                        </div>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    )}
+
                     {/* Bouton acheter */}
                     {!isSeller && listing.status === 'active' && (
                         <div className="bg-white rounded-2xl shadow-card p-5 space-y-3">

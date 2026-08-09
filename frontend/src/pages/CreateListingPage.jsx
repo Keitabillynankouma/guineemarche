@@ -83,7 +83,9 @@ export default function CreateListingPage() {
         price_type: 'fixed', condition: 'good',
         city: 'Conakry', quartier: '', category: '',
         weight_kg: '',
+        pickup_address: '',
     })
+    const [deliveryModes, setDeliveryModes] = useState(['home_delivery'])
     const [files, setFiles]               = useState([])
     const [previews, setPreviews]         = useState([])
     const [videoFile, setVideoFile]       = useState(null)
@@ -165,11 +167,22 @@ export default function CreateListingPage() {
         setError('')
         setLoading(true)
         try {
+            if (deliveryModes.length === 0) {
+                setError('Sélectionnez au moins un mode de livraison.')
+                setLoading(false)
+                return
+            }
+            if (deliveryModes.includes('pickup') && !form.pickup_address.trim()) {
+                setError('Veuillez indiquer l\'adresse du point de retrait.')
+                setLoading(false)
+                return
+            }
             const formData = new FormData()
             const payload  = { ...form, category: subCategory || form.category }
             Object.entries(payload).forEach(([k, v]) => {
                 if (v !== '' && v !== null && v !== undefined) formData.append(k, v)
             })
+            formData.append('allowed_delivery_modes', JSON.stringify(deliveryModes))
             if (Object.keys(attributes).length > 0) {
                 formData.append('attributes', JSON.stringify(attributes))
             }
@@ -431,9 +444,90 @@ export default function CreateListingPage() {
                         </div>
                     </div>
 
-                    {/* ── Section 4 : Médias ── */}
+                    {/* ── Section 5 : Modes de livraison ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="5" icon="📷" title="Photos & Vidéo" subtitle="Les annonces avec photos obtiennent 5× plus de vues" />
+                        <SectionHeader number="5" icon="🚚" title="Modes de livraison" subtitle="Comment l'acheteur peut-il récupérer l'article ?" />
+
+                        <div className="space-y-3">
+                            {/* Livraison à domicile */}
+                            <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition ${
+                                deliveryModes.includes('home_delivery')
+                                    ? 'border-green-500 bg-green-50'
+                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    className="mt-0.5 w-4 h-4 accent-green-600"
+                                    checked={deliveryModes.includes('home_delivery')}
+                                    onChange={e => {
+                                        setDeliveryModes(prev =>
+                                            e.target.checked
+                                                ? [...prev, 'home_delivery']
+                                                : prev.filter(m => m !== 'home_delivery')
+                                        )
+                                    }}
+                                />
+                                <div className="flex-1">
+                                    <p className={`text-sm font-bold ${deliveryModes.includes('home_delivery') ? 'text-green-800' : 'text-gray-700'}`}>
+                                        🏠 Livraison à domicile
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">Un livreur GuinéeMarché récupère le colis et le livre à l'adresse de l'acheteur.</p>
+                                </div>
+                            </label>
+
+                            {/* Point de retrait */}
+                            <label className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition ${
+                                deliveryModes.includes('pickup')
+                                    ? 'border-blue-500 bg-blue-50'
+                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
+                            }`}>
+                                <input
+                                    type="checkbox"
+                                    className="mt-0.5 w-4 h-4 accent-blue-600"
+                                    checked={deliveryModes.includes('pickup')}
+                                    onChange={e => {
+                                        setDeliveryModes(prev =>
+                                            e.target.checked
+                                                ? [...prev, 'pickup']
+                                                : prev.filter(m => m !== 'pickup')
+                                        )
+                                    }}
+                                />
+                                <div className="flex-1">
+                                    <p className={`text-sm font-bold ${deliveryModes.includes('pickup') ? 'text-blue-800' : 'text-gray-700'}`}>
+                                        📦 Point de retrait
+                                    </p>
+                                    <p className="text-xs text-gray-500 mt-0.5">L'acheteur vient chercher l'article directement chez vous.</p>
+                                </div>
+                            </label>
+
+                            {/* Adresse de retrait — s'affiche seulement si pickup coché */}
+                            {deliveryModes.includes('pickup') && (
+                                <div className="mt-1 ml-1">
+                                    <label className={labelClass}>
+                                        📍 Adresse du point de retrait <span className="text-red-500">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        placeholder="Ex : Kaloum, en face de la mosquée centrale, Conakry"
+                                        value={form.pickup_address}
+                                        onChange={e => setForm({ ...form, pickup_address: e.target.value })}
+                                        className={inputClass}
+                                        required
+                                    />
+                                    <p className="text-xs text-gray-400 mt-1">Soyez précis : quartier, repère, numéro de boutique…</p>
+                                </div>
+                            )}
+
+                            {deliveryModes.length === 0 && (
+                                <p className="text-xs text-red-500 mt-1">⚠️ Sélectionnez au moins un mode de livraison.</p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* ── Section 6 : Médias ── */}
+                    <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+                        <SectionHeader number="6" icon="📷" title="Photos & Vidéo" subtitle="Les annonces avec photos obtiennent 5× plus de vues" />
 
                         <div className="space-y-5">
                             {/* Upload photos */}

@@ -65,6 +65,7 @@ class ListingSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'title', 'description', 'price_gnf', 'price_type',
             'condition', 'status', 'city', 'quartier', 'latitude', 'longitude',
+            'weight_kg', 'allowed_delivery_modes', 'pickup_address',
             'view_count', 'is_boosted', 'expires_at', 'created_at',
             'seller', 'seller_name', 'seller_phone', 'category', 'category_name',
             'attributes', 'media', 'uploaded_files', 'uploaded_video', 'is_favorited',
