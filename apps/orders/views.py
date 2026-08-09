@@ -880,7 +880,7 @@ class PaymentWebhookView(APIView):
                     except Exception:
                         pass
 
-                    # ── Notification vendeur : moyen de paiement de l'acheteur ─
+                    # ── Notification vendeur : moyen de paiement + message conversation ─
                     try:
                         _PM_LABELS = {
                             'orange_money':   '🟠 Orange Money',
@@ -896,22 +896,57 @@ class PaymentWebhookView(APIView):
                             'orange':         '🟠 Orange Money',
                             'cash':           '💵 Espèces',
                         }
-                        # Méthode spécifique (ex: orange_money / mtn_momo dans la transaction ChapChap)
                         _pm_raw = ''
                         if provider == 'chachap' and isinstance(data, dict):
                             _pm_raw = (data.get('transaction') or {}).get('payment_method', '')
                         if not _pm_raw:
-                            _pm_raw = provider  # fallback : orange, paycard…
+                            _pm_raw = provider
                         _pm_label  = _PM_LABELS.get(_pm_raw, _pm_raw.replace('_', ' ').title())
                         _order_ref = str(payment.order.id)[:8].upper()
+
+                        # Chercher la conversation buyer↔seller et y ajouter
+                        # un message de confirmation de paiement (visible des deux côtés)
+                        _conv_id_str = ''
+                        try:
+                            from apps.messaging.models import (
+                                Conversation as _Conv, Message as _Msg
+                            )
+                            from django.utils import timezone as _tz_m
+                            _convo = _Conv.objects.filter(
+                                listing=payment.order.listing,
+                                buyer=payment.order.buyer,
+                                seller=payment.order.seller,
+                            ).first()
+                            if _convo:
+                                _conv_id_str = str(_convo.id)
+                                _Msg.objects.create(
+                                    conversation=_convo,
+                                    sender=payment.order.buyer,
+                                    content=(
+                                        f'✅ Paiement confirmé — {_pm_label}\n'
+                                        f'Montant : {payment.amount_gnf:,} GNF\n'
+                                        f'Commande #{_order_ref} — '
+                                        f'Coordonnez maintenant la remise ou la livraison.'
+                                    ),
+                                    msg_type=_Msg.MsgType.TEXT,
+                                )
+                                _convo.last_message_at = _tz_m.now()
+                                _convo.save(update_fields=['last_message_at'])
+                        except Exception as _cm_exc:
+                            logger.warning("[WEBHOOK] Msg conversation paiement : %s", _cm_exc)
+
                         Notification.send(
                             user=payment.order.seller,
                             type=Notification.Type.ORDER_UPDATE,
                             title=f'💰 Paiement reçu — {_pm_label}',
                             body=(f'Commande #{_order_ref} · {payment.order.buyer.full_name} '
                                   f'a payé {payment.amount_gnf:,} GNF via {_pm_label} '
-                                  f'pour « {payment.order.listing.title} ».'),
-                            data={'order_id': str(payment.order.id)},
+                                  f'pour « {payment.order.listing.title} ». '
+                                  f'Ouvrez la conversation pour coordonner.'),
+                            data={
+                                'order_id': str(payment.order.id),
+                                'conversation_id': _conv_id_str,
+                            },
                         )
                     except Exception as _sn_exc:
                         logger.warning("[WEBHOOK] Notif vendeur paiement : %s", _sn_exc)

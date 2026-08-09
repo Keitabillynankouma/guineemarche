@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { notificationsAPI } from '../services/api'
 
 const TYPE_ICON = {
@@ -24,6 +24,7 @@ function timeAgo(dateStr) {
 
 export default function NotificationsPage() {
   const qc = useQueryClient()
+  const navigate = useNavigate()
 
   const { data, isLoading } = useQuery({
     queryKey: ['notifications'],
@@ -41,6 +42,13 @@ export default function NotificationsPage() {
 
   function handleMarkRead(notif) {
     if (!notif.is_read) markRead.mutate(notif.id)
+    // Navigation selon le contenu de la notification
+    const d = notif.data || {}
+    if (d.conversation_id) {
+      navigate('/messages', { state: { conversationId: d.conversation_id } })
+    } else if (d.order_id) {
+      navigate('/orders')
+    }
   }
 
   function markAllRead() {

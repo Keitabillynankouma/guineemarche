@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { Link } from 'react-router-dom'
+import { Link, useLocation } from 'react-router-dom'
 import { messagingAPI } from '../services/api'
+import useAuthStore from '../store/authStore'
 import Logo from '../components/Logo'
 
-// Messages rapides pré-définis
-const QUICK_MSGS = [
+// Messages rapides — acheteur
+const QUICK_MSGS_BUYER = [
   'Bonjour, est-ce disponible ?',
   'Quel est votre dernier prix ?',
   'Je suis intéressé(e), on peut se retrouver où ?',
@@ -13,6 +14,17 @@ const QUICK_MSGS = [
   'Je viens d\'Hamdallaye, ça vous convient ?',
   'C\'est toujours en vente ?',
   'Merci, je vous contacterai bientôt.',
+]
+
+// Messages rapides — vendeur
+const QUICK_MSGS_SELLER = [
+  'Oui, l\'article est disponible !',
+  'Je suis disponible pour la remise aujourd\'hui.',
+  'On peut se retrouver au marché central, ça vous convient ?',
+  'Quel quartier êtes-vous ? Je peux me déplacer.',
+  'Le prix est ferme, pas de négociation.',
+  'Envoyez-moi votre numéro WhatsApp pour coordonner.',
+  'Merci pour votre achat ! Passez une bonne journée.',
 ]
 
 function timeLabel(dateStr) {
@@ -27,6 +39,8 @@ function timeLabel(dateStr) {
 
 export default function MessagesPage() {
   const qc = useQueryClient()
+  const location = useLocation()
+  const { user: currentUser } = useAuthStore()
   // Sur mobile : null = liste visible. Sur desktop : les deux sont visibles.
   const [activeConv, setActiveConv]       = useState(null)
   const [showChat, setShowChat]           = useState(false)   // mobile: affiche le chat
@@ -35,6 +49,7 @@ export default function MessagesPage() {
   const [showQuick, setShowQuick]         = useState(false)
   const [showOffer, setShowOffer]         = useState(false)
   const [offerAmount, setOfferAmount]     = useState('')
+  const [autoOpenId, setAutoOpenId]       = useState(location.state?.conversationId || null)
   const bottomRef                         = useRef(null)
 
   const { data: conversations, isLoading } = useQuery({
@@ -42,6 +57,17 @@ export default function MessagesPage() {
     queryFn: () => messagingAPI.getConversations().then(r => r.data),
     refetchInterval: 8000,
   })
+
+  // Auto-ouvrir la conversation si navigué depuis une notification
+  useEffect(() => {
+    if (!autoOpenId || !conversations) return
+    const list = conversations?.results ?? conversations ?? []
+    const target = list.find(c => c.id === autoOpenId)
+    if (target) {
+      openConv(target)
+      setAutoOpenId(null)
+    }
+  }, [autoOpenId, conversations]) // eslint-disable-line
 
   const { data: msgs, refetch: refetchMsgs } = useQuery({
     queryKey: ['messages', activeConv?.id],
@@ -210,14 +236,23 @@ export default function MessagesPage() {
                 Commencez la conversation !
               </div>
             )}
-            {messages.map((msg, i) => {
-              const isMine = msg.sender !== activeConv.buyer
-                ? msg.sender !== activeConv.other_user?.id
-                : msg.sender === activeConv.buyer
-              // Détermination côté: buyer = gauche, vendeur = droite côté acheteur
+            {messages.map((msg) => {
               const isFromOther = msg.sender === activeConv.other_user?.id
-
               const isOffer = msg.msg_type === 'offer' && msg.offer_amount_gnf
+              // Message de confirmation de paiement — style centré spécial
+              const isPaymentMsg = msg.content?.startsWith('✅ Paiement confirmé')
+              if (isPaymentMsg) {
+                return (
+                  <div key={msg.id} className="flex justify-center my-3">
+                    <div className="max-w-[85%] bg-emerald-50 border border-emerald-200 rounded-2xl px-4 py-3 text-center shadow-sm">
+                      <p className="text-sm font-semibold text-emerald-700 whitespace-pre-line leading-relaxed">
+                        {msg.content}
+                      </p>
+                      <p className="text-xs text-emerald-400 mt-1">{timeLabel(msg.created_at)}</p>
+                    </div>
+                  </div>
+                )
+              }
               return (
                 <div key={msg.id} className={`flex ${isFromOther ? 'justify-start' : 'justify-end'}`}>
                   {isOffer ? (
@@ -259,7 +294,10 @@ export default function MessagesPage() {
             <div className="bg-white border-t px-4 py-3">
               <p className="text-xs text-gray-500 mb-2 font-medium">Messages rapides :</p>
               <div className="flex flex-wrap gap-2">
-                {QUICK_MSGS.map((q, i) => (
+                {(activeConv && String(activeConv.seller) === String(currentUser?.id)
+                  ? QUICK_MSGS_SELLER
+                  : QUICK_MSGS_BUYER
+                ).map((q, i) => (
                   <button
                     key={i}
                     onClick={() => handleSend(q)}
