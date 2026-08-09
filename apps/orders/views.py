@@ -564,6 +564,21 @@ class InitiatePaymentView(APIView):
                     referral.give_reward()
             except Exception as _ref_exc:
                 logger.warning("[CASH] Récompense parrainage : %s", _ref_exc)
+            # Notifier le vendeur : paiement espèces à la livraison
+            try:
+                from apps.notifications.models import Notification as _Notif
+                _order_ref = str(order.id)[:8].upper()
+                _Notif.send(
+                    user=order.seller,
+                    type=_Notif.Type.ORDER_UPDATE,
+                    title='💵 Commande — paiement en espèces',
+                    body=(f'Commande #{_order_ref} · {order.buyer.full_name} '
+                          f'a choisi de payer {order.amount_gnf:,} GNF en espèces à la livraison '
+                          f'pour « {order.listing.title} ».'),
+                    data={'order_id': str(order.id)},
+                )
+            except Exception as _sn:
+                logger.warning("[CASH] Notif vendeur : %s", _sn)
             return Response({
                 'message': 'Commande confirmée. Le paiement en espèces sera effectué à la livraison.',
                 'payment': PaymentSerializer(payment).data,
@@ -846,6 +861,42 @@ class PaymentWebhookView(APIView):
                         )
                     except Exception:
                         pass
+
+                    # ── Notification vendeur : moyen de paiement de l'acheteur ─
+                    try:
+                        _PM_LABELS = {
+                            'orange_money':   '🟠 Orange Money',
+                            'mtn_momo':       '🟡 MTN MoMo',
+                            'mtn':            '🟡 MTN MoMo',
+                            'paycard':        '💳 PayCard',
+                            'cc':             '💳 Carte bancaire',
+                            'carte_bancaire': '💳 Carte bancaire',
+                            'kulu':           '🔵 Kulu',
+                            'soutra_money':   '🔷 Soutra Money',
+                            'akiba':          '🟢 Akiba',
+                            'chachap':        '💰 ChaChap Pay',
+                            'orange':         '🟠 Orange Money',
+                            'cash':           '💵 Espèces',
+                        }
+                        # Méthode spécifique (ex: orange_money / mtn_momo dans la transaction ChapChap)
+                        _pm_raw = ''
+                        if provider == 'chachap' and isinstance(data, dict):
+                            _pm_raw = (data.get('transaction') or {}).get('payment_method', '')
+                        if not _pm_raw:
+                            _pm_raw = provider  # fallback : orange, paycard…
+                        _pm_label  = _PM_LABELS.get(_pm_raw, _pm_raw.replace('_', ' ').title())
+                        _order_ref = str(payment.order.id)[:8].upper()
+                        Notification.send(
+                            user=payment.order.seller,
+                            type=Notification.Type.ORDER_UPDATE,
+                            title=f'💰 Paiement reçu — {_pm_label}',
+                            body=(f'Commande #{_order_ref} · {payment.order.buyer.full_name} '
+                                  f'a payé {payment.amount_gnf:,} GNF via {_pm_label} '
+                                  f'pour « {payment.order.listing.title} ».'),
+                            data={'order_id': str(payment.order.id)},
+                        )
+                    except Exception as _sn_exc:
+                        logger.warning("[WEBHOOK] Notif vendeur paiement : %s", _sn_exc)
             else:
                 # ── Boost payment ? ──────────────────────────────────────────
                 if ref and provider == 'chachap':
