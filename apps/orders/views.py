@@ -873,9 +873,10 @@ class PaymentWebhookView(APIView):
                         logger.warning("[WEBHOOK] Email post-paiement : %s", _email_exc)
                     # Notification in-app acheteur
                     try:
-                        Notification.send(
+                        from apps.notifications.models import Notification as _NotifWH
+                        _NotifWH.send(
                             user=payment.order.buyer,
-                            type=Notification.Type.ORDER_UPDATE,
+                            type=_NotifWH.Type.ORDER_UPDATE,
                             title='✅ Paiement confirmé',
                             body=f'Votre paiement pour « {payment.order.listing.title} » a été reçu.',
                             data={'order_id': str(payment.order.id)},
@@ -938,9 +939,10 @@ class PaymentWebhookView(APIView):
                         except Exception as _cm_exc:
                             logger.warning("[WEBHOOK] Msg conversation paiement : %s", _cm_exc)
 
-                        Notification.send(
+                        from apps.notifications.models import Notification as _NotifSeller
+                        _NotifSeller.send(
                             user=payment.order.seller,
-                            type=Notification.Type.ORDER_UPDATE,
+                            type=_NotifSeller.Type.ORDER_UPDATE,
                             title=f'💰 Paiement reçu — {_pm_label}',
                             body=(f'Commande #{_order_ref} · {payment.order.buyer.full_name} '
                                   f'a payé {payment.amount_gnf:,} GNF via {_pm_label} '
@@ -969,10 +971,10 @@ class PaymentWebhookView(APIView):
                                 _apply_boost(boost.listing, boost.days)
                                 logger.info("[CHACHAP] Boost %s activé — listing %s", boost.id, boost.listing.id)
                                 try:
-                                    from apps.notifications.models import Notification
-                                    Notification.send(
+                                    from apps.notifications.models import Notification as _NotifBoost
+                                    _NotifBoost.send(
                                         user=boost.listing.seller,
-                                        type=Notification.Type.ORDER_UPDATE,
+                                        type=_NotifBoost.Type.ORDER_UPDATE,
                                         title='⚡ Annonce boostée !',
                                         body=f'Votre annonce « {boost.listing.title} » '
                                              f'est mise en avant pour {boost.days} jours.',
