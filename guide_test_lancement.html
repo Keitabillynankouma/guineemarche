@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GuinéeMarché — Guide de Test Réel</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', sans-serif; font-size: 13px; color: #212121; background: #fff; }
+
+  /* Print */
+  @media print {
+    .no-print { display: none; }
+    body { font-size: 11px; }
+    .page-break { page-break-before: always; }
+    table { page-break-inside: avoid; }
+  }
+
+  /* Layout */
+  .container { max-width: 1100px; margin: 0 auto; padding: 20px 30px; }
+
+  /* Cover */
+  .cover { text-align: center; padding: 60px 0 40px; border-bottom: 4px solid #00796B; margin-bottom: 40px; }
+  .cover h1 { font-size: 42px; color: #00796B; font-weight: 700; margin-bottom: 8px; }
+  .cover h2 { font-size: 22px; color: #455A64; font-weight: 500; margin-bottom: 16px; }
+  .cover p  { font-size: 14px; color: #78909C; }
+
+  /* Meta grid */
+  .meta-grid { display: grid; grid-template-columns: 200px 1fr; gap: 0; border: 1px solid #CFD8DC; border-radius: 8px; overflow: hidden; margin-bottom: 32px; }
+  .meta-grid .k { background: #E3F2FD; color: #0D47A1; font-weight: 600; padding: 10px 14px; border-bottom: 1px solid #CFD8DC; }
+  .meta-grid .v { background: #fff; padding: 10px 14px; border-bottom: 1px solid #CFD8DC; white-space: pre-line; }
+  .meta-grid .k:last-of-type, .meta-grid .v:last-of-type { border-bottom: none; }
+
+  /* Day header */
+  .day-header { background: #00796B; color: #fff; font-size: 20px; font-weight: 700; text-align: center; padding: 14px; border-radius: 8px; margin: 40px 0 24px; }
+
+  /* Section header */
+  h2.bloc { font-size: 16px; color: #00796B; font-weight: 700; border-bottom: 2px solid #00796B; padding-bottom: 6px; margin: 32px 0 12px; }
+  h3.bloc { font-size: 14px; color: #37474F; font-weight: 600; margin: 20px 0 8px; }
+
+  /* Notes */
+  .note  { background: #FFFDE7; border-left: 4px solid #F9A825; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 12px; }
+  .warn  { background: #FFEBEE; border-left: 4px solid #E53935; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 12px; color: #B71C1C; }
+  .tip   { background: #E8F5E9; border-left: 4px solid #43A047; padding: 10px 14px; border-radius: 0 6px 6px 0; margin: 12px 0; font-size: 12px; color: #1B5E20; }
+
+  /* Scenario table */
+  .scenario-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 12px; }
+  .scenario-table th { background: #00796B; color: #fff; padding: 10px 12px; text-align: left; font-weight: 600; }
+  .scenario-table td { padding: 10px 12px; border-bottom: 1px solid #ECEFF1; vertical-align: top; white-space: pre-line; }
+  .scenario-table tr:nth-child(even) td { background: #F5F5F5; }
+  .scenario-table tr:nth-child(odd)  td { background: #fff; }
+  .scenario-table .num { width: 44px; text-align: center; font-weight: 700; color: #00796B; }
+  .scenario-table .ok  { width: 50px; text-align: center; font-size: 20px; }
+  .cb { width: 20px; height: 20px; border: 2px solid #90A4AE; border-radius: 4px; display: inline-block; }
+
+  /* Summary table */
+  .summary-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+  .summary-table td { padding: 10px 14px; border: 1px solid #CFD8DC; vertical-align: top; white-space: pre-line; }
+  .summary-table td:first-child { background: #E3F2FD; color: #0D47A1; font-weight: 600; width: 220px; }
+
+  /* Report */
+  .report-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; font-size: 12px; }
+  .report-table th { background: #00796B; color: #fff; padding: 10px 12px; font-weight: 600; }
+  .report-table td { padding: 10px 12px; border: 1px solid #CFD8DC; }
+  .report-table tr:nth-child(even) td { background: #F5F5F5; }
+  .report-table .total td { font-weight: 700; color: #00796B; background: #E8F5E9 !important; }
+
+  /* Decision */
+  .decision-box { border: 2px solid #00796B; border-radius: 10px; padding: 24px; margin: 24px 0; }
+  .decision-row { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px dashed #CFD8DC; font-size: 13px; }
+  .decision-row:last-child { border-bottom: none; }
+  .decision-label { font-weight: 600; color: #00796B; }
+  .decision-value { color: #455A64; }
+
+  /* Print button */
+  .print-btn { position: fixed; top: 20px; right: 20px; background: #00796B; color: #fff; border: none; padding: 10px 20px; border-radius: 6px; cursor: pointer; font-size: 14px; font-weight: 600; box-shadow: 0 2px 8px rgba(0,0,0,0.2); z-index: 999; }
+  .print-btn:hover { background: #005F56; }
+
+  footer { text-align: center; color: #90A4AE; font-size: 11px; margin-top: 40px; padding-top: 16px; border-top: 1px solid #ECEFF1; }
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Imprimer / Enregistrer PDF</button>
+
+<div class="container">
+
+  <!-- COUVERTURE -->
+  <div class="cover">
+    <h1>🛒 GuinéeMarché</h1>
+    <h2>Guide de Test Réel — Avant Lancement</h2>
+    <p>Durée : 1 à 2 jours &nbsp;•&nbsp; Équipe : 2-3 testeurs minimum</p>
+  </div>
+
+  <div class="meta-grid">
+    <div class="k">Environnement</div><div class="v">Production — https://guimatrix.com (backend Render)</div>
+    <div class="k">Durée recommandée</div><div class="v">Jour 1 : Flux principaux (inscription → paiement → livraison)
+Jour 2 : Cas limites, admin, sécurité, notifications</div>
+    <div class="k">Testeurs nécessaires</div><div class="v">3 rôles : Acheteur • Vendeur • Livreur (+1 Admin)</div>
+    <div class="k">Appareils</div><div class="v">Chrome desktop + téléphone Android/iPhone + app mobile Expo</div>
+    <div class="k">Données test</div><div class="v">Numéros sandbox ChaChap — Ne pas utiliser de vrais paiements en dehors des montants de test</div>
+    <div class="k">Document rempli par</div><div class="v">___________________________________</div>
+    <div class="k">Date de test</div><div class="v">___________________________________</div>
+  </div>
+
+  <!-- ══════════════ JOUR 1 ══════════════ -->
+  <div class="page-break"></div>
+  <div class="day-header">JOUR 1 — Flux Principaux</div>
+
+  <!-- BLOC 1 -->
+  <h2 class="bloc">BLOC 1 — Inscription &amp; Authentification</h2>
+  <div class="note">ℹ️ Tester avec 3 comptes différents : un acheteur, un vendeur, un livreur. Utiliser de vrais numéros de téléphone guinéens.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T01</td><td>Inscription acheteur</td><td>1. Ouvrir guimatrix.com
+2. Cliquer "S'inscrire"
+3. Remplir : nom, téléphone, mot de passe
+4. Choisir rôle "Acheteur"
+5. Valider</td><td>SMS OTP reçu en &lt; 60 sec. Compte créé et redirigé vers accueil.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T02</td><td>Vérification OTP</td><td>1. Saisir le code OTP reçu
+2. Soumettre</td><td>Compte vérifié. Badge vert visible dans profil.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T03</td><td>OTP expiré (&gt;10 min)</td><td>1. Attendre 11 minutes sans saisir le code
+2. Saisir l'ancien code</td><td>Message d'erreur "Code expiré". Proposition de renvoyer.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T04</td><td>OTP faux (3 tentatives)</td><td>1. Saisir un mauvais code 3 fois de suite</td><td>Blocage temporaire. Message d'erreur clair.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T05</td><td>Inscription vendeur</td><td>1. Répéter T01 avec rôle "Vendeur"
+2. Ajouter nom de boutique</td><td>Compte vendeur créé avec boutique associée.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T06</td><td>Inscription livreur</td><td>1. Répéter T01 avec rôle "Livreur"
+2. Activer disponibilité</td><td>Compte livreur actif et disponible.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T07</td><td>Connexion valide</td><td>1. Se déconnecter
+2. Se reconnecter avec téléphone + mot de passe</td><td>Connexion réussie. Tokens JWT rafraîchis.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T08</td><td>Mauvais mdp (10x)</td><td>1. Tenter 10 connexions avec un mauvais mot de passe</td><td>Après 10 tentatives : throttle activé (erreur 429).</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T09</td><td>Réinitialisation mdp</td><td>1. Cliquer "Mot de passe oublié"
+2. Saisir numéro de téléphone
+3. Recevoir OTP de réinitialisation
+4. Définir nouveau mot de passe</td><td>Mot de passe changé. Ancienne session invalidée.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T10</td><td>Code parrainage</td><td>1. Copier le code parrainage du compte acheteur
+2. Créer un nouveau compte avec ce code</td><td>Nouveau compte lié au parrain. Visible dans le profil.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 2 -->
+  <h2 class="bloc">BLOC 2 — Annonces (Publication &amp; Navigation)</h2>
+  <div class="note">ℹ️ Se connecter avec le compte vendeur pour les tests de publication.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T11</td><td>Publier une annonce complète</td><td>1. Cliquer "+ Publier"
+2. Remplir : titre, description, prix, catégorie, ville
+3. Uploader 3 photos
+4. Soumettre</td><td>Annonce en statut DRAFT. Message "En attente de validation admin".</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T12</td><td>Upload fichier invalide</td><td>1. Tenter d'uploader un fichier .exe ou .php</td><td>Rejet immédiat. Message d'erreur. Aucun fichier stocké.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T13</td><td>Image trop lourde (&gt;10 Mo)</td><td>1. Tenter d'uploader une image de 15 Mo</td><td>Erreur : "Image trop lourde. Maximum 10 Mo."</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T14</td><td>Admin approuve l'annonce</td><td>1. Admin → Annonces → En attente
+2. Approuver l'annonce T11</td><td>Annonce passe ACTIVE. Vendeur reçoit notification.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T15</td><td>Recherche par mot-clé</td><td>1. Compte acheteur
+2. Chercher un mot du titre de T11</td><td>Annonce apparaît dans les résultats.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T16</td><td>Filtres ville + catégorie</td><td>1. Filtrer par ville = Conakry
+2. Filtrer par catégorie de T11</td><td>Seules les annonces correspondantes s'affichent.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T17</td><td>Ajouter aux favoris</td><td>1. Ouvrir l'annonce T11
+2. Cliquer le cœur "Favoris"</td><td>Annonce sauvegardée. Visible dans page Favoris.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T18</td><td>Signaler une annonce</td><td>1. Ouvrir une annonce
+2. Cliquer "Signaler" + choisir une raison</td><td>Signalement enregistré. Admin peut le voir dans le panel.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T19</td><td>Modifier une annonce (vendeur)</td><td>1. Compte vendeur
+2. Modifier le prix de l'annonce T11</td><td>Prix mis à jour correctement.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T20</td><td>Boost d'annonce</td><td>1. Cliquer "Booster" sur T11
+2. Choisir 3 jours, payer</td><td>Annonce marquée "Boostée". Apparaît en tête de liste. boost_expires_at défini.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 3 -->
+  <h2 class="bloc">BLOC 3 — Messagerie</h2>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T21</td><td>Envoyer un message au vendeur</td><td>1. Ouvrir l'annonce T11 (acheteur)
+2. Cliquer "Contacter le vendeur"
+3. Envoyer un message texte</td><td>Message reçu côté vendeur. Vendeur reçoit notification push.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T22</td><td>Réponse du vendeur</td><td>1. Se connecter vendeur
+2. Lire le message T21
+3. Répondre</td><td>Réponse visible côté acheteur. Notification envoyée.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T23</td><td>Offre de prix</td><td>1. Envoyer un message de type "Offre"
+2. Saisir un montant de négociation</td><td>Offre affichée avec montant. Vendeur peut accepter/refuser.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T24</td><td>Throttle messagerie (&gt;60/h)</td><td>1. Envoyer 61 messages en peu de temps</td><td>Après 60 messages : erreur 429 "Trop de messages".</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 4 -->
+  <h2 class="bloc">BLOC 4 — Commande &amp; Paiement</h2>
+  <div class="warn">⚠️ Utiliser le mode sandbox ChaChap. Ne pas utiliser de vrais fonds.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T25</td><td>Créer une commande (point retrait)</td><td>1. Ouvrir annonce T11 (acheteur)
+2. Choisir "Point de retrait"
+3. Confirmer la commande</td><td>Commande créée, statut PENDING. Redirigé vers paiement.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T26</td><td>Paiement ChaChap réussi</td><td>1. Choisir ChaChap Pay
+2. Saisir numéro sandbox
+3. Confirmer</td><td>Webhook reçu. Commande CONFIRMED. Escrow HELD. Acheteur + vendeur notifiés.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T27</td><td>Commande livraison à domicile</td><td>1. Créer commande mode "Livraison à domicile"
+2. Saisir adresse et commune
+3. Payer</td><td>Frais de livraison calculés et ajoutés. Escrow inclut les frais.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T28</td><td>Achat de sa propre annonce</td><td>1. Se connecter avec le compte vendeur
+2. Tenter d'acheter l'annonce T11</td><td>Erreur 403 "Vous ne pouvez pas acheter votre propre annonce".</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T29</td><td>Double commande simultanée</td><td>1. Ouvrir l'annonce dans 2 onglets (2 acheteurs)
+2. Les deux cliquent "Acheter" en même temps</td><td>Seule une commande acceptée. L'autre reçoit une erreur.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T30</td><td>Webhook dupliqué (idempotence)</td><td>1. Renvoyer le webhook ChaChap pour une commande déjà payée (via Postman)</td><td>Deuxième webhook ignoré. Escrow non doublé.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 5 -->
+  <h2 class="bloc">BLOC 5 — Livraison (Flux Complet)</h2>
+  <div class="note">ℹ️ Ce flux nécessite 3 personnes : acheteur, vendeur, livreur. GPS activé obligatoire.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T31</td><td>Assignation automatique livreur</td><td>1. Commande T27 payée (T26)
+2. Attendre l'assignation automatique</td><td>Livreur disponible reçoit une notification. DeliveryAssignment créé.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T32</td><td>Livreur : démarrer la livraison</td><td>1. Livreur → "Mes livraisons"
+2. Cliquer "Démarrer"</td><td>Statut EN_ROUTE. GPS tracking actif. Vendeur et acheteur notifiés.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T33</td><td>Vendeur voit pickup_code uniquement</td><td>1. Compte vendeur → détail commande
+2. Vérifier les codes affichés</td><td>pickup_code visible côté vendeur UNIQUEMENT. Pas de verification_code.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T34</td><td>Livreur montre pickup_code au vendeur</td><td>1. Livreur affiche son code
+2. Vendeur compare avec son écran</td><td>Codes identiques → vendeur remet le colis au livreur.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T35</td><td>Acheteur voit verification_code uniquement</td><td>1. Compte acheteur → détail commande
+2. Vérifier les codes affichés</td><td>verification_code visible côté acheteur UNIQUEMENT. Pas de pickup_code.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T36</td><td>Livreur ne peut pas voir verification_code</td><td>1. Compte livreur
+2. Appeler GET /api/v1/orders/livreur/assignments/
+3. Inspecter le JSON</td><td>verification_code ABSENT de la réponse. 🔴 CRITIQUE si visible.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T37</td><td>Confirmation livraison (bon code)</td><td>1. Acheteur donne son verification_code au livreur
+2. Livreur saisit le code dans l'app
+3. Confirmer</td><td>Commande DELIVERED. Escrow libéré. Vendeur notifié du paiement.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T38</td><td>Confirmation avec mauvais code</td><td>1. Livreur saisit un code erroné
+2. Confirmer</td><td>Erreur "Code de vérification invalide". Livraison non confirmée.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T39</td><td>Throttle confirmation (&gt;20/h)</td><td>1. Tenter 21 confirmations erronées en 1h</td><td>Après 20 tentatives : erreur 429. Protection anti-brute-force active.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T40</td><td>Tracking GPS (acheteur voit position)</td><td>1. Livreur active GPS
+2. Acheteur ouvre la carte de suivi</td><td>Position du livreur mise à jour en temps réel sur la carte.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 6 -->
+  <h2 class="bloc">BLOC 6 — Escrow &amp; Libération</h2>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T41</td><td>Libération manuelle (acheteur confirme)</td><td>1. Acheteur clique "Confirmer la réception" sur la commande T37</td><td>Escrow libéré immédiatement. Vendeur reçoit le paiement. Commande COMPLETED.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T42</td><td>Libération auto (24h) — simuler</td><td>1. Modifier escrow_release_at à -1h en DB
+2. Lancer la tâche Celery manuellement</td><td>Escrow libéré auto. Log Celery visible. Vendeur notifié.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T43</td><td>Admin hold (bloquer la libération)</td><td>1. Admin : activer escrow_admin_hold
+2. Attendre le délai auto-release</td><td>Escrow NON libéré tant que escrow_admin_hold = True.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T44</td><td>Commande ≥ 500 000 GNF → 72h</td><td>1. Créer une commande avec prix ≥ 500 000 GNF
+2. Vérifier escrow_release_at</td><td>escrow_release_at = now + 72h (et non 24h).</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- ══════════════ JOUR 2 ══════════════ -->
+  <div class="page-break"></div>
+  <div class="day-header">JOUR 2 — Cas Limites, Admin &amp; Sécurité</div>
+
+  <!-- BLOC 7 -->
+  <h2 class="bloc">BLOC 7 — Avis &amp; Réputation</h2>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T45</td><td>Laisser un avis (post-livraison)</td><td>1. Acheteur → commande COMPLETED
+2. Laisser un avis 4 étoiles au vendeur</td><td>Avis enregistré. Note vendeur mise à jour. Vendeur notifié.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T46</td><td>Avis sur commande non terminée</td><td>1. Tenter de laisser un avis sur une commande PENDING</td><td>Erreur : "Avis impossible — commande non terminée."</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T47</td><td>Double avis (même commande)</td><td>1. Tenter de laisser un 2e avis sur la même commande</td><td>Erreur : "Vous avez déjà laissé un avis pour cette commande."</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T48</td><td>Auto-évaluation</td><td>1. Vendeur tente de se laisser un avis à lui-même</td><td>Erreur 403 "Auto-évaluation interdite."</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 8 -->
+  <h2 class="bloc">BLOC 8 — Dispute &amp; Retours</h2>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T49</td><td>Ouvrir un litige</td><td>1. Acheteur → commande CONFIRMED
+2. "Signaler un problème"
+3. Décrire le litige</td><td>Commande DISPUTED. Escrow bloqué. Admin notifié.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T50</td><td>Litige sur commande non éligible</td><td>1. Tenter d'ouvrir un litige sur une commande COMPLETED</td><td>Erreur : "Litige impossible sur cette commande."</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T51</td><td>Admin résout le litige</td><td>1. Admin → Litiges → T49
+2. Décide en faveur de l'acheteur</td><td>Remboursement déclenché. Parties notifiées.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T52</td><td>Demande de retour</td><td>1. Commande COMPLETED
+2. Acheteur → "Demander un retour"
+3. Décrire la raison</td><td>Retour créé PENDING. Admin notifié.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T53</td><td>Double demande de retour</td><td>1. Soumettre une 2e demande de retour sur la même commande</td><td>Erreur : "Un retour existe déjà pour cette commande."</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T54</td><td>Admin approuve le retour</td><td>1. Admin → Retours → T52
+2. Approuver avec note</td><td>Retour approuvé. Acheteur notifié.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 9 -->
+  <h2 class="bloc">BLOC 9 — Abonnement Pro</h2>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T55</td><td>Activer abonnement Pro (Orange Money)</td><td>1. Compte vendeur → Abonnement
+2. Payer avec Orange Money sandbox</td><td>Abonnement Pro activé. Limite d'annonces augmentée.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T56</td><td>Tentative Pro gratuite</td><td>1. Appeler POST /api/v1/accounts/subscription/ sans paiement</td><td>Erreur : "Paiement requis." Gate API_KEY actif.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T57</td><td>Admin active abonnement manuellement</td><td>1. Admin → Utilisateurs → Vendeur
+2. Activer l'abonnement Pro</td><td>Abonnement activé. Vendeur notifié.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T58</td><td>Limite annonces (plan gratuit = 5)</td><td>1. Compte vendeur FREE
+2. Publier 6 annonces</td><td>La 6e annonce refusée avec message de limite atteinte.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 10 -->
+  <h2 class="bloc">BLOC 10 — Panel Admin</h2>
+  <div class="note">ℹ️ Tester avec un compte super_admin.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T59</td><td>Tableau de bord admin</td><td>1. Se connecter admin
+2. Ouvrir le tableau de bord</td><td>Statistiques correctes : commandes, paiements, escrow en cours.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T60</td><td>Gestion des utilisateurs</td><td>1. Admin → Utilisateurs
+2. Chercher le compte T01
+3. Voir profil complet</td><td>Profil complet visible. Bouton suspend/activer fonctionnel.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T61</td><td>Modification rôle (super_admin)</td><td>1. Se connecter super_admin
+2. Modifier le rôle d'un utilisateur</td><td>Rôle modifié avec succès.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T62</td><td>Modification rôle (admin simple)</td><td>1. Se connecter admin non super
+2. Tenter de modifier un rôle</td><td>Erreur 403 "Seul un super_admin peut modifier les rôles."</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T63</td><td>Assignation manuelle livreur</td><td>1. Admin → Commandes sans livreur
+2. Assigner manuellement un livreur</td><td>Livreur assigné. Notification livreur. verification_code absent de la notif.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T64</td><td>Vue comptabilité</td><td>1. Admin comptable → Comptabilité
+2. Voir le résumé des commissions</td><td>Chiffres cohérents avec les commandes COMPLETED.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T65</td><td>Gestion bannières publicitaires</td><td>1. Admin → Publicités
+2. Ajouter une bannière avec image</td><td>Bannière créée et visible sur la page d'accueil.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 11 -->
+  <h2 class="bloc">BLOC 11 — Notifications</h2>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T66</td><td>Push — nouvelle commande (vendeur)</td><td>1. Acheteur crée commande + paye
+2. Vérifier notif push du vendeur</td><td>Notification push reçue sur l'appareil du vendeur.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T67</td><td>Push — livraison assignée (livreur)</td><td>1. Admin assigne un livreur (T63)
+2. Vérifier notif livreur</td><td>Notification push reçue sur l'appareil du livreur.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T68</td><td>Push — livraison confirmée</td><td>1. Livreur confirme livraison T37
+2. Vérifier notifs vendeur et acheteur</td><td>Les deux reçoivent une notification push.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T69</td><td>Centre de notifications (cloche)</td><td>1. Compte acheteur → cloche notifications
+2. Vérifier toutes les notifs reçues</td><td>Toutes les notifs listées avec date et statut lu/non-lu.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T70</td><td>SMS OTP reçu</td><td>1. Déclencher un envoi OTP</td><td>SMS reçu en &lt; 60 secondes sur le numéro guinéen.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 12 -->
+  <h2 class="bloc">BLOC 12 — Sécurité &amp; Robustesse</h2>
+  <div class="warn">⚠️ Ne pas effectuer ces tests depuis la même IP que les autres testeurs pour ne pas déclencher le blocage IP sur leurs sessions.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T71</td><td>Injection SQL dans la recherche</td><td>1. Dans le champ recherche, saisir : ' OR 1=1 --</td><td>Requête refusée ou résultat vide. Aucune donnée exposée. Log sécurité écrit.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T72</td><td>XSS dans le titre d'annonce</td><td>1. Créer une annonce avec titre : &lt;script&gt;alert(1)&lt;/script&gt;</td><td>Texte affiché en clair (échappé). Aucun script exécuté.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T73</td><td>Accès admin sans token</td><td>1. Appeler GET /api/v1/admin/users/ sans Authorization header</td><td>Erreur 401.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T74</td><td>Accès annonce d'un autre vendeur</td><td>1. Acheteur tente de modifier l'annonce d'un vendeur via API</td><td>Erreur 403 ou 404.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T75</td><td>Token JWT expiré (&gt;2h)</td><td>1. Attendre 2h+ sans refresher
+2. Utiliser l'access token expiré</td><td>Erreur 401. L'app demande un refresh automatiquement.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T76</td><td>Refresh token après logout</td><td>1. Se déconnecter (logout)
+2. Utiliser le refresh token pour obtenir un nouveau access token</td><td>Erreur 401 "Token blacklisté". Re-connexion obligatoire.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T77</td><td>Accès admin URL obfusquée</td><td>1. Tenter d'accéder à /admin/</td><td>Page 404. Admin URL réelle : /gm-backoffice-9f3a2e/</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T78</td><td>Upload .php renommé .jpg</td><td>1. Renommer test.php en test.jpg
+2. Tenter de l'uploader comme image</td><td>Rejet par validation magic bytes. Erreur "fichier invalide".</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T79</td><td>Scanner détecté (sqlmap)</td><td>1. Requête avec User-Agent: sqlmap/1.0</td><td>Erreur 403. IP bloquée. Log sécurité écrit.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T80</td><td>Support chat (Claude)</td><td>1. Ouvrir le chat support
+2. Poser une question sur la plateforme</td><td>Réponse cohérente. Throttle 200/h respecté.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- BLOC 13 -->
+  <h2 class="bloc">BLOC 13 — App Mobile</h2>
+  <div class="note">ℹ️ Tester sur un vrai appareil Android et iPhone si possible.</div>
+  <table class="scenario-table">
+    <tr><th class="num">N°</th><th>Scénario</th><th>Étapes</th><th>Résultat attendu</th><th class="ok">OK?</th></tr>
+    <tr><td class="num">T81</td><td>Bannière web visible (HomeScreen)</td><td>1. Ouvrir l'app mobile
+2. Aller sur l'écran d'accueil</td><td>Bannière "Aussi disponible sur le web — guimatrix.com" visible et cliquable.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T82</td><td>Fermer la bannière web</td><td>1. Cliquer ✕ sur la bannière T81</td><td>Bannière disparaît. Contenu liste s'affiche normalement.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T83</td><td>Navigation principale</td><td>1. Naviguer entre Accueil, Commandes, Messagerie, Profil</td><td>Tous les onglets fonctionnels sans crash.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T84</td><td>Push notification mobile</td><td>1. Déclencher une action qui génère une notif (T66)
+2. Vérifier sur l'appareil mobile</td><td>Notification push reçue sur l'écran d'accueil du téléphone.</td><td class="ok"><span class="cb"></span></td></tr>
+    <tr><td class="num">T85</td><td>Dashboard livreur mobile + GPS</td><td>1. Compte livreur sur mobile
+2. Activer le GPS
+3. Démarrer une livraison</td><td>Position transmise. Acheteur voit le livreur sur la carte.</td><td class="ok"><span class="cb"></span></td></tr>
+  </table>
+
+  <!-- ══════════════ RAPPORT FINAL ══════════════ -->
+  <div class="page-break"></div>
+  <div class="day-header">RAPPORT FINAL</div>
+
+  <h2 class="bloc">Résumé des Tests</h2>
+  <table class="report-table">
+    <tr><th>Bloc</th><th>Total tests</th><th>Tests OK ✅</th><th>Tests KO ❌</th></tr>
+    <tr><td>Bloc 1 — Inscription &amp; Authentification</td><td>10</td><td></td><td></td></tr>
+    <tr><td>Bloc 2 — Annonces</td><td>10</td><td></td><td></td></tr>
+    <tr><td>Bloc 3 — Messagerie</td><td>4</td><td></td><td></td></tr>
+    <tr><td>Bloc 4 — Commande &amp; Paiement</td><td>6</td><td></td><td></td></tr>
+    <tr><td>Bloc 5 — Livraison</td><td>10</td><td></td><td></td></tr>
+    <tr><td>Bloc 6 — Escrow</td><td>4</td><td></td><td></td></tr>
+    <tr><td>Bloc 7 — Avis</td><td>4</td><td></td><td></td></tr>
+    <tr><td>Bloc 8 — Dispute &amp; Retours</td><td>6</td><td></td><td></td></tr>
+    <tr><td>Bloc 9 — Abonnement</td><td>4</td><td></td><td></td></tr>
+    <tr><td>Bloc 10 — Admin</td><td>7</td><td></td><td></td></tr>
+    <tr><td>Bloc 11 — Notifications</td><td>5</td><td></td><td></td></tr>
+    <tr><td>Bloc 12 — Sécurité</td><td>10</td><td></td><td></td></tr>
+    <tr><td>Bloc 13 — Mobile</td><td>5</td><td></td><td></td></tr>
+    <tr class="total"><td><strong>TOTAL</strong></td><td><strong>85</strong></td><td></td><td></td></tr>
+  </table>
+
+  <h2 class="bloc">Problèmes Identifiés</h2>
+  <table class="report-table">
+    <tr><th>N°</th><th>Test</th><th>Description du problème</th><th>Sévérité</th><th>Assigné à</th></tr>
+    <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+    <tr><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td><td>&nbsp;</td></tr>
+  </table>
+
+  <h2 class="bloc">Décision de Lancement</h2>
+  <div class="decision-box">
+    <div class="decision-row">
+      <span class="decision-label">Testeur 1</span>
+      <span class="decision-value">☐ LANCEMENT OK &nbsp;&nbsp;&nbsp; ☐ LANCEMENT BLOQUÉ — Raison : _______________________</span>
+    </div>
+    <div class="decision-row">
+      <span class="decision-label">Testeur 2</span>
+      <span class="decision-value">☐ LANCEMENT OK &nbsp;&nbsp;&nbsp; ☐ LANCEMENT BLOQUÉ — Raison : _______________________</span>
+    </div>
+    <div class="decision-row">
+      <span class="decision-label">Testeur 3</span>
+      <span class="decision-value">☐ LANCEMENT OK &nbsp;&nbsp;&nbsp; ☐ LANCEMENT BLOQUÉ — Raison : _______________________</span>
+    </div>
+    <div class="decision-row">
+      <span class="decision-label">Décision finale</span>
+      <span class="decision-value">☐ <strong>GO</strong> — Lancement autorisé &nbsp;&nbsp;&nbsp; ☐ <strong>NO GO</strong> — Corrections requises</span>
+    </div>
+    <div class="decision-row">
+      <span class="decision-label">Date de décision</span>
+      <span class="decision-value">___________________________________</span>
+    </div>
+    <div class="decision-row">
+      <span class="decision-label">Signature</span>
+      <span class="decision-value">___________________________________</span>
+    </div>
+  </div>
+
+  <footer>GuinéeMarché — Document confidentiel. Ne pas diffuser en dehors de l'équipe projet.</footer>
+</div>
+</body>
+</html>

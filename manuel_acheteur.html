@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GuinéeMarché — Manuel Acheteur</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;line-height:1.6}
+  @media print{
+    .no-print{display:none}
+    .page-break{page-break-before:always}
+    body{font-size:11px}
+    section{page-break-inside:avoid}
+  }
+  .print-btn{position:fixed;top:16px;right:16px;background:#16a34a;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:999}
+  .print-btn:hover{background:#15803d}
+
+  /* Cover */
+  .cover{background:linear-gradient(135deg,#16a34a 0%,#065f46 100%);color:#fff;padding:60px 40px;text-align:center}
+  .cover .badge{display:inline-block;background:rgba(255,255,255,.2);border-radius:99px;padding:4px 16px;font-size:12px;font-weight:600;letter-spacing:.05em;margin-bottom:20px}
+  .cover h1{font-size:38px;font-weight:700;margin-bottom:10px}
+  .cover p{font-size:16px;opacity:.85}
+  .cover .version{margin-top:24px;font-size:12px;opacity:.6}
+
+  /* Layout */
+  .container{max-width:820px;margin:0 auto;padding:32px 28px}
+
+  /* TOC */
+  .toc{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:12px;padding:24px 28px;margin-bottom:40px}
+  .toc h2{font-size:14px;font-weight:700;color:#15803d;margin-bottom:14px}
+  .toc ol{padding-left:20px;color:#166534}
+  .toc li{margin-bottom:6px;font-size:13px}
+  .toc a{color:#16a34a;text-decoration:none}
+  .toc a:hover{text-decoration:underline}
+
+  /* Sections */
+  .section-header{display:flex;align-items:center;gap:12px;background:#f0fdf4;border-left:4px solid #16a34a;padding:12px 16px;border-radius:0 8px 8px 0;margin:36px 0 16px}
+  .section-header .num{background:#16a34a;color:#fff;font-weight:700;font-size:13px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .section-header h2{font-size:16px;font-weight:700;color:#166534}
+
+  /* Steps */
+  .steps{list-style:none;space-y:8px}
+  .step{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f3f4f6}
+  .step:last-child{border-bottom:none}
+  .step-num{background:#16a34a;color:#fff;font-weight:700;font-size:11px;min-width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0}
+  .step-text{font-size:13px;color:#374151}
+  .step-text strong{color:#111827}
+
+  /* Tips & warnings */
+  .tip{background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#166534}
+  .warn{background:#fff7ed;border-left:3px solid #f97316;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#9a3412}
+  .info{background:#eff6ff;border-left:3px solid #3b82f6;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#1e40af}
+
+  /* Table */
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}
+  th{background:#16a34a;color:#fff;padding:9px 12px;text-align:left;font-weight:600}
+  td{padding:9px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f9fafb}
+
+  /* Sub-heading */
+  h3{font-size:14px;font-weight:700;color:#111827;margin:20px 0 8px}
+
+  footer{text-align:center;color:#9ca3af;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #e5e7eb}
+</style>
+</head>
+<body>
+
+<button class="print-btn no-print" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+
+<!-- COVER -->
+<div class="cover">
+  <div class="badge">🛒 GuinéeMarché</div>
+  <h1>Manuel Acheteur</h1>
+  <p>Tout ce que vous devez savoir pour acheter en toute sécurité</p>
+  <div class="version">Version 1.0 · guimatrix.com</div>
+</div>
+
+<div class="container">
+
+  <!-- TOC -->
+  <div class="toc">
+    <h2>📋 Table des matières</h2>
+    <ol>
+      <li><a href="#s1">Créer votre compte</a></li>
+      <li><a href="#s2">Trouver une annonce</a></li>
+      <li><a href="#s3">Contacter un vendeur</a></li>
+      <li><a href="#s4">Passer une commande</a></li>
+      <li><a href="#s5">Payer en sécurité</a></li>
+      <li><a href="#s6">Suivre votre livraison</a></li>
+      <li><a href="#s7">Confirmer la réception</a></li>
+      <li><a href="#s8">Laisser un avis</a></li>
+      <li><a href="#s9">Ouvrir un litige</a></li>
+      <li><a href="#s10">Demander un retour</a></li>
+      <li><a href="#s11">Gérer votre profil</a></li>
+      <li><a href="#s12">Questions fréquentes</a></li>
+    </ol>
+  </div>
+
+  <!-- S1 -->
+  <div id="s1">
+    <div class="section-header"><div class="num">1</div><h2>Créer votre compte</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Ouvrez <strong>guimatrix.com</strong> dans votre navigateur.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez sur <strong>« S'inscrire »</strong> en haut à droite.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Renseignez votre <strong>nom complet</strong>, votre <strong>numéro de téléphone guinéen</strong> et choisissez un <strong>mot de passe</strong>.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Sélectionnez le rôle <strong>« Acheteur »</strong>. Si vous souhaitez aussi vendre, choisissez <strong>« Vendeur »</strong>.</div></li>
+      <li class="step"><div class="step-num">5</div><div class="step-text">Cliquez <strong>« Créer mon compte »</strong>. Un <strong>code OTP à 6 chiffres</strong> vous est envoyé par SMS.</div></li>
+      <li class="step"><div class="step-num">6</div><div class="step-text">Saisissez le code OTP reçu dans les <strong>10 minutes</strong>. Votre compte est activé.</div></li>
+    </ol>
+    <div class="tip">💡 Si vous avez un <strong>code de parrainage</strong>, saisissez-le lors de l'inscription pour gagner des avantages supplémentaires.</div>
+    <div class="warn">⚠️ Le code OTP expire après 10 minutes. Si vous ne le recevez pas, cliquez sur « Renvoyer le code ».</div>
+  </div>
+
+  <!-- S2 -->
+  <div id="s2" class="page-break">
+    <div class="section-header"><div class="num">2</div><h2>Trouver une annonce</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Sur la page d'accueil, utilisez la <strong>barre de recherche</strong> pour taper un mot-clé (ex : « téléphone Samsung »).</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Filtrez par <strong>ville</strong> (Conakry, Kindia, Labé…) pour voir les annonces proches de vous.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Filtrez par <strong>catégorie</strong> (Électronique, Immobilier, Véhicules…) pour affiner les résultats.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Cliquez sur une annonce pour voir le <strong>détail complet</strong> : photos, description, prix, localisation, profil vendeur.</div></li>
+      <li class="step"><div class="step-num">5</div><div class="step-text">Cliquez sur ❤️ pour <strong>ajouter aux favoris</strong> et retrouver l'annonce plus tard.</div></li>
+    </ol>
+    <div class="info">ℹ️ Les annonces avec l'icône ⚡ sont <strong>boostées</strong> par le vendeur — elles apparaissent en priorité mais restent soumises aux mêmes garanties.</div>
+  </div>
+
+  <!-- S3 -->
+  <div id="s3">
+    <div class="section-header"><div class="num">3</div><h2>Contacter un vendeur</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Sur la page de l'annonce, cliquez sur <strong>« Contacter le vendeur »</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Rédigez votre message dans la zone de texte et envoyez.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Le vendeur reçoit une notification et vous répond directement dans la messagerie.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Vous pouvez aussi envoyer une <strong>offre de prix</strong> si l'annonce est à prix négociable.</div></li>
+    </ol>
+    <div class="tip">💡 Vos coordonnées personnelles ne sont jamais partagées automatiquement avec le vendeur. La communication passe uniquement par la messagerie intégrée.</div>
+  </div>
+
+  <!-- S4 -->
+  <div id="s4">
+    <div class="section-header"><div class="num">4</div><h2>Passer une commande</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Sur la page de l'annonce, cliquez sur <strong>« Acheter »</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Choisissez votre <strong>mode de récupération</strong> :</div></li>
+    </ol>
+    <table>
+      <tr><th>Mode</th><th>Description</th></tr>
+      <tr><td>📍 Point de retrait</td><td>Vous venez chercher l'article dans un point relais GuinéeMarché.</td></tr>
+      <tr><td>🤝 Point de rencontre</td><td>Rendez-vous convenu avec le vendeur dans un lieu public.</td></tr>
+      <tr><td>🏠 Livraison à domicile</td><td>Un livreur GuinéeMarché apporte l'article chez vous. Des frais de livraison s'appliquent.</td></tr>
+    </table>
+    <ol class="steps" start="3">
+      <li class="step"><div class="step-num">3</div><div class="step-text">Renseignez votre <strong>adresse</strong> si vous choisissez la livraison à domicile.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Ajoutez une <strong>note</strong> pour le vendeur si nécessaire, puis cliquez <strong>« Confirmer la commande »</strong>.</div></li>
+    </ol>
+    <div class="info">ℹ️ Le montant total affiché inclut le prix de l'article et les éventuels frais de livraison. Il est définitif.</div>
+  </div>
+
+  <!-- S5 -->
+  <div id="s5" class="page-break">
+    <div class="section-header"><div class="num">5</div><h2>Payer en sécurité</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Après la confirmation de commande, vous êtes redirigé vers la page de <strong>paiement ChaChap Pay</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Saisissez votre <strong>numéro Mobile Money</strong> (Orange Money, MTN MoMo, etc.) et validez.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Confirmez le paiement sur votre téléphone (notification de votre opérateur).</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Vous recevez une <strong>confirmation</strong> par notification et SMS. La commande passe au statut <strong>CONFIRMÉE</strong>.</div></li>
+    </ol>
+    <div class="tip">🔒 <strong>Système Escrow :</strong> votre argent est sécurisé sur GuinéeMarché et n'est versé au vendeur qu'après confirmation de votre réception. Vous êtes protégé.</div>
+    <div class="warn">⚠️ Ne payez jamais directement au vendeur en dehors de la plateforme. Cela annule toute protection.</div>
+  </div>
+
+  <!-- S6 -->
+  <div id="s6">
+    <div class="section-header"><div class="num">6</div><h2>Suivre votre livraison</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Allez dans <strong>« Mes commandes »</strong> depuis votre profil.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez sur la commande concernée pour voir son statut en temps réel.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Si vous avez choisi la <strong>livraison à domicile</strong>, une carte affiche la position GPS du livreur.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Vous recevez des notifications à chaque étape : assignation livreur, départ, arrivée imminente.</div></li>
+    </ol>
+    <h3>📦 Votre code de vérification</h3>
+    <p style="font-size:13px;color:#374151;margin-bottom:8px">Dans le détail de la commande, vous trouverez votre <strong>code de vérification à 6 chiffres</strong>. Ce code est <em>strictement personnel</em> — ne le partagez avec personne sauf le livreur au moment de la remise de l'article.</p>
+    <div class="warn">⚠️ Ne communiquez jamais ce code par téléphone ou message avant d'avoir l'article en main. Le livreur n'en a pas besoin avant la livraison.</div>
+  </div>
+
+  <!-- S7 -->
+  <div id="s7">
+    <div class="section-header"><div class="num">7</div><h2>Confirmer la réception</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Lorsque le livreur arrive, <strong>vérifiez l'article</strong> (état, quantité, conformité à l'annonce).</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Si tout est correct, <strong>donnez votre code de vérification</strong> au livreur qui le saisit dans son application.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">La commande passe en statut <strong>LIVRÉ</strong>. Vous pouvez aussi cliquer <strong>« Confirmer la réception »</strong> depuis Mes commandes.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Les fonds sont automatiquement versés au vendeur après confirmation.</div></li>
+    </ol>
+    <div class="info">ℹ️ Si vous ne confirmez pas dans les <strong>24 heures</strong> (ou 72h pour les commandes ≥ 500 000 GNF), les fonds sont libérés automatiquement au vendeur.</div>
+  </div>
+
+  <!-- S8 -->
+  <div id="s8" class="page-break">
+    <div class="section-header"><div class="num">8</div><h2>Laisser un avis</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Une fois la commande terminée, allez dans <strong>« Mes commandes »</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez sur la commande, puis sur <strong>« Laisser un avis »</strong>.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Choisissez une note de 1 à 5 étoiles et écrivez un commentaire.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Soumettez. L'avis est public et visible sur le profil du vendeur.</div></li>
+    </ol>
+    <div class="tip">💡 Votre avis aide les autres acheteurs à faire confiance aux bons vendeurs. Soyez honnête et précis.</div>
+  </div>
+
+  <!-- S9 -->
+  <div id="s9">
+    <div class="section-header"><div class="num">9</div><h2>Ouvrir un litige</h2></div>
+    <p style="font-size:13px;color:#374151;margin-bottom:12px">Si l'article reçu ne correspond pas à l'annonce (défectueux, manquant, différent), vous pouvez ouvrir un litige <strong>avant de confirmer la réception</strong>.</p>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Allez dans <strong>« Mes commandes »</strong> → ouvrez la commande concernée.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez sur <strong>« Signaler un problème »</strong>.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Décrivez le problème en détail et soumettez.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Les fonds sont <strong>bloqués</strong> jusqu'à résolution par l'équipe GuinéeMarché.</div></li>
+      <li class="step"><div class="step-num">5</div><div class="step-text">L'équipe vous contacte sous 24-48h pour traiter le litige.</div></li>
+    </ol>
+    <div class="warn">⚠️ N'ouvrez un litige qu'en cas de réel problème. Un litige abusif peut entraîner la suspension de votre compte.</div>
+  </div>
+
+  <!-- S10 -->
+  <div id="s10">
+    <div class="section-header"><div class="num">10</div><h2>Demander un retour</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Une fois la commande marquée comme <strong>terminée</strong>, allez dans les détails de la commande.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez sur <strong>« Demander un retour »</strong> et expliquez la raison.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">L'équipe admin examine la demande et vous notifie de sa décision.</div></li>
+    </ol>
+    <div class="info">ℹ️ Une seule demande de retour est possible par commande. Le retour est soumis à l'appréciation de l'équipe GuinéeMarché.</div>
+  </div>
+
+  <!-- S11 -->
+  <div id="s11" class="page-break">
+    <div class="section-header"><div class="num">11</div><h2>Gérer votre profil</h2></div>
+    <table>
+      <tr><th>Action</th><th>Comment faire</th></tr>
+      <tr><td>Modifier nom / ville</td><td>Profil → ✏️ Modifier mon profil</td></tr>
+      <tr><td>Ajouter un email</td><td>Profil → ✏️ Modifier → champ Email</td></tr>
+      <tr><td>Mes favoris</td><td>Profil → ❤️ Mes favoris</td></tr>
+      <tr><td>Voir mes commandes</td><td>Profil → 🛍️ Mes commandes</td></tr>
+      <tr><td>Mes messages</td><td>Profil → 💬 Mes messages</td></tr>
+      <tr><td>Supprimer le compte</td><td>Profil → 🗑️ Supprimer mon compte (irréversible)</td></tr>
+      <tr><td>Se déconnecter</td><td>Profil → 🚪 Se déconnecter</td></tr>
+    </table>
+    <h3>Programme de parrainage</h3>
+    <p style="font-size:13px;color:#374151">Dans votre profil, retrouvez votre <strong>code de parrainage</strong> unique. Partagez-le : chaque ami inscrit avec votre code vous rapporte des annonces gratuites supplémentaires.</p>
+  </div>
+
+  <!-- S12 -->
+  <div id="s12">
+    <div class="section-header"><div class="num">12</div><h2>Questions fréquentes</h2></div>
+    <table>
+      <tr><th>Question</th><th>Réponse</th></tr>
+      <tr><td>Mon argent est-il en sécurité ?</td><td>Oui. Il est bloqué en escrow jusqu'à confirmation de votre réception. Vous êtes remboursé en cas de litige confirmé.</td></tr>
+      <tr><td>Puis-je annuler une commande ?</td><td>Vous pouvez ouvrir un litige si l'article ne correspond pas. Contactez le support via le chat.</td></tr>
+      <tr><td>Je n'ai pas reçu mon OTP</td><td>Vérifiez votre réseau, attendez 60 sec et cliquez « Renvoyer le code ».</td></tr>
+      <tr><td>Le livreur me demande le code avant la livraison</td><td>Refusez. Ne donnez le code qu'en main propre, article en main.</td></tr>
+      <tr><td>Comment contacter le support ?</td><td>Utilisez le chat support en bas de l'écran (icône bulle) ou envoyez un email.</td></tr>
+    </table>
+  </div>
+
+  <footer>GuinéeMarché · Manuel Acheteur · guimatrix.com · Document confidentiel</footer>
+</div>
+</body>
+</html>

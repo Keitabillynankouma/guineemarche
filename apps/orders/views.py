@@ -283,10 +283,28 @@ class OrderListCreateView(generics.ListCreateAPIView):
                 locked = Listing.objects.select_for_update().get(pk=listing.pk)
                 if not locked.is_active:
                     raise ValidationError("Cette annonce n'est plus disponible.")
-                if Order.objects.filter(
+                # ── Détection vrai doublon (pas les commandes abandonnées) ────
+                # CONFIRMED / DISPUTED → toujours bloquants
+                # PENDING → bloquant seulement si un paiement actif existe
+                #           ET la commande a moins de 20 min (protection race condition)
+                from django.utils import timezone as _tz2
+                from datetime import timedelta as _td
+                _cutoff = _tz2.now() - _td(minutes=20)
+
+                # Commandes fermes (payées ou en litige)
+                _firm = Order.objects.filter(
                     listing=locked,
-                    status__in=[Order.Status.PENDING, Order.Status.CONFIRMED, Order.Status.DISPUTED],
-                ).exists():
+                    status__in=[Order.Status.CONFIRMED, Order.Status.DISPUTED],
+                ).exists()
+                # Commandes PENDING récentes avec paiement en attente (ChapChap initié)
+                _active_pending = Order.objects.filter(
+                    listing=locked,
+                    status=Order.Status.PENDING,
+                    created_at__gte=_cutoff,
+                    payments__status=Payment.Status.PENDING,
+                ).exists()
+
+                if _firm or _active_pending:
                     raise ValidationError(
                         "Cette annonce est déjà en cours d'achat. Réessayez dans quelques instants."
                     )
@@ -333,7 +351,7 @@ class OrderListCreateView(generics.ListCreateAPIView):
             from apps.notifications.models import Notification as _Notif
             _Notif.send(
                 user=order.seller,
-                type=_Notif.Type.MESSAGE,
+                type=_Notif.Type.NEW_MESSAGE,
                 title=f'💬 Nouveau message — {order.buyer.full_name}',
                 body=f'Commande #{order_ref} : « {order.listing.title} » — L\'acheteur vous a envoyé un message.',
                 data={'conversation_id': str(convo.id), 'order_id': str(order.id)},

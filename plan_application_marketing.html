@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GuinéeMarché — Plan d'Application Marketing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;font-size:13px;color:#111827;background:#fff;line-height:1.7}
+  @media print{
+    .no-print{display:none!important}
+    .page-break{page-break-before:always}
+    body{font-size:11.5px}
+    .week-card{page-break-inside:avoid}
+    .kpi-grid{page-break-inside:avoid}
+  }
+  .print-btn{position:fixed;top:16px;right:16px;background:#0369a1;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.2);z-index:999;font-family:'Inter',sans-serif}
+  .print-btn:hover{background:#075985}
+
+  /* COVER */
+  .cover{background:linear-gradient(135deg,#0369a1 0%,#0c4a6e 100%);color:#fff;padding:64px 48px;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;background:rgba(255,255,255,.06);border-radius:50%}
+  .cover .tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:5px 18px;font-size:12px;font-weight:600;letter-spacing:.06em;margin-bottom:22px}
+  .cover h1{font-size:42px;font-weight:800;line-height:1.15;margin-bottom:14px}
+  .cover h1 span{color:#bae6fd}
+  .cover .sub{font-size:16px;opacity:.82;max-width:520px;margin-bottom:28px}
+  .cover .meta{font-size:12px;opacity:.55;border-top:1px solid rgba(255,255,255,.2);padding-top:16px;margin-top:8px}
+
+  .container{max-width:860px;margin:0 auto;padding:40px 32px}
+
+  /* SECTION HEADER */
+  .section-title{display:flex;align-items:center;gap:14px;margin:44px 0 20px}
+  .section-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .section-title h2{font-size:19px;font-weight:700;color:#111827}
+  .section-title p{font-size:12px;color:#6b7280;margin-top:2px}
+
+  /* PHASE LABEL */
+  .phase-label{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;padding:4px 14px;border-radius:99px;margin-bottom:16px}
+  .phase-pre{background:#fef3c7;color:#92400e}
+  .phase-launch{background:#dcfce7;color:#166534}
+  .phase-growth{background:#eff6ff;color:#1e40af}
+  .phase-scale{background:#f5f3ff;color:#5b21b6}
+
+  /* WEEK CARDS */
+  .week-card{border:1px solid #e5e7eb;border-radius:14px;margin-bottom:20px;overflow:hidden;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .week-header{padding:14px 20px;display:flex;align-items:center;justify-content:space-between}
+  .week-header h3{font-size:15px;font-weight:700;color:#fff}
+  .week-header .week-num{font-size:12px;font-weight:600;opacity:.8;color:#fff}
+  .week-body{padding:18px 20px}
+  .week-body p{font-size:13px;font-weight:600;color:#374151;margin-bottom:10px}
+  .task-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;font-size:13px;color:#374151}
+  .task-check{color:#16a34a;font-size:14px;margin-top:1px;flex-shrink:0}
+  .task-text strong{color:#111827}
+  .week-footer{background:#f9fafb;padding:10px 20px;font-size:12px;color:#6b7280;border-top:1px solid #e5e7eb}
+
+  /* KPI GRID */
+  .kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:20px 0}
+  .kpi-card{background:#f9fafb;border:1px solid #e5e7eb;border-radius:12px;padding:18px;text-align:center}
+  .kpi-card .kpi-val{font-size:28px;font-weight:800;color:#0369a1;margin-bottom:4px}
+  .kpi-card .kpi-label{font-size:12px;color:#6b7280}
+  .kpi-card .kpi-deadline{font-size:11px;font-weight:600;color:#16a34a;margin-top:6px}
+
+  /* BUDGET TABLE */
+  table{width:100%;border-collapse:collapse;margin-top:16px;font-size:12px}
+  th{background:#0369a1;color:#fff;padding:10px 14px;text-align:left;font-weight:600}
+  td{padding:10px 14px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f9fafb}
+  td.total{font-weight:700;color:#111827}
+  td.low{color:#16a34a;font-weight:600}
+  td.high{color:#b91c1c;font-weight:600}
+
+  /* CHECKLIST */
+  .checklist{background:#eff6ff;border:1px solid #bfdbfe;border-radius:12px;padding:20px 24px;margin:20px 0}
+  .checklist h3{font-size:14px;font-weight:700;color:#1e40af;margin-bottom:14px}
+  .check-item{display:flex;gap:10px;align-items:flex-start;margin-bottom:8px;font-size:13px;color:#1e40af}
+  .check-box{width:16px;height:16px;border:2px solid #1e40af;border-radius:4px;flex-shrink:0;margin-top:1px}
+
+  /* GO/NO-GO */
+  .gono{background:linear-gradient(135deg,#16a34a,#064e3b);color:#fff;border-radius:14px;padding:24px 28px;margin-top:32px;text-align:center}
+  .gono h3{font-size:20px;font-weight:800;margin-bottom:8px}
+  .gono p{font-size:13px;opacity:.85}
+
+  footer{text-align:center;color:#9ca3af;font-size:11px;margin-top:56px;padding-top:20px;border-top:1px solid #e5e7eb}
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+
+<div class="cover">
+  <div class="tag">🗓️ PLAN D'ACTION · 90 JOURS</div>
+  <h1>Plan d'Application<br><span>Marketing</span></h1>
+  <p class="sub">Timeline semaine par semaine, actions concrètes, budget estimatif et indicateurs de succès pour le lancement de GuinéeMarché.</p>
+  <div class="meta">Fichier 2/2 · Août 2026 · guimatrix.com · Confidentiel</div>
+</div>
+
+<div class="container">
+
+  <!-- PHASE 0 : PRÉ-LANCEMENT -->
+  <div class="section-title">
+    <div class="section-icon" style="background:#fef3c7">⚙️</div>
+    <div><h2>Phase 0 — Pré-lancement</h2><p>J-14 à J-1 : Préparer le terrain avant d'appuyer sur le bouton</p></div>
+  </div>
+  <div class="phase-label phase-pre">Semaines -2 à -1</div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#b45309">
+      <h3>Semaine -2 · Infrastructure & Contenus</h3>
+      <span class="week-num">J-14 → J-8</span>
+    </div>
+    <div class="week-body">
+      <p>🔧 Mise en place</p>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Créer et configurer la <strong>Page Facebook GuinéeMarché</strong> (logo, bannière, description, lien guimatrix.com)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Ouvrir le compte <strong>Instagram</strong> et <strong>WhatsApp Business</strong></div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Préparer <strong>20 visuels produits</strong> attrayants (avec le logo GuinéeMarché)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Rédiger 5 posts de teasing : "Quelque chose arrive en Guinée..." sans révéler encore le nom</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Identifier et contacter <strong>10 micro-influenceurs</strong> : proposer partenariat de lancement</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Recruter les <strong>10 premiers vendeurs</strong> (famille, amis, contacts) pour peupler la plateforme avant ouverture</div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif : plateforme visuellement riche avec au moins 50 annonces avant l'ouverture publique</div>
+  </div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#92400e">
+      <h3>Semaine -1 · Teasing & Recrutement</h3>
+      <span class="week-num">J-7 → J-1</span>
+    </div>
+    <div class="week-body">
+      <p>📢 Buzz de lancement</p>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Poster les contenus de teasing sur Facebook/Instagram (2 posts par jour)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer un <strong>compte à rebours</strong> Facebook : "GuinéeMarché ouvre dans X jours"</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">WhatsApp Broadcast à tous vos contacts : "J'ai quelque chose d'excitant à vous montrer bientôt"</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Finaliser les accords avec 3–5 micro-influenceurs : briefing + date de publication J+1</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Préparer votre post de lancement officiel (texte + 3 visuels + lien)</div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif : 200+ personnes qui attendent déjà le lancement</div>
+  </div>
+
+  <!-- PHASE 1 : LANCEMENT -->
+  <div class="section-title page-break">
+    <div class="section-icon" style="background:#dcfce7">🚀</div>
+    <div><h2>Phase 1 — Lancement</h2><p>Semaines 1 à 4 : Faire du bruit et acquérir les 500 premiers utilisateurs</p></div>
+  </div>
+  <div class="phase-label phase-launch">Semaines 1–4</div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#16a34a">
+      <h3>Semaine 1 · Jour J — Le Grand Lancement</h3>
+      <span class="week-num">J+1 → J+7</span>
+    </div>
+    <div class="week-body">
+      <p>🎉 Actions du Jour J</p>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text"><strong>Post officiel de lancement</strong> sur toutes les plateformes simultanément (9h du matin)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Les <strong>influenceurs partenaires publient leur vidéo/post</strong> le même jour</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Diffusion WhatsApp à tous vos contacts : lien d'inscription + message personnel</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer le <strong>premier boost Facebook Ads</strong> (ciblage Conakry 18–45 ans, budget 100 000 GNF)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Activer le <strong>programme de parrainage</strong> et communiquer les codes promo de bienvenue</div></div>
+      <p style="margin-top:14px">📆 Actions de la semaine</p>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Répondre personnellement à chaque nouveau vendeur inscrit (message de bienvenue)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Publier 2 posts/jour : annonces vedettes + témoignages des premiers acheteurs</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Mesurer chaque jour : inscriptions, annonces publiées, premières commandes</div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif S1 : 150 inscrits · 5 commandes complètes · 3 témoignages collectés</div>
+  </div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#15803d">
+      <h3>Semaines 2–3 · Activation & Premières Transactions</h3>
+      <span class="week-num">J+8 → J+21</span>
+    </div>
+    <div class="week-body">
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Publier les <strong>premiers témoignages vidéo</strong> d'acheteurs et vendeurs satisfaits (très puissant)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer le <strong>défi "Première vente"</strong> : les 10 premiers vendeurs qui complètent une vente gagnent 1 mois Pro gratuit</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Facebook Live de démonstration : "Comment acheter et vendre en toute sécurité sur GuinéeMarché"</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Contacter les <strong>radios locales</strong> pour un passage dans une émission économique</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Rejoindre et animer 10 groupes Facebook d'achat-vente à Conakry</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Identifier vos 5 meilleurs vendeurs → leur proposer le statut <strong>Vendeur Ambassadeur</strong></div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif S2–S3 : 350 inscrits · 25 commandes · 5 ambassadeurs actifs</div>
+  </div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#166534">
+      <h3>Semaine 4 · Bilan & Pivot</h3>
+      <span class="week-num">J+22 → J+28</span>
+    </div>
+    <div class="week-body">
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Analyser les données : quels canaux ont amené le plus d'inscrits ? Quelle catégorie se vend le mieux ?</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Doubler le budget sur les canaux qui fonctionnent, réduire ou stopper les autres</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Contacter les utilisateurs inactifs (inscrits mais n'ont pas acheté/vendu) : email/SMS de réengagement</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Poster un résumé public du premier mois : "GuinéeMarché fête son 1er mois !" avec chiffres clés</div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif fin S4 : 500 inscrits · 50 commandes · NPS > 7/10</div>
+  </div>
+
+  <!-- PHASE 2 : CROISSANCE -->
+  <div class="section-title page-break">
+    <div class="section-icon" style="background:#dbeafe">📈</div>
+    <div><h2>Phase 2 — Croissance</h2><p>Mois 2–3 : Consolider et accélérer</p></div>
+  </div>
+  <div class="phase-label phase-growth">Semaines 5–12</div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#1d4ed8">
+      <h3>Mois 2 · Expansion géographique & Catégories</h3>
+      <span class="week-num">J+29 → J+60</span>
+    </div>
+    <div class="week-body">
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Étendre les Facebook Ads à <strong>Kamsar, Kindia, Kankan</strong> (nouvelles villes)</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer des <strong>campagnes par catégorie</strong> : "Semaine de l'électronique", "Semaine de la mode"</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Activer les partenariats avec 2 associations étudiantes pour toucher les universités</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer une <strong>Newsletter hebdomadaire</strong> (via WhatsApp) : top annonces de la semaine</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Recruter 5 nouveaux micro-influenceurs dans d'autres régions</div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif fin Mois 2 : 1 500 inscrits · 200 commandes · 3 villes actives</div>
+  </div>
+
+  <div class="week-card">
+    <div class="week-header" style="background:#1e40af">
+      <h3>Mois 3 · Fidélisation & Réputation</h3>
+      <span class="week-num">J+61 → J+90</span>
+    </div>
+    <div class="week-body">
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer un <strong>programme de fidélité</strong> : paliers de points (Bronze, Argent, Or) pour les acheteurs actifs</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Publier un <strong>rapport de transparence</strong> : "X transactions sécurisées, 0 arnaque confirmée"</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Lancer la campagne "Vrai témoignage" : vidéos d'utilisateurs réels partageant leur expérience</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Approcher <strong>Orange Guinée ou MTN</strong> pour une réunion de partenariat co-marketing</div></div>
+      <div class="task-row"><div class="task-check">✓</div><div class="task-text">Créer la première <strong>vente flash</strong> : 24h de promotions exclusives avec des vendeurs partenaires</div></div>
+    </div>
+    <div class="week-footer">🎯 Objectif fin Mois 3 : 3 000 inscrits · 500 commandes · 4,5/5 note moyenne</div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-title page-break">
+    <div class="section-icon" style="background:#fce7f3">📊</div>
+    <div><h2>Indicateurs clés de succès (KPIs)</h2><p>Ce que vous mesurez chaque semaine pour savoir si ça marche</p></div>
+  </div>
+
+  <div class="kpi-grid">
+    <div class="kpi-card">
+      <div class="kpi-val">500</div>
+      <div class="kpi-label">Utilisateurs inscrits</div>
+      <div class="kpi-deadline">✓ Fin du Mois 1</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">50</div>
+      <div class="kpi-label">Commandes complètes</div>
+      <div class="kpi-deadline">✓ Fin du Mois 1</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">4,5/5</div>
+      <div class="kpi-label">Note plateforme</div>
+      <div class="kpi-deadline">✓ Objectif permanent</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">3 000</div>
+      <div class="kpi-label">Utilisateurs inscrits</div>
+      <div class="kpi-deadline">✓ Fin du Mois 3</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">500</div>
+      <div class="kpi-label">Commandes complètes</div>
+      <div class="kpi-deadline">✓ Fin du Mois 3</div>
+    </div>
+    <div class="kpi-card">
+      <div class="kpi-val">&lt;24h</div>
+      <div class="kpi-label">Délai résolution litiges</div>
+      <div class="kpi-deadline">✓ Objectif permanent</div>
+    </div>
+  </div>
+
+  <table>
+    <tr><th>KPI</th><th>Mesure</th><th>Fréquence</th><th>Outil</th></tr>
+    <tr><td>Inscriptions</td><td>Nouveaux comptes créés</td><td>Quotidien</td><td>Dashboard admin GuinéeMarché</td></tr>
+    <tr><td>Taux d'activation</td><td>% inscrits qui publient ou achètent</td><td>Hebdo</td><td>Admin → Stats utilisateurs</td></tr>
+    <tr><td>Commandes complètes</td><td>Commandes en statut COMPLETED</td><td>Quotidien</td><td>Dashboard admin</td></tr>
+    <tr><td>Taux de conversion</td><td>Visites → inscription → achat</td><td>Hebdo</td><td>Google Analytics (site web)</td></tr>
+    <tr><td>Engagement Facebook</td><td>Likes, commentaires, partages</td><td>Quotidien</td><td>Facebook Insights</td></tr>
+    <tr><td>Portée des posts</td><td>Personnes atteintes par post</td><td>Hebdo</td><td>Facebook / Instagram Insights</td></tr>
+    <tr><td>Coût par inscription</td><td>Budget Ads ÷ inscriptions générées</td><td>Hebdo</td><td>Facebook Ads Manager</td></tr>
+    <tr><td>Litiges ouverts</td><td>Nombre de disputes actives</td><td>Quotidien</td><td>Dashboard admin</td></tr>
+  </table>
+
+  <!-- BUDGET -->
+  <div class="section-title">
+    <div class="section-icon" style="background:#fef3c7">💰</div>
+    <div><h2>Budget Marketing Estimé</h2><p>90 premiers jours · Fourchette basse et haute</p></div>
+  </div>
+
+  <table>
+    <tr><th>Poste</th><th>Fréquence</th><th class="low">Min (GNF)</th><th class="high">Max (GNF)</th></tr>
+    <tr><td>Facebook Ads (Conakry)</td><td>Mensuel</td><td class="low">200 000</td><td class="high">500 000</td></tr>
+    <tr><td>Boost Facebook Ads (expansion)</td><td>Mois 2–3</td><td class="low">150 000</td><td class="high">400 000</td></tr>
+    <tr><td>Micro-influenceurs (5 contrats)</td><td>Mensuel</td><td class="low">100 000</td><td class="high">300 000</td></tr>
+    <tr><td>Radio locale (2 passages)</td><td>Mois 1</td><td class="low">100 000</td><td class="high">300 000</td></tr>
+    <tr><td>Création visuels & vidéos</td><td>Mensuel</td><td class="low">50 000</td><td class="high">150 000</td></tr>
+    <tr><td>Crédits parrainage (300 filleuls)</td><td>Mois 1–3</td><td class="low">600 000</td><td class="high">600 000</td></tr>
+    <tr><td>Flyers & supports imprimés</td><td>Une fois</td><td class="low">50 000</td><td class="high">100 000</td></tr>
+    <tr><td>Événements / présence universitaire</td><td>Mois 2–3</td><td class="low">50 000</td><td class="high">150 000</td></tr>
+    <tr><td><strong>TOTAL 3 mois</strong></td><td></td><td class="total low">1 300 000 GNF</td><td class="total high">2 500 000 GNF</td></tr>
+  </table>
+
+  <!-- CHECKLIST LANCEMENT -->
+  <div class="page-break"></div>
+  <div class="checklist">
+    <h3>✅ Checklist Lancement — À valider avant J+0</h3>
+    <div class="check-item"><div class="check-box"></div><div>Page Facebook créée avec logo, bannière et lien guimatrix.com</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Compte WhatsApp Business configuré (catalogue, réponses automatiques)</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Minimum 50 annonces actives sur la plateforme avant ouverture</div></div>
+    <div class="check-item"><div class="check-box"></div><div>3 à 5 influenceurs briefés et prêts à publier le Jour J</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Post de lancement rédigé, visuels préparés</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Programme de parrainage activé sur la plateforme</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Premiers Facebook Ads configurés (prêts à activer J+0)</div></div>
+    <div class="check-item"><div class="check-box"></div><div>SMS/WhatsApp de lancement préparés pour votre liste de contacts</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Compte admin GuinéeMarché prêt pour modérer en temps réel</div></div>
+    <div class="check-item"><div class="check-box"></div><div>Numéro WhatsApp Support communiqué aux premiers utilisateurs</div></div>
+  </div>
+
+  <div class="gono">
+    <h3>🚀 Vous êtes prêt à lancer !</h3>
+    <p>Exécutez ce plan avec discipline. La régularité bat l'intensité ponctuelle : <strong>1 post par jour vaut mieux que 10 posts en un jour puis rien</strong>. Mesurez, ajustez, et doublez la mise sur ce qui fonctionne.</p>
+  </div>
+
+  <footer>GuinéeMarché · Plan d'Application Marketing · Fichier 2/2 · guimatrix.com · Confidentiel</footer>
+</div>
+</body>
+</html>

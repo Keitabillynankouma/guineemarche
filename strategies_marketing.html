@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GuinéeMarché — Stratégies Marketing</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;font-size:13px;color:#111827;background:#fff;line-height:1.7}
+  @media print{
+    .no-print{display:none!important}
+    .page-break{page-break-before:always}
+    body{font-size:11.5px}
+    .card{page-break-inside:avoid}
+  }
+  .print-btn{position:fixed;top:16px;right:16px;background:#16a34a;color:#fff;border:none;padding:10px 20px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 10px rgba(0,0,0,.2);z-index:999;font-family:'Inter',sans-serif}
+  .print-btn:hover{background:#15803d}
+
+  /* COVER */
+  .cover{background:linear-gradient(135deg,#16a34a 0%,#064e3b 100%);color:#fff;padding:64px 48px;position:relative;overflow:hidden}
+  .cover::before{content:'';position:absolute;top:-60px;right:-60px;width:300px;height:300px;background:rgba(255,255,255,.06);border-radius:50%}
+  .cover::after{content:'';position:absolute;bottom:-80px;left:-40px;width:250px;height:250px;background:rgba(255,255,255,.04);border-radius:50%}
+  .cover .tag{display:inline-block;background:rgba(255,255,255,.18);border:1px solid rgba(255,255,255,.3);border-radius:99px;padding:5px 18px;font-size:12px;font-weight:600;letter-spacing:.06em;margin-bottom:22px}
+  .cover h1{font-size:42px;font-weight:800;line-height:1.15;margin-bottom:14px}
+  .cover h1 span{color:#bbf7d0}
+  .cover .sub{font-size:16px;opacity:.82;max-width:520px;margin-bottom:28px}
+  .cover .meta{font-size:12px;opacity:.55;border-top:1px solid rgba(255,255,255,.2);padding-top:16px;margin-top:8px}
+
+  /* BODY */
+  .container{max-width:860px;margin:0 auto;padding:40px 32px}
+
+  /* INTRO BOX */
+  .intro{background:#f0fdf4;border:1px solid #bbf7d0;border-radius:14px;padding:24px 28px;margin-bottom:40px}
+  .intro h2{font-size:15px;font-weight:700;color:#166534;margin-bottom:8px}
+  .intro p{font-size:13px;color:#166534;line-height:1.65}
+
+  /* SECTION */
+  .section-title{display:flex;align-items:center;gap:14px;margin:44px 0 20px}
+  .section-icon{width:42px;height:42px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex-shrink:0}
+  .section-title h2{font-size:19px;font-weight:700;color:#111827}
+  .section-title p{font-size:12px;color:#6b7280;margin-top:2px}
+
+  /* CARDS */
+  .card{border:1px solid #e5e7eb;border-radius:14px;padding:22px 24px;margin-bottom:18px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,.04)}
+  .card-header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+  .card-icon{font-size:22px}
+  .card-title{font-size:15px;font-weight:700;color:#111827}
+  .card-sub{font-size:12px;color:#6b7280}
+  .card-body{font-size:13px;color:#374151;line-height:1.7}
+  .card-body ul{padding-left:18px;margin-top:8px}
+  .card-body li{margin-bottom:6px}
+  .card-body strong{color:#111827}
+
+  /* TAGS */
+  .tag-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .tag{background:#f0fdf4;color:#166534;border:1px solid #bbf7d0;padding:3px 12px;border-radius:99px;font-size:11px;font-weight:600}
+  .tag.orange{background:#fff7ed;color:#9a3412;border-color:#fed7aa}
+  .tag.blue{background:#eff6ff;color:#1e40af;border-color:#bfdbfe}
+  .tag.purple{background:#f5f3ff;color:#5b21b6;border-color:#c4b5fd}
+
+  /* PRIORITY BADGE */
+  .prio{display:inline-block;font-size:10px;font-weight:700;padding:2px 9px;border-radius:99px;vertical-align:middle;margin-left:8px}
+  .prio.haute{background:#fef2f2;color:#b91c1c}
+  .prio.moyenne{background:#fff7ed;color:#9a3412}
+  .prio.basse{background:#f0fdf4;color:#166534}
+
+  /* SUMMARY TABLE */
+  table{width:100%;border-collapse:collapse;margin-top:20px;font-size:12px}
+  th{background:#16a34a;color:#fff;padding:10px 14px;text-align:left;font-weight:600}
+  td{padding:10px 14px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f9fafb}
+
+  /* QUOTE */
+  .quote{background:#f0fdf4;border-left:4px solid #16a34a;padding:14px 18px;border-radius:0 10px 10px 0;margin:24px 0;font-size:13px;color:#166534;font-style:italic}
+
+  footer{text-align:center;color:#9ca3af;font-size:11px;margin-top:56px;padding-top:20px;border-top:1px solid #e5e7eb}
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+
+<div class="cover">
+  <div class="tag">📢 MARKETING · LANCEMENT</div>
+  <h1>Stratégies Marketing<br><span>GuinéeMarché</span></h1>
+  <p class="sub">Les grandes stratégies pour acquérir vos premiers utilisateurs, construire votre notoriété et dominer le marché guinéen.</p>
+  <div class="meta">Fichier 1/2 · Août 2026 · guimatrix.com · Confidentiel</div>
+</div>
+
+<div class="container">
+
+  <div class="intro">
+    <h2>🎯 Positionnement stratégique</h2>
+    <p>GuinéeMarché n'est pas un simple site de petites annonces. C'est <strong>la première marketplace guinéenne qui sécurise l'argent et livre à domicile</strong>. Ce positionnement différenciant doit être au cœur de chaque action marketing. Votre avantage concurrentiel sur Guineezone et les classifieds : l'<strong>escrow + la livraison intégrée</strong>.</p>
+  </div>
+
+  <!-- STRATÉGIE 1 : DIGITAL -->
+  <div class="section-title">
+    <div class="section-icon" style="background:#dcfce7">📱</div>
+    <div><h2>Stratégie 1 — Marketing Digital</h2><p>Présence en ligne et acquisition via les réseaux sociaux</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">📘</div>
+      <div><div class="card-title">Facebook & Facebook Marketplace <span class="prio haute">PRIORITÉ HAUTE</span></div><div class="card-sub">La principale plateforme de Guinée · 2M+ utilisateurs actifs</div></div>
+    </div>
+    <div class="card-body">
+      Créez une <strong>Page Facebook GuinéeMarché</strong> avec le lien guimatrix.com bien visible. Postez quotidiennement des annonces attrayantes des meilleurs produits de la plateforme. Utilisez Facebook Marketplace pour référencer vos catégories.
+      <ul>
+        <li>Publicités Facebook Ads ciblées : Conakry, Kamsar, Kankan (25–45 ans, smartphone)</li>
+        <li>Boosting de posts : au moins 2 posts boostés par semaine au lancement</li>
+        <li>Groupes d'achat-vente guinéens : rejoignez et animez les groupes existants</li>
+      </ul>
+      <div class="tag-row"><span class="tag">Page Facebook</span><span class="tag">Facebook Ads</span><span class="tag">Marketplace</span><span class="tag">Groupes</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">📸</div>
+      <div><div class="card-title">Instagram & WhatsApp Business <span class="prio haute">PRIORITÉ HAUTE</span></div><div class="card-sub">Visuels produits + canal de vente directe</div></div>
+    </div>
+    <div class="card-body">
+      Instagram pour les photos de produits tendance (électronique, mode, food). <strong>WhatsApp Business</strong> comme canal de support client et de diffusion d'offres à votre liste de contacts.
+      <ul>
+        <li>Stories Instagram : produits du jour, annonces vedettes, témoignages acheteurs</li>
+        <li>WhatsApp Broadcast : liste d'acheteurs et vendeurs inscrits → offres exclusives</li>
+        <li>Catalogue WhatsApp Business avec les catégories populaires</li>
+      </ul>
+      <div class="tag-row"><span class="tag">Instagram</span><span class="tag">WhatsApp Business</span><span class="tag">Stories</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">🎥</div>
+      <div><div class="card-title">TikTok & YouTube Shorts <span class="prio moyenne">PRIORITÉ MOYENNE</span></div><div class="card-sub">Contenu vidéo viral pour les 18–35 ans</div></div>
+    </div>
+    <div class="card-body">
+      Vidéos courtes (30–60 sec) montrant <strong>comment ça marche</strong> : "J'ai acheté un téléphone sur GuinéeMarché et voici ce qui s'est passé". Le format narration + résultat fonctionne très bien.
+      <ul>
+        <li>Tutoriels : "Comment publier une annonce en 2 minutes"</li>
+        <li>Unboxing : montrez des livraisons réussies avec le code de vérification</li>
+        <li>Témoignages : vendeurs qui ont gagné de l'argent grâce à la plateforme</li>
+      </ul>
+      <div class="tag-row"><span class="tag blue">TikTok</span><span class="tag blue">YouTube Shorts</span><span class="tag blue">Vidéo virale</span></div>
+    </div>
+  </div>
+
+  <!-- STRATÉGIE 2 : INFLUENCE -->
+  <div class="section-title page-break">
+    <div class="section-icon" style="background:#fef3c7">🌟</div>
+    <div><h2>Stratégie 2 — Marketing d'Influence</h2><p>Partenariats avec des influenceurs guinéens</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">🎙️</div>
+      <div><div class="card-title">Micro-influenceurs locaux <span class="prio haute">PRIORITÉ HAUTE</span></div><div class="card-sub">5k–50k abonnés · Forte crédibilité · Coût abordable</div></div>
+    </div>
+    <div class="card-body">
+      Les micro-influenceurs guinéens (mode, tech, lifestyle, cuisine) ont une <strong>communauté engagée et locale</strong>. Leur recommandation a plus d'impact qu'une publicité classique.
+      <ul>
+        <li>Identifiez 10–15 micro-influenceurs actifs sur Facebook/Instagram/TikTok en Guinée</li>
+        <li>Offrez-leur un <strong>compte Pro gratuit + commission sur les ventes</strong> générées par leur code promo</li>
+        <li>Demandez une revue honnête de l'expérience d'achat ou de vente</li>
+        <li>Format préféré : vidéo de démonstration en direct depuis le téléphone</li>
+      </ul>
+      <div class="tag-row"><span class="tag orange">Micro-influenceurs</span><span class="tag orange">Code promo</span><span class="tag orange">Partenariat</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">📻</div>
+      <div><div class="card-title">Radio & Médias locaux <span class="prio moyenne">PRIORITÉ MOYENNE</span></div><div class="card-sub">Espace FM, Sabari FM, Koloma FM…</div></div>
+    </div>
+    <div class="card-body">
+      La radio reste très puissante en Guinée. Une mention sur une émission populaire peut générer des centaines d'inscriptions en un jour.
+      <ul>
+        <li>Passage dans les émissions économiques ou tech (15–30 sec de présentation)</li>
+        <li>Parrainage d'émissions "comment entreprendre" ou "conseils consommateurs"</li>
+        <li>Interviews du fondateur : "comment GuinéeMarché protège l'argent des acheteurs"</li>
+      </ul>
+      <div class="tag-row"><span class="tag orange">Radio</span><span class="tag orange">Presse locale</span><span class="tag orange">Interview</span></div>
+    </div>
+  </div>
+
+  <!-- STRATÉGIE 3 : BOUCHE À OREILLE -->
+  <div class="section-title">
+    <div class="section-icon" style="background:#ede9fe">🗣️</div>
+    <div><h2>Stratégie 3 — Bouche à oreille & Referral</h2><p>Transformer chaque utilisateur en ambassadeur</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">🎁</div>
+      <div><div class="card-title">Programme de parrainage <span class="prio haute">PRIORITÉ HAUTE</span></div><div class="card-sub">La croissance organique la plus puissante</div></div>
+    </div>
+    <div class="card-body">
+      Chaque utilisateur satisfait peut en amener 5 nouveaux. Un bon programme de parrainage est votre levier de croissance le moins coûteux.
+      <ul>
+        <li><strong>Parrain</strong> : reçoit 5 000 GNF de crédit pour chaque ami inscrit qui effectue sa première achat</li>
+        <li><strong>Filleul</strong> : reçoit 2 000 GNF de bienvenue dès son inscription via le lien de parrainage</li>
+        <li>Partage simplifié : lien unique par utilisateur, partage WhatsApp en 1 clic</li>
+        <li>Tableau de bord parrainage dans le profil pour suivre ses gains</li>
+      </ul>
+      <div class="tag-row"><span class="tag purple">Referral</span><span class="tag purple">Crédit plateforme</span><span class="tag purple">Croissance organique</span></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">🏪</div>
+      <div><div class="card-title">Réseau de vendeurs ambassadeurs <span class="prio moyenne">PRIORITÉ MOYENNE</span></div><div class="card-sub">Vos meilleurs vendeurs deviennent vos représentants</div></div>
+    </div>
+    <div class="card-body">
+      Identifiez vos 20 premiers vendeurs actifs et faites-en des <strong>ambassadeurs officiels de quartier</strong>. Ils parlent de GuinéeMarché autour d'eux en échange de visibilité accrue sur la plateforme.
+      <ul>
+        <li>Badge "Vendeur Ambassadeur" visible sur leur profil et leurs annonces</li>
+        <li>Annonces mises en avant gratuitement pendant 3 mois</li>
+        <li>Kit marketing : visuels à partager sur WhatsApp, statuts Facebook prêts à l'emploi</li>
+      </ul>
+      <div class="tag-row"><span class="tag purple">Ambassadeurs</span><span class="tag purple">Badge</span><span class="tag purple">Mise en avant</span></div>
+    </div>
+  </div>
+
+  <!-- STRATÉGIE 4 : PARTENARIATS -->
+  <div class="section-title page-break">
+    <div class="section-icon" style="background:#dbeafe">🤝</div>
+    <div><h2>Stratégie 4 — Partenariats Stratégiques</h2><p>S'appuyer sur des réseaux déjà existants</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">📦</div>
+      <div><div class="card-title">Livreurs & Sociétés de logistique <span class="prio haute">PRIORITÉ HAUTE</span></div></div>
+    </div>
+    <div class="card-body">
+      Les livreurs sur GuinéeMarché sont aussi des prescripteurs. Chaque livraison est une occasion de parler de la plateforme à l'acheteur ET au vendeur.
+      <ul>
+        <li>Partenariats avec les moto-taxis (motos jaunes) dans les quartiers populaires</li>
+        <li>Intégrer des flyers GuinéeMarché dans chaque livraison physique</li>
+        <li>Former les livreurs à recommander la plateforme à leurs clients réguliers</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">🏫</div>
+      <div><div class="card-title">Universités & Écoles de commerce <span class="prio moyenne">PRIORITÉ MOYENNE</span></div></div>
+    </div>
+    <div class="card-body">
+      Les étudiants sont vos premiers adopteurs : ils achètent, vendent et partagent massivement. Une bonne présence universitaire crée une base d'utilisateurs jeunes et actifs.
+      <ul>
+        <li>Présentation de GuinéeMarché dans des clubs entrepreneuriat (UGANC, ISIG…)</li>
+        <li>Challenge "Vends ton premier article sur GuinéeMarché" : prix pour les meilleurs vendeurs étudiants</li>
+        <li>Partenariat avec les associations étudiantes pour promouvoir la plateforme</li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">💳</div>
+      <div><div class="card-title">Opérateurs Mobile Money <span class="prio moyenne">PRIORITÉ MOYENNE</span></div></div>
+    </div>
+    <div class="card-body">
+      Orange Money et MTN MoMo sont vos partenaires naturels. Un co-branding avec eux légitime instantanément GuinéeMarché aux yeux des utilisateurs.
+      <ul>
+        <li>Approcher Orange Guinée et MTN Guinée pour un partenariat co-marketing</li>
+        <li>Mentionner GuinéeMarché dans leurs communications SMS/push</li>
+        <li>Cashback Orange Money pour les achats sur GuinéeMarché</li>
+      </ul>
+    </div>
+  </div>
+
+  <!-- STRATÉGIE 5 : CONTENU -->
+  <div class="section-title">
+    <div class="section-icon" style="background:#fce7f3">✍️</div>
+    <div><h2>Stratégie 5 — Marketing de Contenu</h2><p>Créer de la valeur pour attirer et fidéliser</p></div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">
+      <div class="card-icon">💡</div>
+      <div><div class="card-title">Éducation des utilisateurs</div></div>
+    </div>
+    <div class="card-body">
+      Le marché guinéen n'est pas habitué à acheter en ligne avec confiance. Votre rôle est d'<strong>éduquer</strong> autant que de vendre.
+      <ul>
+        <li>"Comment éviter les arnaques en achetant en ligne" → viral + positionne GuinéeMarché comme solution</li>
+        <li>"5 conseils pour vendre rapidement votre article" → attire les vendeurs</li>
+        <li>"Qu'est-ce que l'escrow et pourquoi c'est important ?" → pédagogie différenciante</li>
+        <li>Infographies simples en français et pular/soussou pour toucher plus large</li>
+      </ul>
+      <div class="tag-row"><span class="tag">Éducation</span><span class="tag">Confiance</span><span class="tag">Contenu viral</span></div>
+    </div>
+  </div>
+
+  <!-- TABLEAU RÉCAP -->
+  <div class="page-break"></div>
+  <div class="quote">"La première impression compte double. Votre objectif au lancement : 500 utilisateurs actifs en 30 jours, 10 transactions complètes validées, 5 témoignages réels à partager."</div>
+
+  <h3 style="font-size:15px;font-weight:700;margin:24px 0 4px">Récapitulatif des priorités</h3>
+  <table>
+    <tr><th>Stratégie</th><th>Priorité</th><th>Coût estimé</th><th>Impact attendu</th></tr>
+    <tr><td>Facebook Ads + Page</td><td>🔴 Haute</td><td>200 000 – 500 000 GNF/mois</td><td>Acquisition rapide, trafic immédiat</td></tr>
+    <tr><td>Programme de parrainage</td><td>🔴 Haute</td><td>Faible (crédits utilisés)</td><td>Croissance organique exponentielle</td></tr>
+    <tr><td>Micro-influenceurs</td><td>🔴 Haute</td><td>Produits offerts + commission</td><td>Crédibilité + notoriété locale</td></tr>
+    <tr><td>WhatsApp Business</td><td>🔴 Haute</td><td>Gratuit</td><td>Fidélisation et support direct</td></tr>
+    <tr><td>Vendeurs ambassadeurs</td><td>🟡 Moyenne</td><td>Avantages en nature</td><td>Réseau de prescripteurs actifs</td></tr>
+    <tr><td>Radio locale</td><td>🟡 Moyenne</td><td>100 000 – 300 000 GNF</td><td>Notoriété grand public</td></tr>
+    <tr><td>TikTok / YouTube Shorts</td><td>🟡 Moyenne</td><td>Temps créatif</td><td>Viral chez les 18–35 ans</td></tr>
+    <tr><td>Partenariats universités</td><td>🟡 Moyenne</td><td>Faible</td><td>Base d'early adopters engagés</td></tr>
+    <tr><td>Partenariat Mobile Money</td><td>🟡 Moyenne</td><td>Négociation B2B</td><td>Légitimité institutionnelle</td></tr>
+    <tr><td>Contenu éducatif</td><td>🟢 Continue</td><td>Temps rédaction</td><td>SEO + confiance long terme</td></tr>
+  </table>
+
+  <footer>GuinéeMarché · Stratégies Marketing · Fichier 1/2 · guimatrix.com · Confidentiel</footer>
+</div>
+</body>
+</html>

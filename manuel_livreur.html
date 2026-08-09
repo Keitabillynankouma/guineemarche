@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GuinéeMarché — Manuel Livreur</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;line-height:1.6}
+  @media print{.no-print{display:none}.page-break{page-break-before:always}body{font-size:11px}section{page-break-inside:avoid}}
+  .print-btn{position:fixed;top:16px;right:16px;background:#7c3aed;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:999}
+  .print-btn:hover{background:#6d28d9}
+  .cover{background:linear-gradient(135deg,#7c3aed 0%,#4c1d95 100%);color:#fff;padding:60px 40px;text-align:center}
+  .cover .badge{display:inline-block;background:rgba(255,255,255,.2);border-radius:99px;padding:4px 16px;font-size:12px;font-weight:600;letter-spacing:.05em;margin-bottom:20px}
+  .cover h1{font-size:38px;font-weight:700;margin-bottom:10px}
+  .cover p{font-size:16px;opacity:.85}
+  .cover .version{margin-top:24px;font-size:12px;opacity:.6}
+  .container{max-width:820px;margin:0 auto;padding:32px 28px}
+  .toc{background:#f5f3ff;border:1px solid #c4b5fd;border-radius:12px;padding:24px 28px;margin-bottom:40px}
+  .toc h2{font-size:14px;font-weight:700;color:#6d28d9;margin-bottom:14px}
+  .toc ol{padding-left:20px;color:#5b21b6}
+  .toc li{margin-bottom:6px;font-size:13px}
+  .toc a{color:#7c3aed;text-decoration:none}
+  .section-header{display:flex;align-items:center;gap:12px;background:#f5f3ff;border-left:4px solid #7c3aed;padding:12px 16px;border-radius:0 8px 8px 0;margin:36px 0 16px}
+  .section-header .num{background:#7c3aed;color:#fff;font-weight:700;font-size:13px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .section-header h2{font-size:16px;font-weight:700;color:#4c1d95}
+  .steps{list-style:none}
+  .step{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f3f4f6}
+  .step:last-child{border-bottom:none}
+  .step-num{background:#7c3aed;color:#fff;font-weight:700;font-size:11px;min-width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0}
+  .step-text{font-size:13px;color:#374151}
+  .step-text strong{color:#111827}
+  .tip{background:#f5f3ff;border-left:3px solid #7c3aed;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#5b21b6}
+  .warn{background:#fff7ed;border-left:3px solid #f97316;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#9a3412}
+  .info{background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#166534}
+  .danger{background:#fef2f2;border-left:3px solid #ef4444;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#991b1b}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}
+  th{background:#7c3aed;color:#fff;padding:9px 12px;text-align:left;font-weight:600}
+  td{padding:9px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f9fafb}
+  h3{font-size:14px;font-weight:700;color:#111827;margin:20px 0 8px}
+  p.body{font-size:13px;color:#374151;margin-bottom:10px}
+  .flow{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0}
+  .flow-step{background:#f5f3ff;border:1px solid #c4b5fd;border-radius:8px;padding:10px 14px;font-size:12px;color:#4c1d95;flex:1;min-width:120px;text-align:center}
+  .flow-arrow{font-size:18px;color:#7c3aed;display:flex;align-items:center}
+  footer{text-align:center;color:#9ca3af;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #e5e7eb}
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+
+<div class="cover">
+  <div class="badge">🚚 GuinéeMarché</div>
+  <h1>Manuel Livreur</h1>
+  <p>Effectuez vos livraisons, gagnez des revenus en toute confiance</p>
+  <div class="version">Version 1.0 · guimatrix.com</div>
+</div>
+
+<div class="container">
+  <div class="toc">
+    <h2>📋 Table des matières</h2>
+    <ol>
+      <li><a href="#s1">Devenir livreur</a></li>
+      <li><a href="#s2">Comprendre votre espace livreur</a></li>
+      <li><a href="#s3">Accepter une mission</a></li>
+      <li><a href="#s4">Récupérer le colis chez le vendeur</a></li>
+      <li><a href="#s5">Livrer à l'acheteur</a></li>
+      <li><a href="#s6">Le code de vérification (confirmation de livraison)</a></li>
+      <li><a href="#s7">Flux complet d'une livraison</a></li>
+      <li><a href="#s8">Vos revenus et paiements</a></li>
+      <li><a href="#s9">Gérer les incidents</a></li>
+      <li><a href="#s10">Votre profil et réputation</a></li>
+      <li><a href="#s11">Questions fréquentes</a></li>
+    </ol>
+  </div>
+
+  <div id="s1">
+    <div class="section-header"><div class="num">1</div><h2>Devenir livreur</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Rendez-vous sur <strong>guimatrix.com</strong> et créez un compte en sélectionnant le rôle <strong>« Livreur »</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Complétez votre profil avec vos informations : nom, quartier d'opération, moyen de transport.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Soumettez votre candidature. L'équipe GuinéeMarché valide votre profil sous 24-48h.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Une fois approuvé, vous recevez une notification et vous pouvez commencer à accepter des missions.</div></li>
+    </ol>
+    <div class="info">✅ Il n'y a pas de quota minimum. Vous travaillez à votre rythme — acceptez les missions quand vous êtes disponible.</div>
+    <div class="tip">💡 Renseignez un <strong>numéro Mobile Money</strong> dans votre profil dès l'inscription pour recevoir vos paiements sans délai.</div>
+  </div>
+
+  <div id="s2">
+    <div class="section-header"><div class="num">2</div><h2>Comprendre votre espace livreur</h2></div>
+    <table>
+      <tr><th>Section</th><th>Description</th></tr>
+      <tr><td>🗂️ Missions disponibles</td><td>Liste des livraisons non encore assignées dans votre zone.</td></tr>
+      <tr><td>📦 Mes livraisons actives</td><td>Missions que vous avez acceptées et qui sont en cours.</td></tr>
+      <tr><td>✅ Historique</td><td>Toutes vos livraisons terminées avec détails et gains.</td></tr>
+      <tr><td>💰 Mes revenus</td><td>Revenus de la semaine, du mois, total cumulé.</td></tr>
+      <tr><td>⭐ Ma réputation</td><td>Note moyenne donnée par les acheteurs et vendeurs.</td></tr>
+    </table>
+  </div>
+
+  <div id="s3">
+    <div class="section-header"><div class="num">3</div><h2>Accepter une mission</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Consultez la section <strong>« Missions disponibles »</strong>. Chaque mission indique la zone de retrait, la zone de livraison et les frais.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Vérifiez que la mission est dans <strong>votre zone d'opération</strong> et que vous êtes disponible.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Cliquez <strong>« Accepter »</strong>. La mission vous est maintenant assignée.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Vous recevez les coordonnées du vendeur (nom, quartier, numéro de contact).</div></li>
+    </ol>
+    <div class="warn">⚠️ Une fois une mission acceptée, engagez-vous à la mener jusqu'au bout. Les abandons répétés impactent votre note.</div>
+  </div>
+
+  <div id="s4" class="page-break">
+    <div class="section-header"><div class="num">4</div><h2>Récupérer le colis chez le vendeur</h2></div>
+    <p class="body">C'est l'étape de <strong>pickup</strong>. Vous allez chercher l'article chez le vendeur pour le livrer à l'acheteur.</p>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Contactez le vendeur via l'application (numéro affiché dans la mission) pour confirmer votre heure de passage.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Rendez-vous à l'adresse indiquée.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Présentez au vendeur votre <strong>code pickup</strong> depuis l'application (section détail de la mission).</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Le vendeur <strong>vérifie le code</strong> et vous remet le colis si les codes correspondent.</div></li>
+      <li class="step"><div class="step-num">5</div><div class="step-text">Cliquez <strong>« Colis récupéré »</strong> dans l'application. Le statut passe à <em>En transit</em>.</div></li>
+    </ol>
+    <div class="info">✅ Le code pickup protège <strong>les deux parties</strong> : vous êtes certifié comme livreur légitime, le vendeur est sûr de remettre à la bonne personne.</div>
+    <div class="tip">💡 Inspectez visuellement le colis avant de le prendre. Si le colis est endommagé ou non conforme à la description, signalez-le immédiatement via le support.</div>
+  </div>
+
+  <div id="s5">
+    <div class="section-header"><div class="num">5</div><h2>Livrer à l'acheteur</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Consultez l'adresse de livraison dans le détail de la mission.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Contactez l'acheteur pour confirmer qu'il est disponible à la réception.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Rendez-vous à l'adresse de l'acheteur.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Remettez le colis en main propre.</div></li>
+      <li class="step"><div class="step-num">5</div><div class="step-text">Demandez à l'acheteur son <strong>code de vérification</strong> pour confirmer la livraison (voir section 6).</div></li>
+    </ol>
+    <div class="warn">⚠️ Ne laissez jamais le colis sans présence de l'acheteur sans son accord explicite. En cas d'absence, recontactez-le et signalez la situation dans l'application.</div>
+  </div>
+
+  <div id="s6">
+    <div class="section-header"><div class="num">6</div><h2>Le code de vérification (confirmation de livraison)</h2></div>
+    <p class="body">Le code de vérification est le moyen officiel de confirmer que la livraison a bien eu lieu. C'est l'acheteur qui le détient — pas le livreur.</p>
+
+    <h3>Comment ça marche ?</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">L'acheteur reçoit son <strong>code de vérification à 6 chiffres</strong> dans l'application au moment de la commande.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Lors de la livraison, <strong>demandez ce code à l'acheteur</strong> et saisissez-le dans l'application.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Si le code est correct → la livraison est <strong>confirmée</strong> → la mission se clôture → les fonds sont libérés au vendeur.</div></li>
+    </ol>
+
+    <div class="danger">🔴 IMPORTANT : Vous ne voyez jamais ce code dans votre application — c'est délibéré. Ne demandez pas à l'acheteur de vous envoyer le code avant la livraison. Le code ne se partage qu'en face à face au moment de la remise du colis.</div>
+    <div class="warn">⚠️ Si l'acheteur ne retrouve pas son code, demandez-lui de vérifier dans la section <strong>« Mes commandes »</strong> de l'application.</div>
+  </div>
+
+  <div id="s7" class="page-break">
+    <div class="section-header"><div class="num">7</div><h2>Flux complet d'une livraison</h2></div>
+    <div class="flow">
+      <div class="flow-step">📋<br>Mission disponible</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">✋<br>J'accepte</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🏃<br>Je vais chez le vendeur</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🔑<br>Code pickup vérifié</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">📦<br>Colis récupéré</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🚚<br>En transit</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🏠<br>Chez l'acheteur</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">🔢<br>Code de véri. saisi</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">✅<br>Livraison confirmée</div>
+      <div class="flow-arrow">→</div>
+      <div class="flow-step">💰<br>Revenu crédité</div>
+    </div>
+  </div>
+
+  <div id="s8">
+    <div class="section-header"><div class="num">8</div><h2>Vos revenus et paiements</h2></div>
+    <table>
+      <tr><th>Point</th><th>Détail</th></tr>
+      <tr><td>Rémunération</td><td>Vous recevez les frais de livraison de chaque mission. Ces frais sont visibles avant d'accepter.</td></tr>
+      <tr><td>Paiement hebdomadaire</td><td>Les revenus de la semaine sont virés chaque <strong>dimanche soir</strong> sur votre numéro Mobile Money.</td></tr>
+      <tr><td>Opérateurs acceptés</td><td>Orange Money, MTN MoMo, PayCard, Kulu, Soutra Money, Akiba.</td></tr>
+      <tr><td>Configurer le paiement</td><td>Profil → Modifier → onglet 💳 Mobile Money → numéro + opérateur → Enregistrer.</td></tr>
+      <tr><td>Historique</td><td>Section « 💰 Mes revenus » → détail par semaine, par mission.</td></tr>
+    </table>
+    <div class="warn">⚠️ Si votre numéro Mobile Money n'est pas configuré, vos revenus restent bloqués jusqu'à ce que vous l'ajoutiez. Ajoutez-le dès l'inscription.</div>
+  </div>
+
+  <div id="s9" class="page-break">
+    <div class="section-header"><div class="num">9</div><h2>Gérer les incidents</h2></div>
+    <table>
+      <tr><th>Situation</th><th>Que faire</th></tr>
+      <tr><td>Le vendeur est absent au pickup</td><td>Appelez-le. S'il ne répond pas sous 30 min, signalez dans l'application → "Vendeur injoignable" et contactez le support.</td></tr>
+      <tr><td>L'acheteur est absent à la livraison</td><td>Appelez-le. S'il ne répond pas, prenez une photo devant l'adresse, signalez dans l'app. Discutez d'un second passage avec l'acheteur.</td></tr>
+      <tr><td>Le colis est endommagé</td><td>Photographiez avant de le prendre. Signalez immédiatement via le support. Ne prenez pas un colis visiblement endommagé sans signalement.</td></tr>
+      <tr><td>L'acheteur refuse le colis</td><td>Ne forçez pas. Signalez le refus dans l'application. Le support tranche entre vendeur et acheteur.</td></tr>
+      <tr><td>Vous êtes en retard</td><td>Prévenez l'acheteur via l'application dès que vous savez. La communication réduit les mauvaises notes.</td></tr>
+    </table>
+    <div class="tip">💡 Le support GuinéeMarché est disponible dans l'application → Menu → 💬 Support. Décrivez l'incident avec précision.</div>
+  </div>
+
+  <div id="s10">
+    <div class="section-header"><div class="num">10</div><h2>Votre profil et réputation</h2></div>
+    <p class="body">Votre note est un élément clé : les vendeurs et acheteurs peuvent voir votre score avant de vous faire confiance.</p>
+    <table>
+      <tr><th>Indicateur</th><th>Comment l'améliorer</th></tr>
+      <tr><td>⭐ Note moyenne</td><td>Soyez ponctuel, soigneux et communiquant. Les avis positifs montent votre note.</td></tr>
+      <tr><td>📦 Livraisons réussies</td><td>Chaque livraison confirmée s'ajoute à votre compteur.</td></tr>
+      <tr><td>🕐 Taux de ponctualité</td><td>Respectez les créneaux convenus. Prévenez en cas de retard.</td></tr>
+      <tr><td>🚫 Taux d'abandon</td><td>Acceptez uniquement ce que vous pouvez accomplir. Un abandon non justifié pénalise votre score.</td></tr>
+    </table>
+  </div>
+
+  <div id="s11">
+    <div class="section-header"><div class="num">11</div><h2>Questions fréquentes</h2></div>
+    <table>
+      <tr><th>Question</th><th>Réponse</th></tr>
+      <tr><td>Puis-je refuser une mission après l'avoir acceptée ?</td><td>Oui, en cas d'urgence ou d'empêchement réel. Signalez-le dans l'application le plus tôt possible pour minimiser l'impact sur votre note.</td></tr>
+      <tr><td>Que se passe-t-il si l'acheteur perd son code de vérification ?</td><td>L'acheteur peut retrouver son code dans "Mes commandes". En dernier recours, le support peut valider la livraison manuellement.</td></tr>
+      <tr><td>Je n'ai pas reçu mon paiement hebdomadaire</td><td>Vérifiez que votre numéro Mobile Money est bien configuré. Si oui, contactez le support avec la semaine concernée.</td></tr>
+      <tr><td>Un acheteur m'a donné un mauvais avis injuste</td><td>Contactez le support avec les détails de la mission. L'équipe peut examiner et rectifier en cas d'erreur.</td></tr>
+      <tr><td>Puis-je opérer dans plusieurs villes ?</td><td>Oui. Mettez à jour votre zone d'opération dans votre profil.</td></tr>
+    </table>
+  </div>
+
+  <footer>GuinéeMarché · Manuel Livreur · guimatrix.com · Document confidentiel</footer>
+</div>
+</body>
+</html>

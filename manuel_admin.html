@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>GuinéeMarché — Manuel Administrateur</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Inter',sans-serif;font-size:13px;color:#1a1a1a;background:#fff;line-height:1.6}
+  @media print{.no-print{display:none}.page-break{page-break-before:always}body{font-size:11px}section{page-break-inside:avoid}}
+  .print-btn{position:fixed;top:16px;right:16px;background:#b91c1c;color:#fff;border:none;padding:10px 18px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:999}
+  .print-btn:hover{background:#991b1b}
+  .cover{background:linear-gradient(135deg,#b91c1c 0%,#7f1d1d 100%);color:#fff;padding:60px 40px;text-align:center}
+  .cover .badge{display:inline-block;background:rgba(255,255,255,.2);border-radius:99px;padding:4px 16px;font-size:12px;font-weight:600;letter-spacing:.05em;margin-bottom:20px}
+  .cover h1{font-size:38px;font-weight:700;margin-bottom:10px}
+  .cover p{font-size:16px;opacity:.85}
+  .cover .version{margin-top:24px;font-size:12px;opacity:.6}
+  .container{max-width:820px;margin:0 auto;padding:32px 28px}
+  .toc{background:#fef2f2;border:1px solid #fecaca;border-radius:12px;padding:24px 28px;margin-bottom:40px}
+  .toc h2{font-size:14px;font-weight:700;color:#b91c1c;margin-bottom:14px}
+  .toc ol{padding-left:20px;color:#991b1b}
+  .toc li{margin-bottom:6px;font-size:13px}
+  .toc a{color:#dc2626;text-decoration:none}
+  .section-header{display:flex;align-items:center;gap:12px;background:#fef2f2;border-left:4px solid #b91c1c;padding:12px 16px;border-radius:0 8px 8px 0;margin:36px 0 16px}
+  .section-header .num{background:#b91c1c;color:#fff;font-weight:700;font-size:13px;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+  .section-header h2{font-size:16px;font-weight:700;color:#7f1d1d}
+  .steps{list-style:none}
+  .step{display:flex;gap:12px;align-items:flex-start;padding:10px 0;border-bottom:1px solid #f3f4f6}
+  .step:last-child{border-bottom:none}
+  .step-num{background:#b91c1c;color:#fff;font-weight:700;font-size:11px;min-width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;margin-top:1px;flex-shrink:0}
+  .step-text{font-size:13px;color:#374151}
+  .step-text strong{color:#111827}
+  .tip{background:#fef2f2;border-left:3px solid #b91c1c;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#991b1b}
+  .warn{background:#fff7ed;border-left:3px solid #f97316;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#9a3412}
+  .info{background:#f0fdf4;border-left:3px solid #16a34a;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#166534}
+  .critical{background:#fef2f2;border-left:3px solid #ef4444;padding:10px 14px;border-radius:0 8px 8px 0;margin:12px 0;font-size:12px;color:#991b1b;font-weight:600}
+  table{width:100%;border-collapse:collapse;margin:16px 0;font-size:12px}
+  th{background:#b91c1c;color:#fff;padding:9px 12px;text-align:left;font-weight:600}
+  td{padding:9px 12px;border-bottom:1px solid #e5e7eb;vertical-align:top}
+  tr:nth-child(even) td{background:#f9fafb}
+  h3{font-size:14px;font-weight:700;color:#111827;margin:20px 0 8px}
+  p.body{font-size:13px;color:#374151;margin-bottom:10px}
+  footer{text-align:center;color:#9ca3af;font-size:11px;margin-top:48px;padding-top:16px;border-top:1px solid #e5e7eb}
+</style>
+</head>
+<body>
+<button class="print-btn no-print" onclick="window.print()">🖨️ Enregistrer en PDF</button>
+
+<div class="cover">
+  <div class="badge">⚙️ GuinéeMarché</div>
+  <h1>Manuel Administrateur</h1>
+  <p>Gérez la plateforme, modérez le contenu, traitez les litiges</p>
+  <div class="version">Version 1.0 · CONFIDENTIEL · Usage interne uniquement</div>
+</div>
+
+<div class="container">
+  <div class="toc">
+    <h2>📋 Table des matières</h2>
+    <ol>
+      <li><a href="#s1">Accès à l'interface admin</a></li>
+      <li><a href="#s2">Tableau de bord général</a></li>
+      <li><a href="#s3">Gestion des utilisateurs</a></li>
+      <li><a href="#s4">Modération des annonces</a></li>
+      <li><a href="#s5">Gestion des commandes et de l'escrow</a></li>
+      <li><a href="#s6">Traitement des litiges</a></li>
+      <li><a href="#s7">Gestion des abonnements</a></li>
+      <li><a href="#s8">Gestion des boutiques</a></li>
+      <li><a href="#s9">Paiements et virements manuels</a></li>
+      <li><a href="#s10">Sécurité et IP bloquées</a></li>
+      <li><a href="#s11">Support utilisateur</a></li>
+      <li><a href="#s12">Procédures d'urgence</a></li>
+    </ol>
+  </div>
+
+  <div id="s1">
+    <div class="section-header"><div class="num">1</div><h2>Accès à l'interface admin</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Accédez à <strong>guimatrix.com/admin</strong> depuis un navigateur sécurisé.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Connectez-vous avec vos identifiants administrateur (fournis par le Super Admin).</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">L'interface Django Admin s'ouvre. C'est le panneau de contrôle complet de la plateforme.</div></li>
+    </ol>
+    <div class="critical">🔴 SÉCURITÉ : Ne partagez jamais vos identifiants admin. Ne vous connectez pas sur un réseau non sécurisé. Déconnectez-vous après chaque session.</div>
+    <div class="tip">💡 L'URL Django Admin est <code>/admin/</code>. Le frontend GuinéeMarché pour les actions courantes est accessible à <code>guimatrix.com</code> avec votre compte admin.</div>
+  </div>
+
+  <div id="s2">
+    <div class="section-header"><div class="num">2</div><h2>Tableau de bord général</h2></div>
+    <table>
+      <tr><th>Indicateur</th><th>Description</th></tr>
+      <tr><td>Nouveaux inscrits (24h)</td><td>Utilisateurs créés dans les dernières 24 heures.</td></tr>
+      <tr><td>Annonces en attente</td><td>Annonces soumises nécessitant une modération manuelle.</td></tr>
+      <tr><td>Commandes actives</td><td>Commandes payées dont la livraison est en cours.</td></tr>
+      <tr><td>Litiges ouverts</td><td>Disputes actives à traiter. Cible : résolution sous 48h.</td></tr>
+      <tr><td>Virements en attente</td><td>Gains de vendeurs bloqués faute de numéro Mobile Money.</td></tr>
+      <tr><td>Volume de transactions</td><td>Total des paiements traités (jour, semaine, mois).</td></tr>
+    </table>
+  </div>
+
+  <div id="s3" class="page-break">
+    <div class="section-header"><div class="num">3</div><h2>Gestion des utilisateurs</h2></div>
+    <h3>Consulter un utilisateur</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Accounts → Users</strong> → recherchez par numéro de téléphone ou nom.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez sur l'utilisateur pour voir son profil complet : rôle, annonces, commandes, payout info.</div></li>
+    </ol>
+
+    <h3>Actions disponibles sur un compte</h3>
+    <table>
+      <tr><th>Action</th><th>Quand l'utiliser</th></tr>
+      <tr><td>Suspendre un compte</td><td>Fraude confirmée, violation grave des CGU, signalements multiples.</td></tr>
+      <tr><td>Réactiver un compte</td><td>Après vérification d'identité ou résolution du problème signalé.</td></tr>
+      <tr><td>Passer en mode vendeur</td><td>L'utilisateur a demandé à vendre mais a créé un compte acheteur.</td></tr>
+      <tr><td>Réinitialiser le mot de passe</td><td>Utilisateur bloqué hors compte après plusieurs échecs OTP.</td></tr>
+      <tr><td>Voir le numéro payout</td><td>Pour vérifier ou corriger manuellement en cas de virement échoué.</td></tr>
+    </table>
+    <div class="warn">⚠️ Toute suspension de compte doit être documentée avec la raison. Ne suspendez pas sans preuve.</div>
+  </div>
+
+  <div id="s4">
+    <div class="section-header"><div class="num">4</div><h2>Modération des annonces</h2></div>
+    <p class="body">La modération automatique accepte ou signale les annonces à la soumission. Les annonces signalées arrivent dans la file d'attente manuelle.</p>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Listings → Annonces en attente</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Ouvrez chaque annonce. Vérifiez : photos (qualité, pertinence), description (complète, honnête), prix (réaliste), catégorie.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text"><strong>Approuver</strong> → l'annonce passe en statut Active et devient visible. <br><strong>Rejeter</strong> → l'annonce est refusée, l'utilisateur reçoit une notification avec le motif.</div></li>
+    </ol>
+
+    <h3>Motifs de rejet courants</h3>
+    <table>
+      <tr><th>Motif</th><th>Exemple</th></tr>
+      <tr><td>Photos non conformes</td><td>Flou, watermark, numéro de téléphone visible dans l'image.</td></tr>
+      <tr><td>Description insuffisante</td><td>Moins de 20 caractères, description sans rapport avec la photo.</td></tr>
+      <tr><td>Article interdit</td><td>Armes, alcool, produits illicites, contrefaçons.</td></tr>
+      <tr><td>Prix non réaliste</td><td>iPhone à 1 GNF (arnaque) ou 10 milliards GNF (erreur).</td></tr>
+      <tr><td>Doublon</td><td>Même annonce publiée plusieurs fois pour gonfler la visibilité.</td></tr>
+    </table>
+    <div class="tip">💡 Objectif de modération : traiter toutes les annonces en attente sous <strong>24 heures</strong>.</div>
+  </div>
+
+  <div id="s5" class="page-break">
+    <div class="section-header"><div class="num">5</div><h2>Gestion des commandes et de l'escrow</h2></div>
+    <table>
+      <tr><th>Statut commande</th><th>Signification</th></tr>
+      <tr><td>PENDING</td><td>Acheteur en cours de paiement.</td></tr>
+      <tr><td>PAID</td><td>Paiement reçu. Fonds en escrow. En attente de livraison.</td></tr>
+      <tr><td>IN_DELIVERY</td><td>Livreur assigné et en route.</td></tr>
+      <tr><td>DELIVERED</td><td>Livreur a saisi le code de vérification. En attente de confirmation acheteur.</td></tr>
+      <tr><td>COMPLETED</td><td>Acheteur a confirmé. Escrow libéré. Vendeur payé.</td></tr>
+      <tr><td>DISPUTED</td><td>Litige ouvert. Fonds bloqués.</td></tr>
+      <tr><td>REFUNDED</td><td>Remboursement effectué vers l'acheteur.</td></tr>
+      <tr><td>CANCELLED</td><td>Commande annulée (avant paiement ou après — selon la politique).</td></tr>
+    </table>
+
+    <h3>Libération manuelle de l'escrow</h3>
+    <p class="body">Si l'escrow automatique (24h / 72h) n'a pas déclenché ou si une intervention est nécessaire :</p>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Orders → [numéro de commande]</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Vérifiez le statut et la situation (litige clôturé ? livraison confirmée ?).</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Utilisez l'action <strong>« Libérer l'escrow »</strong>. Le virement vers le vendeur se déclenche immédiatement.</div></li>
+    </ol>
+    <div class="warn">⚠️ Ne libérez jamais l'escrow si un litige est encore ouvert sur la commande.</div>
+  </div>
+
+  <div id="s6">
+    <div class="section-header"><div class="num">6</div><h2>Traitement des litiges</h2></div>
+    <p class="body">Les litiges sont ouverts par l'acheteur quand il conteste la livraison ou la conformité de l'article. Les fonds restent bloqués pendant toute la durée.</p>
+
+    <h3>Procédure standard (48h maximum)</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text"><strong>Accusez réception</strong> : notifiez l'acheteur et le vendeur que le litige est en cours d'examen.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text"><strong>Recueillez les preuves</strong> : demandez photos, captures de conversation, description du problème des deux parties.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text"><strong>Analysez</strong> : comparez la description de l'annonce aux photos de l'acheteur. Consultez le statut de livraison.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text"><strong>Décidez</strong> : favorisez l'acheteur (remboursement) ou le vendeur (libération escrow).</div></li>
+      <li class="step"><div class="step-num">5</div><div class="step-text"><strong>Notifiez les deux parties</strong> avec la décision et la justification.</div></li>
+    </ol>
+    <table>
+      <tr><th>Décision</th><th>Action dans le système</th></tr>
+      <tr><td>En faveur de l'acheteur</td><td>Status → REFUNDED. Déclencher le remboursement Mobile Money acheteur.</td></tr>
+      <tr><td>En faveur du vendeur</td><td>Status → COMPLETED. Libérer l'escrow vers le vendeur.</td></tr>
+      <tr><td>Partage (cas complexe)</td><td>Remboursement partiel acheteur + libération partielle vendeur. Documentez.</td></tr>
+    </table>
+  </div>
+
+  <div id="s7" class="page-break">
+    <div class="section-header"><div class="num">7</div><h2>Gestion des abonnements</h2></div>
+    <table>
+      <tr><th>Plan</th><th>Limites</th><th>Accès admin</th></tr>
+      <tr><td>Gratuit (FREE)</td><td>5 annonces maximum</td><td>Voir la date d'expiration, annonces actives</td></tr>
+      <tr><td>Pro</td><td>Annonces illimitées + support prioritaire</td><td>Voir paiement, renouvellement, activations manuelles</td></tr>
+    </table>
+    <h3>Activation manuelle d'un plan Pro</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Subscriptions → [utilisateur]</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Cliquez <strong>Activer Pro</strong>, entrez la durée (en jours) et confirmez.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">L'utilisateur reçoit une notification push de confirmation.</div></li>
+    </ol>
+    <div class="info">✅ Activez manuellement après vérification du paiement hors système (virement direct, erreur de paiement, compensation).</div>
+  </div>
+
+  <div id="s8">
+    <div class="section-header"><div class="num">8</div><h2>Gestion des boutiques</h2></div>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Shops → Boutiques en attente</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Vérifiez le nom, la description et le logo. Assurez-vous que le vendeur a des annonces valides.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text"><strong>Approuver</strong> → la boutique devient visible sur le marketplace. <br><strong>Rejeter</strong> → avec motif (nom inapproprié, logo manquant, etc.).</div></li>
+    </ol>
+    <div class="warn">⚠️ Une boutique approuvée ne peut être supprimée que par l'admin, pas par le vendeur. Procédez avec soin.</div>
+  </div>
+
+  <div id="s9" class="page-break">
+    <div class="section-header"><div class="num">9</div><h2>Paiements et virements manuels</h2></div>
+    <h3>Virements vendeur bloqués (payout_phone vide)</h3>
+    <p class="body">Certains vendeurs n'ont pas configuré leur numéro Mobile Money. Leurs gains sont dans des <code>SellerPayout</code> en statut <strong>PENDING</strong>.</p>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Orders → Seller Payouts</strong> → filtrer par statut <strong>PENDING</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Contactez le vendeur pour l'inviter à renseigner son numéro Mobile Money dans son profil.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Une fois le numéro ajouté par le vendeur, le système déclenche automatiquement le virement.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">En cas d'échec persistant → déclenchez le virement <strong>manuellement</strong> depuis l'admin avec l'action "Disburse".</div></li>
+    </ol>
+
+    <h3>Remboursements acheteur</h3>
+    <table>
+      <tr><th>Étape</th><th>Action</th></tr>
+      <tr><td>Décision litige en faveur acheteur</td><td>Admin → Order → "Rembourser" → saisissez le montant → confirmer.</td></tr>
+      <tr><td>Vérification</td><td>Vérifiez le numéro Mobile Money de l'acheteur avant de déclencher.</td></tr>
+      <tr><td>Notification</td><td>L'acheteur reçoit automatiquement un SMS + notification push.</td></tr>
+    </table>
+  </div>
+
+  <div id="s10">
+    <div class="section-header"><div class="num">10</div><h2>Sécurité et IP bloquées</h2></div>
+    <p class="body">GuinéeMarché bloque automatiquement les IPs après 10 tentatives d'authentification échouées en 1 heure (durée de blocage : 30 minutes).</p>
+    <table>
+      <tr><th>Action</th><th>Localisation</th></tr>
+      <tr><td>Voir les IPs bloquées</td><td>Admin → Security → Blocked IPs</td></tr>
+      <tr><td>Débloquer une IP manuellement</td><td>Sélectionnez l'entrée → action "Débloquer"</td></tr>
+      <tr><td>Bannir une IP définitivement</td><td>Sélectionnez → action "Bannir" → confirmez</td></tr>
+      <tr><td>Voir les logs d'accès suspects</td><td>Admin → Security → Auth Logs → filtrer par statut FAILED</td></tr>
+    </table>
+    <div class="warn">⚠️ Avant de débloquer une IP, vérifiez qu'il ne s'agit pas d'une tentative d'attaque. En cas de doute, maintenez le blocage et contactez le support technique.</div>
+    <div class="info">✅ Le middleware de sécurité protège aussi contre les injections SQL, XSS et les traversées de répertoire. Ces événements sont loggés automatiquement.</div>
+  </div>
+
+  <div id="s11" class="page-break">
+    <div class="section-header"><div class="num">11</div><h2>Support utilisateur</h2></div>
+    <p class="body">Les utilisateurs peuvent envoyer des tickets de support depuis l'application. Ils arrivent dans l'interface admin.</p>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Admin → <strong>Support → Tickets ouverts</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Triez par priorité : litiges financiers &gt; problèmes de compte &gt; questions générales.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Répondez depuis l'interface. L'utilisateur reçoit la réponse par notification push et SMS.</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Clôturez le ticket quand le problème est résolu.</div></li>
+    </ol>
+    <table>
+      <tr><th>Type de ticket</th><th>SLA cible</th></tr>
+      <tr><td>Litige / paiement bloqué</td><td>Réponse initiale sous 4h, résolution sous 48h</td></tr>
+      <tr><td>Problème de compte (connexion, OTP)</td><td>Résolution sous 12h</td></tr>
+      <tr><td>Question annonce / modération</td><td>Résolution sous 24h</td></tr>
+      <tr><td>Question générale</td><td>Résolution sous 48h</td></tr>
+    </table>
+  </div>
+
+  <div id="s12">
+    <div class="section-header"><div class="num">12</div><h2>Procédures d'urgence</h2></div>
+
+    <h3>🚨 Fraude détectée sur un compte</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text"><strong>Suspendez immédiatement</strong> le compte (Admin → Users → Suspendre).</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Bloquez toutes les commandes actives associées.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Documentez les preuves (captures, logs, montants).</div></li>
+      <li class="step"><div class="step-num">4</div><div class="step-text">Contactez le Super Admin pour décision finale (remboursement acheteurs affectés).</div></li>
+    </ol>
+
+    <h3>🚨 Paiement bloqué depuis +72h</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Identifiez la cause : escrow auto non déclenché ? Litige ? Numéro payout absent ?</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Selon la cause → libérez manuellement, résolvez le litige ou contactez le vendeur pour son numéro.</div></li>
+      <li class="step"><div class="step-num">3</div><td>Documentez l'action dans le ticket de commande.</div></li>
+    </ol>
+
+    <h3>🚨 Panne du service (API inaccessible)</h3>
+    <ol class="steps">
+      <li class="step"><div class="step-num">1</div><div class="step-text">Vérifiez le statut de Render (render.com/status) — le backend tourne sur <strong>guineemarche</strong>.</div></li>
+      <li class="step"><div class="step-num">2</div><div class="step-text">Si Render est opérationnel, vérifiez les logs du service dans le dashboard Render.</div></li>
+      <li class="step"><div class="step-num">3</div><div class="step-text">Contactez le développeur technique avec les logs d'erreur.</div></li>
+    </ol>
+
+    <div class="critical">🔴 Règle d'or : en cas de doute sur une action irréversible (suppression, remboursement massif, bannissement), consultez le Super Admin avant d'agir.</div>
+  </div>
+
+  <footer>GuinéeMarché · Manuel Administrateur · guimatrix.com · CONFIDENTIEL — Usage interne uniquement</footer>
+</div>
+</body>
+</html>
