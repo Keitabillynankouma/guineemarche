@@ -317,6 +317,7 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
     # ── Cas 2 : ChaChaP PUSH API ──────────────────────────────────────────────
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
+    access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
     if api_key:
         try:
             import requests as _req, json as _json2, hmac as _hmac2, hashlib as _hs2
@@ -325,6 +326,8 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
                 'amount':         amount,
                 'description':    f'Salaire livreur Guimatrix semaine du {payout.week_start}',
             }
+            if access_code:
+                _body2['access_code'] = access_code
             _body2_bytes = _json2.dumps(_body2, separators=(',', ':')).encode()
             _headers2 = {
                 'CCP-Api-Key':  api_key,
@@ -333,12 +336,18 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
             if encrypt_key:
                 _sig2 = _hmac2.new(encrypt_key.encode(), _body2_bytes, _hs2.sha256).hexdigest()
                 _headers2['CCP-HMAC-Signature'] = _sig2
-            resp = _req.post(
-                f'{CHACHAP_API_URL}/api/push/request',
-                data=_body2_bytes,
-                headers=_headers2,
-                timeout=20,
+            _push_url2 = (
+                f'{CHACHAP_API_URL}/api/push/{access_code}/request'
+                if access_code else
+                f'{CHACHAP_API_URL}/api/push/request'
             )
+            resp = _req.post(_push_url2, data=_body2_bytes, headers=_headers2, timeout=20)
+            if resp.status_code == 404 and access_code:
+                _b3 = {k: v for k, v in _body2.items() if k != 'access_code'}
+                _b3_bytes = _json2.dumps(_b3, separators=(',', ':')).encode()
+                if encrypt_key:
+                    _headers2['CCP-HMAC-Signature'] = _hmac2.new(encrypt_key.encode(), _b3_bytes, _hs2.sha256).hexdigest()
+                resp = _req.post(f'{CHACHAP_API_URL}/api/push/request', data=_b3_bytes, headers=_headers2, timeout=20)
             raw2 = resp.text.strip()
             logger.info("[LIVREUR PAYOUT] PUSH HTTP %s — raw: %.300s", resp.status_code, raw2)
             try:
@@ -464,34 +473,47 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
         logger.warning("[PAYOUT] %s — numéro absent, versement manuel nécessaire", payout_id)
         return PaymentResult(success=False, message="Numéro mobile money manquant — versement manuel")
 
-    # ── Cas 2 : ChaChaP B2C (PUSH API) ──────────────────────────────────────
-    api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
-    encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
+    # ── Cas 2 : ChaChaP PUSH API ──────────────────────────────────────────────
+    api_key      = getattr(settings, 'CHACHAP_API_KEY', '')
+    encrypt_key  = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
+    access_code  = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')  # ex: "787059"
     if api_key:
         try:
             import requests as _req, json as _json, hmac as _hmac, hashlib as _hs
-            # Endpoint officiel: POST /api/push/request
-            # Body minimal selon la doc: account_number + amount (+ description optionnel)
             _body = {
                 'account_number': phone,
                 'amount':         amount,
                 'description':    f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
             }
+            if access_code:
+                _body['access_code'] = access_code
             _body_bytes = _json.dumps(_body, separators=(',', ':')).encode()
             _headers = {
                 'CCP-Api-Key':  api_key,
                 'Content-Type': 'application/json',
             }
-            # Signature HMAC-SHA256 requise par la PUSH API
             if encrypt_key:
                 _sig = _hmac.new(encrypt_key.encode(), _body_bytes, _hs.sha256).hexdigest()
                 _headers['CCP-HMAC-Signature'] = _sig
-            resp = _req.post(
-                f'{CHACHAP_API_URL}/api/push/request',
-                data=_body_bytes,
-                headers=_headers,
-                timeout=20,
+            # Essayer d'abord avec access_code dans l'URL (pattern doc), sinon URL simple
+            _push_url = (
+                f'{CHACHAP_API_URL}/api/push/{access_code}/request'
+                if access_code else
+                f'{CHACHAP_API_URL}/api/push/request'
             )
+            resp = _req.post(_push_url, data=_body_bytes, headers=_headers, timeout=20)
+            # Si 404 avec access_code dans l'URL, réessayer sans
+            if resp.status_code == 404 and access_code:
+                logger.info("[PAYOUT] URL avec access_code → 404, nouvel essai sans")
+                _body2 = {k: v for k, v in _body.items() if k != 'access_code'}
+                _body2_bytes = _json.dumps(_body2, separators=(',', ':')).encode()
+                if encrypt_key:
+                    _sig2 = _hmac.new(encrypt_key.encode(), _body2_bytes, _hs.sha256).hexdigest()
+                    _headers['CCP-HMAC-Signature'] = _sig2
+                resp = _req.post(
+                    f'{CHACHAP_API_URL}/api/push/request',
+                    data=_body2_bytes, headers=_headers, timeout=20,
+                )
             raw = resp.text.strip()
             logger.info("[PAYOUT] PUSH HTTP %s — raw: %.300s", resp.status_code, raw)
 
