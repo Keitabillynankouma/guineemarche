@@ -4,7 +4,7 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-CHACHAP_API_URL = 'https://api.chapchappay.com'
+CHACHAP_API_URL = 'https://chapchappay.com'
 
 
 def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
