@@ -315,6 +315,7 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
         return PaymentResult(success=False, message=f"Numéro mobile money manquant pour {livreur.full_name}")
 
     # ── Cas 2 : ChaChaP Règlement (API Payout) — wallet_transfer vers le livreur ─
+    # ⚠️  ChaChaP ne supporte que PayCard pour l'instant (Orange Money / MTN non disponibles).
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
     access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
@@ -328,6 +329,17 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
                 'kulu': 'kulu', 'soutra_money': 'soutra_money', 'akiba': 'akiba',
             }
             _wallet2 = _w_map2.get(provider or '', 'orange_money')
+
+            # ChaChaP ne supporte que PayCard actuellement — skip les autres wallets
+            if _wallet2 != 'paycard':
+                _skip_msg2 = (
+                    f"ChaChaP Règlement: seul PayCard est supporté actuellement "
+                    f"(wallet={_wallet2}). Virement manuel requis."
+                )
+                logger.info("[LIVREUR PAYOUT] %s — %s", weekly_payout_id, _skip_msg2)
+                payout.note = _skip_msg2
+                payout.save(update_fields=['note', 'updated_at'])
+                return PaymentResult(success=False, message=_skip_msg2)
             _body2 = {
                 'agent_pin':     agent_pin,
                 'payout_amount': amount,
@@ -474,6 +486,7 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
     # ── Cas 2 : ChaChaP Règlement (API Payout) — wallet_transfer vers le vendeur ─
     # Utilise POST /api/payout/{access_code}/request avec payout_mode=wallet_transfer.
     # Nécessite permission "API Payout" (déjà accordée). Pas besoin du PUSH.
+    # ⚠️  ChaChaP ne supporte que PayCard pour l'instant (Orange Money / MTN non disponibles).
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
     access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
@@ -491,6 +504,17 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
                 'akiba':        'akiba',
             }
             _wallet_type = _wallet_map.get(payout.provider or '', 'orange_money')
+
+            # ChaChaP ne supporte que PayCard actuellement — skip les autres wallets
+            if _wallet_type != 'paycard':
+                _skip_msg = (
+                    f"ChaChaP Règlement: seul PayCard est supporté actuellement "
+                    f"(wallet={_wallet_type}). Virement manuel requis."
+                )
+                logger.info("[PAYOUT] %s — %s", payout_id, _skip_msg)
+                payout.admin_note = _skip_msg
+                payout.save(update_fields=['admin_note', 'updated_at'])
+                return PaymentResult(success=False, message=_skip_msg)
             _order_ref   = str(payout.order_id)[:8].upper()
             _body = {
                 'agent_pin':    agent_pin,
