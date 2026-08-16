@@ -321,10 +321,17 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
     if api_key:
         try:
             import requests as _req, json as _json2, hmac as _hmac2, hashlib as _hs2
+            _ch_map2 = {
+                'orange_money': 'orange_money', 'mtn_momo': 'mtn_momo',
+                'mtn': 'mtn_momo', 'paycard': 'paycard',
+                'kulu': 'kulu', 'soutra_money': 'soutra_money', 'akiba': 'akiba',
+            }
+            _channel2 = _ch_map2.get(provider or '', 'orange_money')
             _body2 = {
-                'account_number': phone,
-                'amount':         amount,
-                'description':    f'Salaire livreur Guimatrix semaine du {payout.week_start}',
+                'account_number':  phone,
+                'amount':          amount,
+                'payment_channel': _channel2,
+                'description':     f'Salaire livreur Guimatrix semaine du {payout.week_start}',
             }
             if access_code:
                 _body2['access_code'] = access_code
@@ -480,10 +487,22 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
     if api_key:
         try:
             import requests as _req, json as _json, hmac as _hmac, hashlib as _hs
+            # Mapping provider → payment_channel ChapChap
+            _channel_map = {
+                'orange_money': 'orange_money',
+                'mtn_momo':     'mtn_momo',
+                'mtn':          'mtn_momo',
+                'paycard':      'paycard',
+                'kulu':         'kulu',
+                'soutra_money': 'soutra_money',
+                'akiba':        'akiba',
+            }
+            _channel = _channel_map.get(payout.provider or '', 'orange_money')
             _body = {
-                'account_number': phone,
-                'amount':         amount,
-                'description':    f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
+                'account_number':  phone,
+                'amount':          amount,
+                'payment_channel': _channel,
+                'description':     f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
             }
             if access_code:
                 _body['access_code'] = access_code
