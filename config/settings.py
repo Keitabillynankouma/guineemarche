@@ -309,8 +309,13 @@ CHACHAP_ENCRYPT_KEY  = CHACHAP_HMAC_KEY   # alias — payment_service.py lit CHA
 CHACHAP_WEBHOOK_URL  = env('CHACHAP_WEBHOOK_URL',
                            default='https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/')
 # Agent API PUSH (créé dans le dashboard ChapChap → Agents)
-CHACHAP_AGENT_ACCESS_CODE = env('CHACHAP_AGENT_ACCESS_CODE', default='')
-CHACHAP_AGENT_PIN         = env('CHACHAP_AGENT_PIN', default='')
+CHACHAP_AGENT_ACCESS_CODE  = env('CHACHAP_AGENT_ACCESS_CODE', default='')
+CHACHAP_AGENT_PIN          = env('CHACHAP_AGENT_PIN', default='')
+# URL appelée par ChapChap quand le statut d'un payout change (executed, failed…)
+CHACHAP_PAYOUT_WEBHOOK_URL = env(
+    'CHACHAP_PAYOUT_WEBHOOK_URL',
+    default='https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/'
+)
 
 # ── Paycard Guinée — agrégateur Mobile Money (Orange Money GN + MTN MoMo GN) ─
 # Configurer dans Railway quand tu reçois les clés Paycard :

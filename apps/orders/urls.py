@@ -26,6 +26,10 @@ urlpatterns = [
     # IMPORTANT : les routes spécifiques DOIVENT être AVANT la route générique
     # sinon Django capture tout avec webhook/<str:provider>/ et les routes ci-dessous
     # ne sont jamais atteintes.
+    # Webhook payout ChapChap (statut des virements vendeurs/livreurs)
+    path('webhook/chachap/payout/',
+        views.ChaChaPayoutWebhookView.as_view(),
+        name='chachap-payout-webhook'),
     path('webhook/chachap/',
         views.PaymentWebhookView.as_view(),
         {'provider': 'chachap'},

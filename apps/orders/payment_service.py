@@ -340,6 +340,10 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
                 payout.note = _skip_msg2
                 payout.save(update_fields=['note', 'updated_at'])
                 return PaymentResult(success=False, message=_skip_msg2)
+            _notify_url2 = getattr(
+                settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
+                'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/'
+            )
             _body2 = {
                 'agent_pin':     agent_pin,
                 'payout_amount': amount,
@@ -348,7 +352,8 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
                     'wallet_account_number': phone,
                     'wallet_type':           _wallet2,
                 },
-                'note': f'Salaire livreur Guimatrix semaine du {payout.week_start}',
+                'note':       f'Salaire livreur Guimatrix semaine du {payout.week_start}',
+                'notify_url': _notify_url2,
             }
             _body2_bytes = _json2.dumps(_body2, separators=(',', ':')).encode()
             _headers2 = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}
@@ -516,6 +521,10 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
                 payout.save(update_fields=['admin_note', 'updated_at'])
                 return PaymentResult(success=False, message=_skip_msg)
             _order_ref   = str(payout.order_id)[:8].upper()
+            _notify_url  = getattr(
+                settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
+                'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/'
+            )
             _body = {
                 'agent_pin':    agent_pin,
                 'payout_amount': amount,
@@ -524,7 +533,8 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
                     'wallet_account_number': phone,
                     'wallet_type':           _wallet_type,
                 },
-                'note': f'Paiement vendeur Guimatrix #{_order_ref}',
+                'note':       f'Paiement vendeur Guimatrix #{_order_ref}',
+                'notify_url': _notify_url,
             }
             _body_bytes = _json.dumps(_body, separators=(',', ':')).encode()
             _headers = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}

@@ -2604,3 +2604,141 @@ class AdminMarkSellerPayoutPaidView(APIView):
         note = request.data.get('note', 'Versement manuel admin')
         payout.mark_completed(note=note)
         return Response({'message': 'Paiement marqué comme versé.', 'id': str(payout.id)})
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class ChaChaPayoutWebhookView(APIView):
+    """
+    POST /orders/webhook/chachap/payout/
+
+    ChapChap appelle cette URL quand le statut d'un payout change
+    (new → auto_processing → en_cours → executed ou failed).
+
+    Payload attendu :
+    {
+        "payout_request_id": "PAYOUT-...",
+        "payout_request_status": "executed",   # ou "failed", "en_cours", etc.
+        "payout_amount": 4800.0,
+        "payout_mode": "wallet_transfer",
+        "payout_data": { "wallet_account_number": "...", "wallet_type": "paycard" }
+    }
+    """
+    permission_classes = [permissions.AllowAny]
+    throttle_classes   = [WebhookRateThrottle]
+
+    def post(self, request):
+        import json as _json
+
+        logger.info("[PAYOUT WEBHOOK] POST reçu — headers=%s body=%.300s",
+                    dict(request.headers), request.body)
+
+        # ── Vérification signature HMAC ───────────────────────────────────────
+        sig_ok = _verify_chachap_signature(request)
+        if not sig_ok:
+            logger.warning("[PAYOUT WEBHOOK] Signature invalide — rejeté")
+            return Response({'error': 'Signature invalide'}, status=401)
+
+        # ── Parse body ────────────────────────────────────────────────────────
+        try:
+            raw = request.body
+            data = _json.loads(raw)
+            # double-encodé ?
+            if isinstance(data, str):
+                data = _json.loads(data)
+        except Exception as exc:
+            logger.error("[PAYOUT WEBHOOK] Body non-parsable : %s", exc)
+            return Response({'error': 'body invalide'}, status=400)
+
+        payout_ref    = data.get('payout_request_id', '')
+        payout_status = data.get('payout_request_status', '')
+
+        logger.info("[PAYOUT WEBHOOK] payout_request_id=%s status=%s", payout_ref, payout_status)
+
+        if not payout_ref:
+            return Response({'error': 'payout_request_id manquant'}, status=400)
+
+        # ── Chercher le SellerPayout correspondant ─────────────────────────────
+        from .models import SellerPayout, LivreurWeeklyPayout
+
+        seller_payout   = SellerPayout.objects.filter(external_ref=payout_ref).first()
+        livreur_payout  = LivreurWeeklyPayout.objects.filter(payment_ref=payout_ref).first()
+
+        if not seller_payout and not livreur_payout:
+            logger.warning("[PAYOUT WEBHOOK] Aucun payout trouvé pour ref=%s", payout_ref)
+            return Response({'received': True})   # 200 pour éviter les retries ChapChap
+
+        if payout_status == 'executed':
+            # ── Vendeur ────────────────────────────────────────────────────────
+            if seller_payout and seller_payout.status != SellerPayout.Status.COMPLETED:
+                seller_payout.mark_completed(
+                    external_ref=payout_ref,
+                    note=f"Règlement ChaChaP exécuté (webhook status=executed)",
+                )
+                logger.info("[PAYOUT WEBHOOK] SellerPayout %s → COMPLETED", seller_payout.id)
+                self._notify_seller(seller_payout)
+
+            # ── Livreur ────────────────────────────────────────────────────────
+            if livreur_payout and livreur_payout.status != LivreurWeeklyPayout.Status.PAID:
+                from django.utils import timezone as _tz
+                livreur_payout.status      = LivreurWeeklyPayout.Status.PAID
+                livreur_payout.paid_at     = _tz.now()
+                livreur_payout.note        = "Règlement ChaChaP exécuté (webhook status=executed)"
+                livreur_payout.save(update_fields=['status', 'paid_at', 'note', 'updated_at'])
+                logger.info("[PAYOUT WEBHOOK] LivreurWeeklyPayout %s → PAID", livreur_payout.id)
+                self._notify_livreur(livreur_payout)
+
+        elif payout_status in ('failed', 'rejected', 'cancelled'):
+            if seller_payout and seller_payout.status not in (
+                SellerPayout.Status.COMPLETED, SellerPayout.Status.FAILED
+            ):
+                seller_payout.mark_failed(
+                    note=f"Règlement ChaChaP échoué (webhook status={payout_status})"
+                )
+                logger.warning("[PAYOUT WEBHOOK] SellerPayout %s → FAILED (%s)", seller_payout.id, payout_status)
+
+            if livreur_payout and livreur_payout.status not in (
+                LivreurWeeklyPayout.Status.PAID,
+            ):
+                livreur_payout.note = f"Règlement ChaChaP échoué (webhook status={payout_status})"
+                livreur_payout.save(update_fields=['note', 'updated_at'])
+                logger.warning("[PAYOUT WEBHOOK] LivreurWeeklyPayout %s — FAILED (%s)", livreur_payout.id, payout_status)
+
+        else:
+            # Statuts intermédiaires (new, auto_processing, en_cours) → log seulement
+            logger.info("[PAYOUT WEBHOOK] Statut intermédiaire %s pour %s — rien à faire", payout_status, payout_ref)
+
+        return Response({'received': True})
+
+    # ── Helpers notifications ─────────────────────────────────────────────────
+
+    def _notify_seller(self, payout):
+        try:
+            from apps.notifications.models import Notification as _N
+            _N.send(
+                user=payout.seller,
+                type=_N.Type.ORDER_UPDATE,
+                title='💸 Virement reçu !',
+                body=(
+                    f'Votre virement de {payout.amount_gnf:,} GNF a été exécuté '
+                    f'et envoyé sur votre compte {payout.provider}.'
+                ),
+                data={'payout_id': str(payout.id)},
+            )
+        except Exception as exc:
+            logger.warning("[PAYOUT WEBHOOK] Notification vendeur impossible : %s", exc)
+
+    def _notify_livreur(self, payout):
+        try:
+            from apps.notifications.models import Notification as _N
+            _N.send(
+                user=payout.livreur,
+                type=_N.Type.ORDER_UPDATE,
+                title='💸 Salaire reçu !',
+                body=(
+                    f'Votre virement de {payout.net_gnf:,} GNF a été exécuté '
+                    f'et envoyé sur votre compte {payout.payment_method}.'
+                ),
+                data={'payout_id': str(payout.id)},
+            )
+        except Exception as exc:
+            logger.warning("[PAYOUT WEBHOOK] Notification livreur impossible : %s", exc)
