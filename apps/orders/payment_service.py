@@ -373,17 +373,24 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
             http_ok  = resp.status_code in (200, 201, 202)
             has_id   = bool(data.get('payout_request_id'))
             status2_ = data.get('payout_request_status', '')
-            json_ok  = status2_ in ('new', 'auto_processing', 'en_cours', 'executed')
-            if http_ok and (has_id or json_ok):
+            if http_ok and has_id:
                 ext_ref = data.get('payout_request_id', '')
-                payout.status         = LivreurWeeklyPayout.Status.PAID
-                payout.paid_at        = timezone.now()
-                payout.payment_ref    = ext_ref
-                payout.payment_method = provider
-                payout.note           = f"Règlement ChaChaP wallet_transfer (id={ext_ref})"
-                payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
-                logger.info("[LIVREUR PAYOUT] %s → règlement initié id=%s", weekly_payout_id, ext_ref)
-                return PaymentResult(success=True, reference=ext_ref, message="Règlement ChaChaP initié")
+                if status2_ == 'executed':
+                    payout.status         = LivreurWeeklyPayout.Status.PAID
+                    payout.paid_at        = timezone.now()
+                    payout.payment_ref    = ext_ref
+                    payout.payment_method = provider
+                    payout.note           = f"Règlement ChaChaP exécuté (id={ext_ref})"
+                    payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
+                    logger.info("[LIVREUR PAYOUT] %s → exécuté immédiatement id=%s", weekly_payout_id, ext_ref)
+                else:
+                    # En cours (new / auto_processing / en_cours)
+                    payout.payment_ref    = ext_ref
+                    payout.payment_method = provider
+                    payout.note           = f"Règlement ChaChaP soumis (id={ext_ref}, status={status2_})"
+                    payout.save(update_fields=['payment_ref', 'payment_method', 'note', 'updated_at'])
+                    logger.info("[LIVREUR PAYOUT] %s → soumis id=%s status=%s", weekly_payout_id, ext_ref, status2_)
+                return PaymentResult(success=True, reference=ext_ref, message=f"Règlement ChaChaP soumis (status={status2_})")
 
             err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
             logger.warning("[LIVREUR PAYOUT] Règlement ChaChaP échoué: %s", err)
@@ -552,20 +559,28 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
             except _json.JSONDecodeError:
                 data = {}
 
-            # Succès : HTTP 201 + payout_request_id (demande créée, traitement asynchrone)
+            # HTTP 2xx + payout_request_id → demande créée (traitement asynchrone par ChapChap)
             http_ok = resp.status_code in (200, 201, 202)
             has_id  = bool(data.get('payout_request_id'))
             status_ = data.get('payout_request_status', '')
-            json_ok = status_ in ('new', 'auto_processing', 'en_cours', 'executed')
 
-            if http_ok and (has_id or json_ok):
+            if http_ok and has_id:
                 ext_ref = data.get('payout_request_id', '')
-                payout.mark_completed(
-                    external_ref=ext_ref,
-                    note=f"Règlement ChaChaP wallet_transfer (id={ext_ref}, status={status_})",
-                )
-                logger.info("[PAYOUT] %s → règlement initié id=%s status=%s", payout_id, ext_ref, status_)
-                return PaymentResult(success=True, reference=ext_ref, message="Règlement ChaChaP initié")
+                if status_ == 'executed':
+                    # Déjà exécuté (rare mais possible)
+                    payout.mark_completed(
+                        external_ref=ext_ref,
+                        note=f"Règlement ChaChaP exécuté immédiatement (id={ext_ref})",
+                    )
+                    logger.info("[PAYOUT] %s → exécuté immédiatement id=%s", payout_id, ext_ref)
+                else:
+                    # En cours (new / auto_processing / en_cours) → PROCESSING, pas COMPLETED
+                    payout.status     = payout.Status.PROCESSING
+                    payout.external_ref = ext_ref
+                    payout.admin_note = f"Règlement ChaChaP soumis (id={ext_ref}, status={status_})"
+                    payout.save(update_fields=['status', 'external_ref', 'admin_note', 'updated_at'])
+                    logger.info("[PAYOUT] %s → soumis id=%s status=%s (attente exécution ChapChap)", payout_id, ext_ref, status_)
+                return PaymentResult(success=True, reference=ext_ref, message=f"Règlement ChaChaP soumis (status={status_})")
 
             err = data.get('message') or data.get('error') or raw[:120] or f'HTTP {resp.status_code}'
             logger.warning("[PAYOUT] Règlement ChaChaP échoué: %s", err)
@@ -681,3 +696,82 @@ def initiate_paycard_card(amount: int, order_id: str, customer_email: str = '', 
             message="Paiement carte simulé (erreur API)",
             payment_url=f"https://sandbox.paycard.africa/checkout/sim/{sim_ref}",
         )
+
+
+def sync_chachap_payout_status(payout_id: str) -> PaymentResult:
+    """
+    Interroge ChapChap pour connaître le statut actuel d'un payout
+    et met à jour SellerPayout en conséquence.
+
+    Endpoint : GET /api/payout/{access_code}/request/{payout_request_id}
+
+    À appeler depuis l'action admin "Sync statut" ou un job Celery périodique.
+    """
+    from apps.orders.models import SellerPayout
+
+    try:
+        payout = SellerPayout.objects.select_related('seller').get(pk=payout_id)
+    except SellerPayout.DoesNotExist:
+        return PaymentResult(success=False, message="Payout introuvable")
+
+    ext_ref = payout.external_ref
+    if not ext_ref:
+        return PaymentResult(success=False, message="Aucune référence ChapChap — payout jamais soumis")
+
+    api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
+    access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
+    if not (api_key and access_code):
+        return PaymentResult(success=False, message="Clés ChapChap non configurées")
+
+    try:
+        import requests as _req, json as _json
+        url  = f'{CHACHAP_API_URL}/api/payout/{access_code}/request/{ext_ref}'
+        resp = _req.get(url, headers={'CCP-Api-Key': api_key}, timeout=15)
+        raw  = resp.text.strip()
+        logger.info("[PAYOUT SYNC] GET %s → HTTP %s — %.300s", url, resp.status_code, raw)
+
+        try:
+            data = _json.loads(raw)
+            if not isinstance(data, dict):
+                data = {}
+        except Exception:
+            data = {}
+
+        status_ = data.get('payout_request_status', '') or data.get('status', '')
+
+        if status_ == 'executed':
+            if payout.status != SellerPayout.Status.COMPLETED:
+                payout.mark_completed(
+                    external_ref=ext_ref,
+                    note=f"Règlement ChaChaP exécuté (sync manuel, id={ext_ref})",
+                )
+                logger.info("[PAYOUT SYNC] %s → marqué COMPLETED", payout_id)
+                # Notifier le vendeur
+                try:
+                    from apps.notifications.models import Notification as _N
+                    _N.send(
+                        user=payout.seller,
+                        type=_N.Type.ORDER_UPDATE,
+                        title='💸 Virement reçu !',
+                        body=f'Votre virement de {payout.amount_gnf:,} GNF a été exécuté sur votre compte {payout.provider}.',
+                        data={'payout_id': str(payout.id)},
+                    )
+                except Exception as _ne:
+                    logger.warning("[PAYOUT SYNC] Notification vendeur : %s", _ne)
+            return PaymentResult(success=True, reference=ext_ref, message="Exécuté — payout marqué COMPLETED")
+
+        elif status_ in ('failed', 'rejected', 'cancelled', 'error'):
+            if payout.status not in (SellerPayout.Status.COMPLETED, SellerPayout.Status.FAILED):
+                payout.mark_failed(note=f"Règlement ChaChaP échoué (sync, status={status_})")
+                logger.warning("[PAYOUT SYNC] %s → marqué FAILED (%s)", payout_id, status_)
+            return PaymentResult(success=False, message=f"ChapChap: {status_}")
+
+        else:
+            # Statut intermédiaire ou inconnu
+            msg = f"Statut actuel ChapChap: {status_ or 'inconnu'} — en attente"
+            logger.info("[PAYOUT SYNC] %s — %s", payout_id, msg)
+            return PaymentResult(success=True, reference=ext_ref, message=msg)
+
+    except Exception as exc:
+        logger.error("[PAYOUT SYNC] Exception: %s", exc)
+        return PaymentResult(success=False, message=str(exc))

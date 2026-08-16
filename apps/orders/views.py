@@ -2587,6 +2587,22 @@ class AdminTriggerSellerPayoutView(APIView):
         })
 
 
+class AdminSyncSellerPayoutView(APIView):
+    """POST /orders/admin/seller-payouts/<uuid>/sync/ — interroge ChapChap pour le statut réel."""
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        if not (request.user.is_super_admin or request.user.can_manage_accounting):
+            return Response({'error': 'Accès réservé.'}, status=403)
+        from .payment_service import sync_chachap_payout_status
+        result = sync_chachap_payout_status(str(pk))
+        return Response({
+            'success': result.success,
+            'message': result.message,
+            'reference': result.reference,
+        })
+
+
 class AdminMarkSellerPayoutPaidView(APIView):
     """POST /orders/admin/seller-payouts/<uuid>/mark-paid/ — marquer comme versé manuellement."""
     permission_classes = [IsAdmin]

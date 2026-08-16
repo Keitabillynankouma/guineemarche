@@ -23,6 +23,7 @@ const adminAPI = {
   // Versements vendeurs
   getSellerPayouts:      (params) => api.get('/orders/admin/seller-payouts/', { params }),
   disburseSellerPayout:  (id)     => api.post(`/orders/admin/seller-payouts/${id}/disburse/`),
+  syncSellerPayout:      (id)     => api.post(`/orders/admin/seller-payouts/${id}/sync/`),
   markSellerPayoutPaid:  (id, note) => api.post(`/orders/admin/seller-payouts/${id}/mark-paid/`, { note }),
 
   // Ordres / litiges
@@ -2550,6 +2551,16 @@ function SellerPayoutsSection() {
     finally { setBusy(null) }
   }
 
+  async function syncStatus(payout) {
+    setBusy(payout.id); setMsg('')
+    try {
+      const r = await adminAPI.syncSellerPayout(payout.id)
+      setMsg(r.data.success ? `🔄 ${r.data.message}` : `⚠️ ${r.data.message}`)
+      qc.invalidateQueries({ queryKey: ['seller-payouts'] })
+    } catch(e) { setMsg(`❌ ${e.response?.data?.error || 'Erreur sync'}`) }
+    finally { setBusy(null) }
+  }
+
   async function markPaid(payout) {
     const note = window.prompt('Note (ex: virement manuel, référence…)', '')
     if (note === null) return
@@ -2579,31 +2590,121 @@ function SellerPayoutsSection() {
       {isLoading ? <p className="text-sm text-gray-400">Chargement...</p>
       : payouts.length === 0 ? <p className="text-sm text-gray-400 text-center py-4">Aucun versement.</p>
       : (
-        <div className="space-y-2">
-          {payouts.map(p => (
-            <div key={p.id} className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 rounded-xl border border-gray-100 bg-gray-50">
-              <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-800">{p.amount_gnf?.toLocaleString('fr-FR')} GNF</p>
-                <p className="text-xs text-gray-500">Vendeur : {p.seller || '—'} · Cde : {p.order_id?.slice(0,8).toUpperCase()}</p>
-                <p className="text-xs text-gray-500">{PROVIDER_LABEL[p.provider] || p.provider} · {p.payout_phone || 'Aucun numéro'}</p>
-                {p.admin_note && <p className="text-xs text-amber-700 mt-1">{p.admin_note}</p>}
+        <div className="space-y-3">
+          {payouts.map(p => {
+            const phone   = p.payout_phone || ''
+            const amount  = p.amount_gnf || 0
+            const isOM    = (p.provider || '').includes('orange')
+            const isMTN   = (p.provider || '').includes('mtn')
+            // Liens directs transfert mobile
+            const waLink  = phone ? `https://wa.me/${phone.replace('+','')}?text=${encodeURIComponent(`Bonjour, voici votre virement Guimatrix : ${amount.toLocaleString('fr-FR')} GNF (commande ${p.order_id?.slice(0,8).toUpperCase()})`)}`  : null
+            const chapchapLink = 'https://chapchappay.com/pro'
+            return (
+              <div key={p.id} className="rounded-xl border border-gray-200 bg-white overflow-hidden shadow-sm">
+                {/* En-tête montant */}
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-100">
+                  <div>
+                    <p className="text-lg font-black text-gray-800">{amount.toLocaleString('fr-FR')} GNF</p>
+                    <p className="text-xs text-gray-400">Vendeur : <span className="font-semibold text-gray-600">{p.seller || '—'}</span> · Cde : {p.order_id?.slice(0,8).toUpperCase()}</p>
+                  </div>
+                  <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                    p.status === 'completed'  ? 'bg-green-100 text-green-700'  :
+                    p.status === 'failed'     ? 'bg-red-100 text-red-600'      :
+                    p.status === 'processing' ? 'bg-blue-100 text-blue-700'    :
+                                                'bg-amber-100 text-amber-700'
+                  }`}>
+                    {p.status === 'completed'  ? '✅ Versé'      :
+                     p.status === 'failed'     ? '❌ Échoué'     :
+                     p.status === 'processing' ? '🔄 En cours'   :
+                                                 '⏳ En attente'}
+                  </span>
+                </div>
+
+                {/* Détails paiement + actions rapides */}
+                <div className="px-4 py-3 space-y-3">
+                  {/* Numéro + provider */}
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1">
+                      <p className="text-xs text-gray-400 mb-0.5">{PROVIDER_LABEL[p.provider] || p.provider}</p>
+                      {phone ? (
+                        <a href={`tel:${phone}`} className="text-base font-mono font-bold text-gray-800 hover:text-green-700 transition">
+                          {phone}
+                        </a>
+                      ) : (
+                        <p className="text-sm text-red-500 font-semibold">⚠️ Aucun numéro enregistré</p>
+                      )}
+                    </div>
+                    {/* Bouton copier numéro */}
+                    {phone && (
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(phone); setMsg(`📋 ${phone} copié !`) }}
+                        className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition"
+                        title="Copier le numéro"
+                      >📋 Copier</button>
+                    )}
+                  </div>
+
+                  {/* Instructions visuelles — seulement si en attente */}
+                  {p.status !== 'completed' && (
+                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2">
+                      <p className="text-xs font-bold text-blue-700">📋 Étapes pour virer manuellement :</p>
+                      <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
+                        <li>Ouvre ChapChap Pro ou ton app Orange Money / MTN</li>
+                        <li>Envoie <span className="font-black">{amount.toLocaleString('fr-FR')} GNF</span> au numéro <span className="font-black font-mono">{phone || '?'}</span></li>
+                        <li>Reviens ici et clique <span className="font-bold">"✓ Manuel"</span> pour confirmer</li>
+                      </ol>
+                      {/* Liens rapides */}
+                      <div className="flex flex-wrap gap-2 pt-1">
+                        <a href={chapchapLink} target="_blank" rel="noopener noreferrer"
+                          className="text-xs px-3 py-1.5 bg-white border border-blue-200 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 transition">
+                          💰 ChapChap Pro
+                        </a>
+                        {waLink && (
+                          <a href={waLink} target="_blank" rel="noopener noreferrer"
+                            className="text-xs px-3 py-1.5 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition">
+                            💬 WhatsApp vendeur
+                          </a>
+                        )}
+                        {isOM && phone && (
+                          <a href={`tel:*144*1*${phone.replace(/\D/g,'')}*${amount}#`}
+                            className="text-xs px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-700 font-semibold rounded-lg hover:bg-orange-100 transition">
+                            🟠 USSD Orange Money
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {p.admin_note && (
+                    <p className="text-xs text-amber-700 bg-amber-50 px-3 py-2 rounded-lg">{p.admin_note}</p>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="flex gap-2 px-4 pb-3 flex-wrap">
+                  {(p.status === 'pending' || p.status === 'failed') && (
+                    <button onClick={() => disburse(p)} disabled={!!busy}
+                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
+                      {busy === p.id ? '...' : '🚀 Virer auto (ChapChap)'}
+                    </button>
+                  )}
+                  {p.status === 'processing' && p.external_ref && (
+                    <button onClick={() => syncStatus(p)} disabled={!!busy}
+                      className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50"
+                      title="Interroge ChapChap pour le statut actuel">
+                      {busy === p.id ? '...' : '🔄 Sync statut ChapChap'}
+                    </button>
+                  )}
+                  {p.status !== 'completed' && (
+                    <button onClick={() => markPaid(p)} disabled={!!busy}
+                      className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
+                      {busy === p.id ? '...' : '✓ Confirmer virement fait'}
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex gap-2 flex-shrink-0">
-                {(p.status === 'pending' || p.status === 'failed') && (
-                  <button onClick={() => disburse(p)} disabled={!!busy}
-                    className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
-                    {busy === p.id ? '...' : '🚀 Virer'}
-                  </button>
-                )}
-                {p.status !== 'completed' && (
-                  <button onClick={() => markPaid(p)} disabled={!!busy}
-                    className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-xs font-semibold rounded-xl border border-blue-200 transition disabled:opacity-50">
-                    {busy === p.id ? '...' : '✓ Manuel'}
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
     </div>
