@@ -314,74 +314,65 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
         logger.warning("[LIVREUR PAYOUT] %s — numéro absent pour %s", weekly_payout_id, livreur.full_name)
         return PaymentResult(success=False, message=f"Numéro mobile money manquant pour {livreur.full_name}")
 
-    # ── Cas 2 : ChaChaP PUSH API ──────────────────────────────────────────────
+    # ── Cas 2 : ChaChaP Règlement (API Payout) — wallet_transfer vers le livreur ─
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
     access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
-    if api_key:
+    agent_pin   = getattr(settings, 'CHACHAP_AGENT_PIN', '')
+    if api_key and access_code and agent_pin:
         try:
             import requests as _req, json as _json2, hmac as _hmac2, hashlib as _hs2
-            _ch_map2 = {
+            _w_map2 = {
                 'orange_money': 'orange_money', 'mtn_momo': 'mtn_momo',
                 'mtn': 'mtn_momo', 'paycard': 'paycard',
                 'kulu': 'kulu', 'soutra_money': 'soutra_money', 'akiba': 'akiba',
             }
-            _channel2 = _ch_map2.get(provider or '', 'orange_money')
+            _wallet2 = _w_map2.get(provider or '', 'orange_money')
             _body2 = {
-                'account_number':  phone,
-                'amount':          amount,
-                'payment_channel': _channel2,
-                'description':     f'Salaire livreur Guimatrix semaine du {payout.week_start}',
+                'agent_pin':     agent_pin,
+                'payout_amount': amount,
+                'payout_mode':   'wallet_transfer',
+                'payout_data':   {
+                    'wallet_account_number': phone,
+                    'wallet_type':           _wallet2,
+                },
+                'note': f'Salaire livreur Guimatrix semaine du {payout.week_start}',
             }
-            if access_code:
-                _body2['access_code'] = access_code
             _body2_bytes = _json2.dumps(_body2, separators=(',', ':')).encode()
-            _headers2 = {
-                'CCP-Api-Key':  api_key,
-                'Content-Type': 'application/json',
-            }
+            _headers2 = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}
             if encrypt_key:
                 _sig2 = _hmac2.new(encrypt_key.encode(), _body2_bytes, _hs2.sha256).hexdigest()
                 _headers2['CCP-HMAC-Signature'] = _sig2
-            _push_url2 = (
-                f'{CHACHAP_API_URL}/api/push/{access_code}/request'
-                if access_code else
-                f'{CHACHAP_API_URL}/api/push/request'
-            )
-            resp = _req.post(_push_url2, data=_body2_bytes, headers=_headers2, timeout=20)
-            if resp.status_code == 404 and access_code:
-                _b3 = {k: v for k, v in _body2.items() if k != 'access_code'}
-                _b3_bytes = _json2.dumps(_b3, separators=(',', ':')).encode()
-                if encrypt_key:
-                    _headers2['CCP-HMAC-Signature'] = _hmac2.new(encrypt_key.encode(), _b3_bytes, _hs2.sha256).hexdigest()
-                resp = _req.post(f'{CHACHAP_API_URL}/api/push/request', data=_b3_bytes, headers=_headers2, timeout=20)
+            _url2 = f'{CHACHAP_API_URL}/api/payout/{access_code}/request'
+            resp = _req.post(_url2, data=_body2_bytes, headers=_headers2, timeout=20)
             raw2 = resp.text.strip()
-            logger.info("[LIVREUR PAYOUT] PUSH HTTP %s — raw: %.300s", resp.status_code, raw2)
+            logger.info("[LIVREUR PAYOUT] Règlement HTTP %s — raw: %.300s", resp.status_code, raw2)
             try:
                 data = _json2.loads(raw2)
                 if not isinstance(data, dict):
                     data = {}
             except Exception:
                 data = {}
-            http_ok = resp.status_code in (200, 201, 202)
-            has_id  = bool(data.get('request_id'))
-            json_ok = bool(data) and data.get('status', '').lower() in ('success', 'pending', 'processing', 'new')
+            http_ok  = resp.status_code in (200, 201, 202)
+            has_id   = bool(data.get('payout_request_id'))
+            status2_ = data.get('payout_request_status', '')
+            json_ok  = status2_ in ('new', 'auto_processing', 'en_cours', 'executed')
             if http_ok and (has_id or json_ok):
-                ext_ref = data.get('request_id') or data.get('transaction_id', '')
+                ext_ref = data.get('payout_request_id', '')
                 payout.status         = LivreurWeeklyPayout.Status.PAID
                 payout.paid_at        = timezone.now()
                 payout.payment_ref    = ext_ref
                 payout.payment_method = provider
-                payout.note           = f"Virement ChaChaP PUSH (request_id={ext_ref})"
+                payout.note           = f"Règlement ChaChaP wallet_transfer (id={ext_ref})"
                 payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
-                logger.info("[LIVREUR PAYOUT] %s versé via ChaChaP PUSH — request_id=%s", weekly_payout_id, ext_ref)
-                return PaymentResult(success=True, reference=ext_ref, message="Virement ChaChaP PUSH initié")
+                logger.info("[LIVREUR PAYOUT] %s → règlement initié id=%s", weekly_payout_id, ext_ref)
+                return PaymentResult(success=True, reference=ext_ref, message="Règlement ChaChaP initié")
 
             err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
-            logger.warning("[LIVREUR PAYOUT] ChaChaP PUSH échoué: %s", err)
-            payout.note = f"ChaChaP PUSH échoué: {err}"
+            logger.warning("[LIVREUR PAYOUT] Règlement ChaChaP échoué: %s", err)
+            payout.note = f"Règlement ChaChaP échoué: {err}"
             payout.save(update_fields=['note', 'updated_at'])
-            return PaymentResult(success=False, message=f"ChaChaP PUSH: {err}")
+            return PaymentResult(success=False, message=f"Règlement ChaChaP: {err}")
         except Exception as exc:
             logger.error("[LIVREUR PAYOUT] ChaChaP B2C exception: %s", exc)
             payout.note = f"Exception virement: {exc}"
@@ -480,15 +471,17 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
         logger.warning("[PAYOUT] %s — numéro absent, versement manuel nécessaire", payout_id)
         return PaymentResult(success=False, message="Numéro mobile money manquant — versement manuel")
 
-    # ── Cas 2 : ChaChaP PUSH API ──────────────────────────────────────────────
-    api_key      = getattr(settings, 'CHACHAP_API_KEY', '')
-    encrypt_key  = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
-    access_code  = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')  # ex: "787059"
-    if api_key:
+    # ── Cas 2 : ChaChaP Règlement (API Payout) — wallet_transfer vers le vendeur ─
+    # Utilise POST /api/payout/{access_code}/request avec payout_mode=wallet_transfer.
+    # Nécessite permission "API Payout" (déjà accordée). Pas besoin du PUSH.
+    api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
+    encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
+    access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
+    agent_pin   = getattr(settings, 'CHACHAP_AGENT_PIN', '')
+    if api_key and access_code and agent_pin:
         try:
             import requests as _req, json as _json, hmac as _hmac, hashlib as _hs
-            # Mapping provider → payment_channel ChapChap
-            _channel_map = {
+            _wallet_map = {
                 'orange_money': 'orange_money',
                 'mtn_momo':     'mtn_momo',
                 'mtn':          'mtn_momo',
@@ -497,45 +490,27 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
                 'soutra_money': 'soutra_money',
                 'akiba':        'akiba',
             }
-            _channel = _channel_map.get(payout.provider or '', 'orange_money')
+            _wallet_type = _wallet_map.get(payout.provider or '', 'orange_money')
+            _order_ref   = str(payout.order_id)[:8].upper()
             _body = {
-                'account_number':  phone,
-                'amount':          amount,
-                'payment_channel': _channel,
-                'description':     f'Paiement Guimatrix commande {str(payout.order_id)[:8]}',
+                'agent_pin':    agent_pin,
+                'payout_amount': amount,
+                'payout_mode':  'wallet_transfer',
+                'payout_data':  {
+                    'wallet_account_number': phone,
+                    'wallet_type':           _wallet_type,
+                },
+                'note': f'Paiement vendeur Guimatrix #{_order_ref}',
             }
-            if access_code:
-                _body['access_code'] = access_code
             _body_bytes = _json.dumps(_body, separators=(',', ':')).encode()
-            _headers = {
-                'CCP-Api-Key':  api_key,
-                'Content-Type': 'application/json',
-            }
+            _headers = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}
             if encrypt_key:
                 _sig = _hmac.new(encrypt_key.encode(), _body_bytes, _hs.sha256).hexdigest()
                 _headers['CCP-HMAC-Signature'] = _sig
-            # Essayer d'abord avec access_code dans l'URL (pattern doc), sinon URL simple
-            _push_url = (
-                f'{CHACHAP_API_URL}/api/push/{access_code}/request'
-                if access_code else
-                f'{CHACHAP_API_URL}/api/push/request'
-            )
-            resp = _req.post(_push_url, data=_body_bytes, headers=_headers, timeout=20)
-            # Si 404 avec access_code dans l'URL, réessayer sans
-            if resp.status_code == 404 and access_code:
-                logger.info("[PAYOUT] URL avec access_code → 404, nouvel essai sans")
-                _body2 = {k: v for k, v in _body.items() if k != 'access_code'}
-                _body2_bytes = _json.dumps(_body2, separators=(',', ':')).encode()
-                if encrypt_key:
-                    _sig2 = _hmac.new(encrypt_key.encode(), _body2_bytes, _hs.sha256).hexdigest()
-                    _headers['CCP-HMAC-Signature'] = _sig2
-                resp = _req.post(
-                    f'{CHACHAP_API_URL}/api/push/request',
-                    data=_body2_bytes, headers=_headers, timeout=20,
-                )
-            raw = resp.text.strip()
-            logger.info("[PAYOUT] PUSH HTTP %s — raw: %.300s", resp.status_code, raw)
-
+            _url = f'{CHACHAP_API_URL}/api/payout/{access_code}/request'
+            resp = _req.post(_url, data=_body_bytes, headers=_headers, timeout=20)
+            raw  = resp.text.strip()
+            logger.info("[PAYOUT] Règlement HTTP %s — raw: %.300s", resp.status_code, raw)
             try:
                 data = _json.loads(raw)
                 if not isinstance(data, dict):
@@ -543,25 +518,28 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
             except _json.JSONDecodeError:
                 data = {}
 
-            # Succès : HTTP 201 + request_id présent (demande créée, traitement asynchrone)
-            # ou HTTP 200/202 avec status success/pending
-            http_ok  = resp.status_code in (200, 201, 202)
-            has_id   = bool(data.get('request_id'))
-            json_ok  = bool(data) and data.get('status', '').lower() in ('success', 'pending', 'processing', 'new')
+            # Succès : HTTP 201 + payout_request_id (demande créée, traitement asynchrone)
+            http_ok = resp.status_code in (200, 201, 202)
+            has_id  = bool(data.get('payout_request_id'))
+            status_ = data.get('payout_request_status', '')
+            json_ok = status_ in ('new', 'auto_processing', 'en_cours', 'executed')
 
             if http_ok and (has_id or json_ok):
-                ext_ref = data.get('request_id') or data.get('transaction_id') or data.get('operation_id') or ''
-                payout.mark_completed(external_ref=ext_ref, note=f"Versement ChaChaP PUSH (request_id={ext_ref})")
-                logger.info("[PAYOUT] %s versé via ChaChaP PUSH — request_id=%s", payout_id, ext_ref)
-                return PaymentResult(success=True, reference=ext_ref, message="Versement ChaChaP PUSH initié")
+                ext_ref = data.get('payout_request_id', '')
+                payout.mark_completed(
+                    external_ref=ext_ref,
+                    note=f"Règlement ChaChaP wallet_transfer (id={ext_ref}, status={status_})",
+                )
+                logger.info("[PAYOUT] %s → règlement initié id=%s status=%s", payout_id, ext_ref, status_)
+                return PaymentResult(success=True, reference=ext_ref, message="Règlement ChaChaP initié")
 
             err = data.get('message') or data.get('error') or raw[:120] or f'HTTP {resp.status_code}'
-            logger.warning("[PAYOUT] ChaChaP PUSH échoué: %s", err)
-            payout.mark_failed(note=f"ChaChaP PUSH: {err}")
+            logger.warning("[PAYOUT] Règlement ChaChaP échoué: %s", err)
+            payout.mark_failed(note=f"Règlement ChaChaP: {err}")
             _notify_payout_failure(payout, err)
-            return PaymentResult(success=False, message=f"ChaChaP PUSH: {err}")
+            return PaymentResult(success=False, message=f"Règlement ChaChaP: {err}")
         except Exception as exc:
-            logger.error("[PAYOUT] ChaChaP PUSH exception: %s", exc)
+            logger.error("[PAYOUT] Règlement ChaChaP exception: %s", exc)
             payout.mark_failed(note=f"Exception: {exc}")
             _notify_payout_failure(payout, str(exc))
             return PaymentResult(success=False, message=str(exc))
