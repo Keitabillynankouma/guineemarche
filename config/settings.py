@@ -303,11 +303,14 @@ ORANGE_WEBHOOK_SECRET = env('ORANGE_WEBHOOK_SECRET', default='')
 # ── ChaChap Pay — agrégateur guinéen agréé BCRG ──────────────────────────────
 # Configurer dans Railway (ou .env local pour les tests) :
 CHACHAP_API_KEY      = env('CHACHAP_API_KEY', default='')
-# Clé HMAC séparée pour la signature des webhooks (≠ clé API)
-# Accepte CHACHAP_HMAC_KEY ou CHACHAP_WEBHOOK_SECRET selon le nom choisi dans Railway
+# Clé HMAC pour signer les webhooks entrants ET les requêtes PUSH sortantes
 CHACHAP_HMAC_KEY     = env('CHACHAP_HMAC_KEY', default='') or env('CHACHAP_WEBHOOK_SECRET', default='')
-CHACHAP_WEBHOOK_URL = env('CHACHAP_WEBHOOK_URL',
-                          default='https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/')
+CHACHAP_ENCRYPT_KEY  = CHACHAP_HMAC_KEY   # alias — payment_service.py lit CHACHAP_ENCRYPT_KEY
+CHACHAP_WEBHOOK_URL  = env('CHACHAP_WEBHOOK_URL',
+                           default='https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/')
+# Agent API PUSH (créé dans le dashboard ChapChap → Agents)
+CHACHAP_AGENT_ACCESS_CODE = env('CHACHAP_AGENT_ACCESS_CODE', default='')
+CHACHAP_AGENT_PIN         = env('CHACHAP_AGENT_PIN', default='')
 
 # ── Paycard Guinée — agrégateur Mobile Money (Orange Money GN + MTN MoMo GN) ─
 # Configurer dans Railway quand tu reçois les clés Paycard :
