@@ -2608,13 +2608,14 @@ class AdminManualPushTransferView(APIView):
         if not phone or not amount:
             return Response({'error': 'phone et amount requis.'}, status=400)
 
-        # Normalisation numéro
-        if phone.startswith('+'):
-            phone = phone[1:]
-        elif phone.startswith('00224'):
-            phone = phone[2:]
-        elif not phone.startswith('224'):
-            phone = '224' + phone
+        # Normalisation numéro — PayCard utilise un n° de compte, pas téléphone
+        if channel != 'paycard':
+            if phone.startswith('+'):
+                phone = phone[1:]
+            elif phone.startswith('00224'):
+                phone = phone[2:]
+            elif not phone.startswith('224'):
+                phone = '224' + phone
 
         try:
             amount = int(amount)

@@ -294,15 +294,17 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
     phone   = livreur.payout_phone
     provider = livreur.payout_provider
 
-    # Normalisation : ChaChaP PUSH API attend 224XXXXXXXXX (sans +)
+    # Normalisation : uniquement pour les opérateurs téléphoniques (OM, MTN…)
+    # PayCard utilise un numéro de compte → ne pas ajouter le préfixe 224
     if phone:
         phone = phone.replace(' ', '').replace('-', '')
-        if phone.startswith('+'):
-            phone = phone[1:]
-        elif phone.startswith('00224'):
-            phone = phone[2:]
-        elif not phone.startswith('224'):
-            phone = '224' + phone
+        if provider != 'paycard':
+            if phone.startswith('+'):
+                phone = phone[1:]
+            elif phone.startswith('00224'):
+                phone = phone[2:]
+            elif not phone.startswith('224'):
+                phone = '224' + phone
 
     logger.info("[LIVREUR PAYOUT] Démarrage virement %s → %s GNF sur %s (%s) pour %s",
                 weekly_payout_id, amount, phone, provider, livreur.full_name)
@@ -313,6 +315,16 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
         payout.save(update_fields=['note', 'updated_at'])
         logger.warning("[LIVREUR PAYOUT] %s — numéro absent pour %s", weekly_payout_id, livreur.full_name)
         return PaymentResult(success=False, message=f"Numéro mobile money manquant pour {livreur.full_name}")
+
+    # ── Minimum ChapChap Push API : 5 000 GNF ───────────────────────────────────
+    CHACHAP_MIN_LIV = 5_000
+    if amount < CHACHAP_MIN_LIV:
+        msg_min_liv = (
+            f"Montant {amount:,} GNF insuffisant — ChapChap exige un minimum de "
+            f"{CHACHAP_MIN_LIV:,} GNF. Virement à effectuer manuellement."
+        )
+        logger.warning("[LIVREUR PAYOUT] %s — montant %s GNF < minimum %s GNF", weekly_payout_id, amount, CHACHAP_MIN_LIV)
+        return PaymentResult(success=False, message=msg_min_liv)
 
     # ── Cas 2 : ChaChaP PUSH API — envoi direct vers OM / MTN / PayCard… ────────
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
@@ -455,15 +467,17 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
     amount = payout.amount_gnf
     phone  = payout.payout_phone
 
-    # Normalisation : ChaChaP PUSH API attend 224XXXXXXXXX (sans +)
+    # Normalisation : uniquement pour les opérateurs téléphoniques (OM, MTN…)
+    # PayCard utilise un numéro de compte, pas un numéro de téléphone → pas de préfixe 224
     if phone:
         phone = phone.replace(' ', '').replace('-', '')
-        if phone.startswith('+'):
-            phone = phone[1:]          # +224XXXXXX → 224XXXXXX
-        elif phone.startswith('00224'):
-            phone = phone[2:]          # 00224XXXXXX → 224XXXXXX
-        elif not phone.startswith('224'):
-            phone = '224' + phone      # 6XXXXXXXX → 224 6XXXXXXXX
+        if payout.provider != 'paycard':
+            if phone.startswith('+'):
+                phone = phone[1:]          # +224XXXXXX → 224XXXXXX
+            elif phone.startswith('00224'):
+                phone = phone[2:]          # 00224XXXXXX → 224XXXXXX
+            elif not phone.startswith('224'):
+                phone = '224' + phone      # 6XXXXXXXX → 2246XXXXXXXX
 
     logger.info("[PAYOUT] Démarrage versement %s → %s GNF sur %s (%s)",
                 payout_id, amount, phone, payout.provider)
@@ -474,6 +488,18 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
         payout.save(update_fields=['admin_note', 'updated_at'])
         logger.warning("[PAYOUT] %s — numéro absent, versement manuel nécessaire", payout_id)
         return PaymentResult(success=False, message="Numéro mobile money manquant — versement manuel")
+
+    # ── Minimum ChapChap Push API : 5 000 GNF ───────────────────────────────────
+    CHACHAP_MIN_AMOUNT = 5_000
+    if amount < CHACHAP_MIN_AMOUNT:
+        msg_min = (
+            f"Montant {amount:,} GNF insuffisant — ChapChap exige un minimum de "
+            f"{CHACHAP_MIN_AMOUNT:,} GNF. Virement à effectuer manuellement."
+        )
+        payout.admin_note = msg_min
+        payout.save(update_fields=['admin_note', 'updated_at'])
+        logger.warning("[PAYOUT] %s — montant %s GNF < minimum %s GNF", payout_id, amount, CHACHAP_MIN_AMOUNT)
+        return PaymentResult(success=False, message=msg_min)
 
     # ── Cas 2 : ChaChaP PUSH API — envoi direct vers OM / MTN / PayCard / Kulu… ─
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
