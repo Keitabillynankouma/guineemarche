@@ -314,89 +314,69 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
         logger.warning("[LIVREUR PAYOUT] %s — numéro absent pour %s", weekly_payout_id, livreur.full_name)
         return PaymentResult(success=False, message=f"Numéro mobile money manquant pour {livreur.full_name}")
 
-    # ── Cas 2 : ChaChaP Règlement (API Payout) — wallet_transfer vers le livreur ─
-    # ⚠️  ChaChaP ne supporte que PayCard pour l'instant (Orange Money / MTN non disponibles).
+    # ── Cas 2 : ChaChaP PUSH API — envoi direct vers OM / MTN / PayCard… ────────
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
     access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
-    agent_pin   = getattr(settings, 'CHACHAP_AGENT_PIN', '')
-    if api_key and access_code and agent_pin:
+    if api_key and access_code:
         try:
             import requests as _req, json as _json2, hmac as _hmac2, hashlib as _hs2
-            _w_map2 = {
+            _ch_map2 = {
                 'orange_money': 'orange_money', 'mtn_momo': 'mtn_momo',
                 'mtn': 'mtn_momo', 'paycard': 'paycard',
                 'kulu': 'kulu', 'soutra_money': 'soutra_money', 'akiba': 'akiba',
             }
-            _wallet2 = _w_map2.get(provider or '', 'orange_money')
-
-            # ChaChaP ne supporte que PayCard actuellement — skip les autres wallets
-            if _wallet2 != 'paycard':
-                _skip_msg2 = (
-                    f"ChaChaP Règlement: seul PayCard est supporté actuellement "
-                    f"(wallet={_wallet2}). Virement manuel requis."
-                )
-                logger.info("[LIVREUR PAYOUT] %s — %s", weekly_payout_id, _skip_msg2)
-                payout.note = _skip_msg2
-                payout.save(update_fields=['note', 'updated_at'])
-                return PaymentResult(success=False, message=_skip_msg2)
-            _notify_url2 = getattr(
-                settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
-                'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/'
-            )
+            _channel2    = _ch_map2.get(provider or '', 'orange_money')
+            _notify_url2 = getattr(settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
+                                   'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/')
             _body2 = {
-                'agent_pin':     agent_pin,
-                'payout_amount': amount,
-                'payout_mode':   'wallet_transfer',
-                'payout_data':   {
-                    'wallet_account_number': phone,
-                    'wallet_type':           _wallet2,
-                },
-                'note':       f'Salaire livreur Guimatrix semaine du {payout.week_start}',
-                'notify_url': _notify_url2,
+                'account_number':  phone,
+                'amount':          amount,
+                'payment_channel': _channel2,
+                'account_name':    livreur.full_name,
+                'notify_url':      _notify_url2,
+                'order_id':        f'LIV-{str(weekly_payout_id)[:8].upper()}',
             }
             _body2_bytes = _json2.dumps(_body2, separators=(',', ':')).encode()
             _headers2 = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}
             if encrypt_key:
                 _sig2 = _hmac2.new(encrypt_key.encode(), _body2_bytes, _hs2.sha256).hexdigest()
                 _headers2['CCP-HMAC-Signature'] = _sig2
-            _url2 = f'{CHACHAP_API_URL}/api/payout/{access_code}/request'
-            resp = _req.post(_url2, data=_body2_bytes, headers=_headers2, timeout=20)
-            raw2 = resp.text.strip()
-            logger.info("[LIVREUR PAYOUT] Règlement HTTP %s — raw: %.300s", resp.status_code, raw2)
+            _url2 = f'{CHACHAP_API_URL}/api/push/{access_code}/request'
+            resp  = _req.post(_url2, data=_body2_bytes, headers=_headers2, timeout=20)
+            raw2  = resp.text.strip()
+            logger.info("[LIVREUR PAYOUT] Push HTTP %s — raw: %.300s", resp.status_code, raw2)
             try:
                 data = _json2.loads(raw2)
                 if not isinstance(data, dict):
                     data = {}
             except Exception:
                 data = {}
-            http_ok  = resp.status_code in (200, 201, 202)
-            has_id   = bool(data.get('payout_request_id'))
-            status2_ = data.get('payout_request_status', '')
-            if http_ok and has_id:
-                ext_ref = data.get('payout_request_id', '')
-                if status2_ == 'executed':
+            http_ok    = resp.status_code in (200, 201, 202)
+            request_id = data.get('request_id', '')
+            status2_   = data.get('status', '')
+            if http_ok and request_id:
+                if status2_ == 'success':
                     payout.status         = LivreurWeeklyPayout.Status.PAID
                     payout.paid_at        = timezone.now()
-                    payout.payment_ref    = ext_ref
+                    payout.payment_ref    = request_id
                     payout.payment_method = provider
-                    payout.note           = f"Règlement ChaChaP exécuté (id={ext_ref})"
+                    payout.note           = f"Push ChaChaP exécuté (id={request_id})"
                     payout.save(update_fields=['status', 'paid_at', 'payment_ref', 'payment_method', 'note', 'updated_at'])
-                    logger.info("[LIVREUR PAYOUT] %s → exécuté immédiatement id=%s", weekly_payout_id, ext_ref)
+                    logger.info("[LIVREUR PAYOUT] %s → push exécuté id=%s", weekly_payout_id, request_id)
                 else:
-                    # En cours (new / auto_processing / en_cours)
-                    payout.payment_ref    = ext_ref
+                    payout.payment_ref    = request_id
                     payout.payment_method = provider
-                    payout.note           = f"Règlement ChaChaP soumis (id={ext_ref}, status={status2_})"
+                    payout.note           = f"Push ChaChaP soumis (id={request_id}, status={status2_})"
                     payout.save(update_fields=['payment_ref', 'payment_method', 'note', 'updated_at'])
-                    logger.info("[LIVREUR PAYOUT] %s → soumis id=%s status=%s", weekly_payout_id, ext_ref, status2_)
-                return PaymentResult(success=True, reference=ext_ref, message=f"Règlement ChaChaP soumis (status={status2_})")
+                    logger.info("[LIVREUR PAYOUT] %s → push soumis id=%s status=%s", weekly_payout_id, request_id, status2_)
+                return PaymentResult(success=True, reference=request_id, message=f"Push ChaChaP {status2_}")
 
             err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
-            logger.warning("[LIVREUR PAYOUT] Règlement ChaChaP échoué: %s", err)
-            payout.note = f"Règlement ChaChaP échoué: {err}"
+            logger.warning("[LIVREUR PAYOUT] Push ChaChaP échoué: %s", err)
+            payout.note = f"Push ChaChaP échoué: {err}"
             payout.save(update_fields=['note', 'updated_at'])
-            return PaymentResult(success=False, message=f"Règlement ChaChaP: {err}")
+            return PaymentResult(success=False, message=f"Push ChaChaP: {err}")
         except Exception as exc:
             logger.error("[LIVREUR PAYOUT] ChaChaP B2C exception: %s", exc)
             payout.note = f"Exception virement: {exc}"
@@ -495,63 +475,39 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
         logger.warning("[PAYOUT] %s — numéro absent, versement manuel nécessaire", payout_id)
         return PaymentResult(success=False, message="Numéro mobile money manquant — versement manuel")
 
-    # ── Cas 2 : ChaChaP Règlement (API Payout) — wallet_transfer vers le vendeur ─
-    # Utilise POST /api/payout/{access_code}/request avec payout_mode=wallet_transfer.
-    # Nécessite permission "API Payout" (déjà accordée). Pas besoin du PUSH.
-    # ⚠️  ChaChaP ne supporte que PayCard pour l'instant (Orange Money / MTN non disponibles).
+    # ── Cas 2 : ChaChaP PUSH API — envoi direct vers OM / MTN / PayCard / Kulu… ─
     api_key     = getattr(settings, 'CHACHAP_API_KEY', '')
     encrypt_key = getattr(settings, 'CHACHAP_ENCRYPT_KEY', '')
     access_code = getattr(settings, 'CHACHAP_AGENT_ACCESS_CODE', '')
-    agent_pin   = getattr(settings, 'CHACHAP_AGENT_PIN', '')
-    if api_key and access_code and agent_pin:
+    if api_key and access_code:
         try:
             import requests as _req, json as _json, hmac as _hmac, hashlib as _hs
-            _wallet_map = {
-                'orange_money': 'orange_money',
-                'mtn_momo':     'mtn_momo',
-                'mtn':          'mtn_momo',
-                'paycard':      'paycard',
-                'kulu':         'kulu',
-                'soutra_money': 'soutra_money',
-                'akiba':        'akiba',
+            _ch_map = {
+                'orange_money': 'orange_money', 'mtn_momo': 'mtn_momo',
+                'mtn': 'mtn_momo', 'paycard': 'paycard',
+                'kulu': 'kulu', 'soutra_money': 'soutra_money', 'akiba': 'akiba',
             }
-            _wallet_type = _wallet_map.get(payout.provider or '', 'orange_money')
-
-            # ChaChaP ne supporte que PayCard actuellement — skip les autres wallets
-            if _wallet_type != 'paycard':
-                _skip_msg = (
-                    f"ChaChaP Règlement: seul PayCard est supporté actuellement "
-                    f"(wallet={_wallet_type}). Virement manuel requis."
-                )
-                logger.info("[PAYOUT] %s — %s", payout_id, _skip_msg)
-                payout.admin_note = _skip_msg
-                payout.save(update_fields=['admin_note', 'updated_at'])
-                return PaymentResult(success=False, message=_skip_msg)
-            _order_ref   = str(payout.order_id)[:8].upper()
-            _notify_url  = getattr(
-                settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
-                'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/'
-            )
+            _channel    = _ch_map.get(payout.provider or '', 'orange_money')
+            _notify_url = getattr(settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
+                                  'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/')
+            _order_ref  = str(payout.order_id)[:8].upper()
             _body = {
-                'agent_pin':    agent_pin,
-                'payout_amount': amount,
-                'payout_mode':  'wallet_transfer',
-                'payout_data':  {
-                    'wallet_account_number': phone,
-                    'wallet_type':           _wallet_type,
-                },
-                'note':       f'Paiement vendeur Guimatrix #{_order_ref}',
-                'notify_url': _notify_url,
+                'account_number':  phone,
+                'amount':          amount,
+                'payment_channel': _channel,
+                'account_name':    getattr(payout.seller, 'full_name', ''),
+                'notify_url':      _notify_url,
+                'order_id':        _order_ref,
             }
             _body_bytes = _json.dumps(_body, separators=(',', ':')).encode()
             _headers = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}
             if encrypt_key:
                 _sig = _hmac.new(encrypt_key.encode(), _body_bytes, _hs.sha256).hexdigest()
                 _headers['CCP-HMAC-Signature'] = _sig
-            _url = f'{CHACHAP_API_URL}/api/payout/{access_code}/request'
+            _url = f'{CHACHAP_API_URL}/api/push/{access_code}/request'
             resp = _req.post(_url, data=_body_bytes, headers=_headers, timeout=20)
             raw  = resp.text.strip()
-            logger.info("[PAYOUT] Règlement HTTP %s — raw: %.300s", resp.status_code, raw)
+            logger.info("[PAYOUT] Push HTTP %s — raw: %.300s", resp.status_code, raw)
             try:
                 data = _json.loads(raw)
                 if not isinstance(data, dict):
@@ -559,34 +515,31 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
             except _json.JSONDecodeError:
                 data = {}
 
-            # HTTP 2xx + payout_request_id → demande créée (traitement asynchrone par ChapChap)
-            http_ok = resp.status_code in (200, 201, 202)
-            has_id  = bool(data.get('payout_request_id'))
-            status_ = data.get('payout_request_status', '')
+            http_ok    = resp.status_code in (200, 201, 202)
+            request_id = data.get('request_id', '')
+            status_    = data.get('status', '')
 
-            if http_ok and has_id:
-                ext_ref = data.get('payout_request_id', '')
-                if status_ == 'executed':
-                    # Déjà exécuté (rare mais possible)
+            if http_ok and request_id:
+                if status_ == 'success':
                     payout.mark_completed(
-                        external_ref=ext_ref,
-                        note=f"Règlement ChaChaP exécuté immédiatement (id={ext_ref})",
+                        external_ref=request_id,
+                        note=f"Push ChaChaP exécuté (id={request_id})",
                     )
-                    logger.info("[PAYOUT] %s → exécuté immédiatement id=%s", payout_id, ext_ref)
+                    logger.info("[PAYOUT] %s → push exécuté id=%s", payout_id, request_id)
                 else:
-                    # En cours (new / auto_processing / en_cours) → PROCESSING, pas COMPLETED
-                    payout.status     = payout.Status.PROCESSING
-                    payout.external_ref = ext_ref
-                    payout.admin_note = f"Règlement ChaChaP soumis (id={ext_ref}, status={status_})"
+                    # initiating / pending → PROCESSING
+                    payout.status       = payout.Status.PROCESSING
+                    payout.external_ref = request_id
+                    payout.admin_note   = f"Push ChaChaP soumis (id={request_id}, status={status_})"
                     payout.save(update_fields=['status', 'external_ref', 'admin_note', 'updated_at'])
-                    logger.info("[PAYOUT] %s → soumis id=%s status=%s (attente exécution ChapChap)", payout_id, ext_ref, status_)
-                return PaymentResult(success=True, reference=ext_ref, message=f"Règlement ChaChaP soumis (status={status_})")
+                    logger.info("[PAYOUT] %s → push soumis id=%s status=%s", payout_id, request_id, status_)
+                return PaymentResult(success=True, reference=request_id, message=f"Push ChaChaP {status_}")
 
             err = data.get('message') or data.get('error') or raw[:120] or f'HTTP {resp.status_code}'
-            logger.warning("[PAYOUT] Règlement ChaChaP échoué: %s", err)
-            payout.mark_failed(note=f"Règlement ChaChaP: {err}")
+            logger.warning("[PAYOUT] Push ChaChaP échoué: %s", err)
+            payout.mark_failed(note=f"Push ChaChaP: {err}")
             _notify_payout_failure(payout, err)
-            return PaymentResult(success=False, message=f"Règlement ChaChaP: {err}")
+            return PaymentResult(success=False, message=f"Push ChaChaP: {err}")
         except Exception as exc:
             logger.error("[PAYOUT] Règlement ChaChaP exception: %s", exc)
             payout.mark_failed(note=f"Exception: {exc}")
@@ -725,7 +678,8 @@ def sync_chachap_payout_status(payout_id: str) -> PaymentResult:
 
     try:
         import requests as _req, json as _json
-        url  = f'{CHACHAP_API_URL}/api/payout/{access_code}/request/{ext_ref}'
+        # Push API: GET /push/{access_code}/request/{request_id}
+        url  = f'{CHACHAP_API_URL}/api/push/{access_code}/request/{ext_ref}'
         resp = _req.get(url, headers={'CCP-Api-Key': api_key}, timeout=15)
         raw  = resp.text.strip()
         logger.info("[PAYOUT SYNC] GET %s → HTTP %s — %.300s", url, resp.status_code, raw)
@@ -737,7 +691,12 @@ def sync_chachap_payout_status(payout_id: str) -> PaymentResult:
         except Exception:
             data = {}
 
-        status_ = data.get('payout_request_status', '') or data.get('status', '')
+        status_ = data.get('status', '') or data.get('payout_request_status', '')
+        # Normaliser : Push "success" → "executed"
+        if status_ == 'success':
+            status_ = 'executed'
+        elif status_ == 'error':
+            status_ = 'failed'
 
         if status_ == 'executed':
             if payout.status != SellerPayout.Status.COMPLETED:

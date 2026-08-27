@@ -2665,23 +2665,30 @@ class ChaChaPayoutWebhookView(APIView):
             logger.error("[PAYOUT WEBHOOK] Body non-parsable : %s", exc)
             return Response({'error': 'body invalide'}, status=400)
 
-        payout_ref    = data.get('payout_request_id', '')
-        payout_status = data.get('payout_request_status', '')
+        # Push API: request_id + status (success/pending/error)
+        # Règlement API: payout_request_id + payout_request_status (executed/failed…)
+        payout_ref    = data.get('request_id') or data.get('payout_request_id', '')
+        payout_status = data.get('status') or data.get('payout_request_status', '')
+        # Normaliser les statuts Push vers des valeurs communes
+        if payout_status == 'success':
+            payout_status = 'executed'
+        elif payout_status == 'error':
+            payout_status = 'failed'
 
-        logger.info("[PAYOUT WEBHOOK] payout_request_id=%s status=%s", payout_ref, payout_status)
+        logger.info("[PAYOUT WEBHOOK] ref=%s status=%s", payout_ref, payout_status)
 
         if not payout_ref:
-            return Response({'error': 'payout_request_id manquant'}, status=400)
+            return Response({'error': 'request_id manquant'}, status=400)
 
         # ── Chercher le SellerPayout correspondant ─────────────────────────────
         from .models import SellerPayout, LivreurWeeklyPayout
 
-        seller_payout   = SellerPayout.objects.filter(external_ref=payout_ref).first()
-        livreur_payout  = LivreurWeeklyPayout.objects.filter(payment_ref=payout_ref).first()
+        seller_payout  = SellerPayout.objects.filter(external_ref=payout_ref).first()
+        livreur_payout = LivreurWeeklyPayout.objects.filter(payment_ref=payout_ref).first()
 
         if not seller_payout and not livreur_payout:
             logger.warning("[PAYOUT WEBHOOK] Aucun payout trouvé pour ref=%s", payout_ref)
-            return Response({'received': True})   # 200 pour éviter les retries ChapChap
+            return Response({'received': True})
 
         if payout_status == 'executed':
             # ── Vendeur ────────────────────────────────────────────────────────
