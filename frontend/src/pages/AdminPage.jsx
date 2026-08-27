@@ -2535,6 +2535,16 @@ function ManualPushTransferSection() {
   const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState(false)
 
+  // Expose le setter pour pré-remplissage depuis SellerPayoutsSection
+  useEffect(() => {
+    _prefillManualTransfer = (data) => {
+      setForm(f => ({ ...f, ...data }))
+      setOpen(true)
+      setMsg('')
+    }
+    return () => { _prefillManualTransfer = null }
+  }, [])
+
   const CHANNELS = [
     { value: 'orange_money',  label: '🟠 Orange Money' },
     { value: 'mtn_momo',      label: '🟡 MTN MoMo' },
@@ -2565,10 +2575,10 @@ function ManualPushTransferSection() {
   }
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3 shadow-sm">
+    <div id="manual-push-section" className="bg-white rounded-2xl border border-orange-200 p-5 space-y-3 shadow-sm">
       <button onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 text-base font-semibold text-gray-800 w-full text-left">
-        <span>💸 Virement manuel (Push API)</span>
+        <span>💸 Virement manuel OM / MTN / PayCard</span>
         <span className="ml-auto text-gray-400 text-sm">{open ? '▲' : '▼'}</span>
       </button>
 
@@ -2664,6 +2674,9 @@ const PROVIDER_LABEL = {
   orange_money: '🟠 Orange Money', mtn_momo: '🟡 MTN MoMo', paycard: '💳 PayCard',
   kulu: '🔵 Kulu', soutra_money: '🟢 Soutra Money', akiba: '💜 Akiba', manual: '💼 Manuel',
 }
+
+// État global pour pré-remplir le formulaire de virement manuel
+let _prefillManualTransfer = null
 
 function SellerPayoutsSection() {
   const qc = useQueryClient()
@@ -2819,12 +2832,40 @@ function SellerPayoutsSection() {
 
                 {/* Actions */}
                 <div className="flex gap-2 px-4 pb-3 flex-wrap">
-                  {(p.status === 'pending' || p.status === 'failed') && (
-                    <button onClick={() => disburse(p)} disabled={!!busy}
-                      className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
-                      {busy === p.id ? '...' : '🚀 Virer auto (ChapChap)'}
-                    </button>
-                  )}
+                  {(p.status === 'pending' || p.status === 'failed') && (() => {
+                    const isPaycard = p.provider === 'paycard'
+                    if (isPaycard) {
+                      // PayCard → automatique via Push API
+                      return (
+                        <button onClick={() => disburse(p)} disabled={!!busy}
+                          className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
+                          {busy === p.id ? '...' : '🚀 Virer auto (PayCard)'}
+                        </button>
+                      )
+                    } else {
+                      // OM / MTN → pré-remplir le formulaire Manuel en dessous
+                      const rawPhone = (p.payout_phone || '').replace(/\D/g,'').replace(/^224/, '')
+                      return (
+                        <button
+                          onClick={() => {
+                            if (_prefillManualTransfer) {
+                              _prefillManualTransfer({
+                                phone: rawPhone,
+                                amount: String(p.amount_gnf || ''),
+                                payment_channel: p.provider === 'mtn_momo' ? 'mtn_momo' : 'orange_money',
+                                account_name: p.seller || '',
+                                note: `Virement vendeur — cde ${p.order_id?.slice(0,8).toUpperCase()}`,
+                              })
+                              document.getElementById('manual-push-section')?.scrollIntoView({ behavior: 'smooth' })
+                            }
+                          }}
+                          disabled={!!busy}
+                          className="flex-1 py-2 bg-orange-500 hover:bg-orange-600 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
+                          {p.provider === 'mtn_momo' ? '🟡 Préparer virement MTN' : '🟠 Préparer virement Orange'}
+                        </button>
+                      )
+                    }
+                  })()}
                   {p.status === 'processing' && p.external_ref && (
                     <button onClick={() => syncStatus(p)} disabled={!!busy}
                       className="flex-1 py-2 bg-blue-500 hover:bg-blue-600 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50"
