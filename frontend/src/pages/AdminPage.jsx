@@ -25,6 +25,7 @@ const adminAPI = {
   disburseSellerPayout:  (id)     => api.post(`/orders/admin/seller-payouts/${id}/disburse/`),
   syncSellerPayout:      (id)     => api.post(`/orders/admin/seller-payouts/${id}/sync/`),
   markSellerPayoutPaid:  (id, note) => api.post(`/orders/admin/seller-payouts/${id}/mark-paid/`, { note }),
+  pushTransfer:          (data)   => api.post('/orders/admin/push-transfer/', data),
 
   // Ordres / litiges
   getStats:    () => api.get('/orders/admin/stats/'),
@@ -2513,11 +2514,147 @@ function TabAccounting() {
       {/* ── Versements vendeurs ── */}
       <SellerPayoutsSection />
 
+      {/* ── Virement manuel Push API ── */}
+      <ManualPushTransferSection />
+
       {/* ── Virements hebdomadaires ── */}
       <WeeklyPayoutsSection />
 
       {/* ── Amendes livreurs ── */}
       <FinesSection />
+    </div>
+  )
+}
+
+// ── Virement manuel Push API ─────────────────────────────────────────────────
+function ManualPushTransferSection() {
+  const [form, setForm] = useState({
+    phone: '', amount: '', payment_channel: 'orange_money', account_name: '', note: '',
+  })
+  const [msg,  setMsg]  = useState('')
+  const [busy, setBusy] = useState(false)
+  const [open, setOpen] = useState(false)
+
+  const CHANNELS = [
+    { value: 'orange_money',  label: '🟠 Orange Money' },
+    { value: 'mtn_momo',      label: '🟡 MTN MoMo' },
+    { value: 'paycard',       label: '💳 PayCard' },
+    { value: 'kulu',          label: '🔵 Kulu' },
+    { value: 'soutra_money',  label: '🟢 Soutra Money' },
+    { value: 'akiba',         label: '💜 Akiba' },
+  ]
+
+  async function handleSend() {
+    if (!form.phone || !form.amount) { setMsg('❌ Numéro et montant requis.'); return }
+    const amt = parseInt(form.amount, 10)
+    if (isNaN(amt) || amt <= 0) { setMsg('❌ Montant invalide.'); return }
+    const label = CHANNELS.find(c => c.value === form.payment_channel)?.label || form.payment_channel
+    if (!window.confirm(`Envoyer ${amt.toLocaleString('fr-FR')} GNF vers ${form.phone} (${label}) ?`)) return
+    setBusy(true); setMsg('')
+    try {
+      const r = await adminAPI.pushTransfer({ ...form, amount: amt })
+      if (r.data.success) {
+        setMsg(`✅ ${r.data.message}`)
+        setForm({ phone: '', amount: '', payment_channel: 'orange_money', account_name: '', note: '' })
+      } else {
+        setMsg(`⚠️ ${r.data.message}`)
+      }
+    } catch(e) {
+      setMsg(`❌ ${e.response?.data?.message || e.response?.data?.error || 'Erreur réseau'}`)
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-3 shadow-sm">
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-2 text-base font-semibold text-gray-800 w-full text-left">
+        <span>💸 Virement manuel (Push API)</span>
+        <span className="ml-auto text-gray-400 text-sm">{open ? '▲' : '▼'}</span>
+      </button>
+
+      {open && (
+        <div className="space-y-3 pt-1">
+          <p className="text-xs text-gray-500">Envoyer un virement direct vers n'importe quel numéro via ChapChap Push API.</p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Numéro */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Numéro de compte</label>
+              <input
+                type="tel"
+                placeholder="ex : 621 00 00 00"
+                value={form.phone}
+                onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              />
+              <p className="text-xs text-gray-400 mt-0.5">Sans indicatif pays (+224 ajouté automatiquement)</p>
+            </div>
+
+            {/* Montant */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Montant (GNF)</label>
+              <input
+                type="number"
+                min="1"
+                placeholder="ex : 50000"
+                value={form.amount}
+                onChange={e => setForm(f => ({ ...f, amount: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              />
+            </div>
+
+            {/* Opérateur */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Opérateur</label>
+              <select
+                value={form.payment_channel}
+                onChange={e => setForm(f => ({ ...f, payment_channel: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white">
+                {CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
+              </select>
+            </div>
+
+            {/* Nom bénéficiaire */}
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Nom bénéficiaire <span className="text-gray-400">(optionnel)</span></label>
+              <input
+                type="text"
+                placeholder="ex : Mamadou Diallo"
+                value={form.account_name}
+                onChange={e => setForm(f => ({ ...f, account_name: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              />
+            </div>
+
+            {/* Note */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Note interne <span className="text-gray-400">(optionnel)</span></label>
+              <input
+                type="text"
+                placeholder="ex : Remboursement commande #XYZ"
+                value={form.note}
+                onChange={e => setForm(f => ({ ...f, note: e.target.value }))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
+              />
+            </div>
+          </div>
+
+          <button
+            onClick={handleSend}
+            disabled={busy}
+            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm">
+            {busy ? '⏳ Envoi en cours…' : '💸 Envoyer le virement'}
+          </button>
+
+          {msg && (
+            <p className={`text-sm font-medium px-3 py-2 rounded-xl ${
+              msg.startsWith('✅') ? 'bg-green-50 text-green-700' :
+              msg.startsWith('⚠️') ? 'bg-amber-50 text-amber-700' :
+              'bg-red-50 text-red-700'
+            }`}>{msg}</p>
+          )}
+        </div>
+      )}
     </div>
   )
 }

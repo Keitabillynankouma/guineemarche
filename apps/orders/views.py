@@ -2587,6 +2587,88 @@ class AdminTriggerSellerPayoutView(APIView):
         })
 
 
+class AdminManualPushTransferView(APIView):
+    """
+    POST /orders/admin/push-transfer/
+    Envoie un virement manuel via ChapChap Push API.
+    Body: { phone, amount, payment_channel, account_name, note }
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request):
+        if not (request.user.is_super_admin or request.user.can_manage_accounting):
+            return Response({'error': 'Accès réservé.'}, status=403)
+
+        phone    = (request.data.get('phone') or '').strip().replace(' ', '').replace('-', '')
+        amount   = request.data.get('amount')
+        channel  = request.data.get('payment_channel', 'orange_money')
+        name     = request.data.get('account_name', '')
+        note_txt = request.data.get('note', 'Virement manuel Guimatrix')
+
+        if not phone or not amount:
+            return Response({'error': 'phone et amount requis.'}, status=400)
+
+        # Normalisation numéro
+        if phone.startswith('+'):
+            phone = phone[1:]
+        elif phone.startswith('00224'):
+            phone = phone[2:]
+        elif not phone.startswith('224'):
+            phone = '224' + phone
+
+        try:
+            amount = int(amount)
+        except (ValueError, TypeError):
+            return Response({'error': 'amount doit être un entier.'}, status=400)
+
+        from django.conf import settings as _s
+        import requests as _req, json as _json, hmac as _hmac, hashlib as _hs
+
+        api_key     = getattr(_s, 'CHACHAP_API_KEY', '')
+        encrypt_key = getattr(_s, 'CHACHAP_ENCRYPT_KEY', '')
+        access_code = getattr(_s, 'CHACHAP_AGENT_ACCESS_CODE', '')
+
+        if not (api_key and access_code):
+            return Response({'error': 'Clés ChapChap non configurées.'}, status=500)
+
+        from apps.orders.payment_service import CHACHAP_API_URL
+        body = {
+            'account_number':  phone,
+            'amount':          amount,
+            'payment_channel': channel,
+            'account_name':    name,
+            'order_id':        f'MAN-{request.user.id}',
+        }
+        body_bytes = _json.dumps(body, separators=(',', ':')).encode()
+        headers    = {'CCP-Api-Key': api_key, 'Content-Type': 'application/json'}
+        if encrypt_key:
+            headers['CCP-HMAC-Signature'] = _hmac.new(
+                encrypt_key.encode(), body_bytes, _hs.sha256
+            ).hexdigest()
+
+        try:
+            resp = _req.post(
+                f'{CHACHAP_API_URL}/api/push/{access_code}/request',
+                data=body_bytes, headers=headers, timeout=20
+            )
+            data = resp.json() if resp.content else {}
+        except Exception as exc:
+            return Response({'error': str(exc)}, status=502)
+
+        logger.info("[MANUAL PUSH] HTTP %s → %s", resp.status_code, str(data)[:300])
+
+        if resp.status_code in (200, 201, 202) and data.get('request_id'):
+            return Response({
+                'success':    True,
+                'request_id': data['request_id'],
+                'status':     data.get('status', ''),
+                'message':    f"Virement soumis vers {phone} ({channel}) — réf: {data['request_id']}",
+            })
+
+        err = data.get('message') or data.get('error') or f'HTTP {resp.status_code}'
+        return Response({'success': False, 'message': err}, status=400)
+
+
 class AdminSyncSellerPayoutView(APIView):
     """POST /orders/admin/seller-payouts/<uuid>/sync/ — interroge ChapChap pour le statut réel."""
     permission_classes = [IsAdmin]
