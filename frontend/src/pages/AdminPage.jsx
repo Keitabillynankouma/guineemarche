@@ -2675,14 +2675,114 @@ const PROVIDER_LABEL = {
   kulu: '🔵 Kulu', soutra_money: '🟢 Soutra Money', akiba: '💜 Akiba', manual: '💼 Manuel',
 }
 
+function genCode(len = 6) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  return Array.from({ length: len }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+
+// Modal de confirmation manuel avec code aléatoire
+function ConfirmManualModal({ payout, onConfirm, onClose }) {
+  const [code]        = useState(() => genCode())
+  const [input, setInput] = useState('')
+  const [note, setNote]   = useState('')
+  const match = input.trim().toUpperCase() === code
+
+  if (!payout) return null
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6 space-y-5">
+        {/* Entête */}
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-bold text-gray-800">✅ Confirmer le virement manuel</h3>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xl leading-none">✕</button>
+        </div>
+
+        {/* Récapitulatif */}
+        <div className="bg-gray-50 rounded-xl p-4 space-y-2 text-sm">
+          <div className="flex justify-between">
+            <span className="text-gray-500">Bénéficiaire</span>
+            <span className="font-semibold text-gray-800">{payout.seller || '—'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Montant</span>
+            <span className="font-black text-emerald-700 text-base">{(payout.amount_gnf || 0).toLocaleString('fr-FR')} GNF</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Numéro</span>
+            <span className="font-mono font-semibold text-gray-800">{payout.payout_phone || '—'}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Opérateur</span>
+            <span className="font-semibold">{PROVIDER_LABEL[payout.provider] || payout.provider}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Commande</span>
+            <span className="font-mono text-xs text-gray-600">{payout.order_id?.slice(0,8).toUpperCase()}</span>
+          </div>
+        </div>
+
+        {/* Code de confirmation */}
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+          <p className="text-xs text-amber-700 font-medium">
+            Pour confirmer que ce virement a bien été effectué manuellement, recopiez le code ci-dessous :
+          </p>
+          <div className="flex justify-center">
+            <span className="text-3xl font-black tracking-[0.3em] text-amber-800 select-all">{code}</span>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-600">Recopiez le code</label>
+          <input
+            type="text"
+            value={input}
+            onChange={e => setInput(e.target.value.toUpperCase())}
+            placeholder={`Ex : ${code}`}
+            maxLength={6}
+            className={`w-full border rounded-xl px-4 py-2.5 text-center text-xl font-mono tracking-widest focus:outline-none focus:ring-2 ${
+              input && !match ? 'border-red-300 focus:ring-red-200' : 'border-gray-200 focus:ring-emerald-200'
+            }`}
+          />
+          {input && !match && <p className="text-xs text-red-500">Code incorrect</p>}
+        </div>
+
+        <div className="space-y-1">
+          <label className="text-xs font-medium text-gray-600">Référence / note <span className="text-gray-400">(optionnel)</span></label>
+          <input
+            type="text"
+            value={note}
+            onChange={e => setNote(e.target.value)}
+            placeholder="ex : réf ChapChap #ABC123"
+            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-200"
+          />
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition text-sm">
+            Annuler
+          </button>
+          <button
+            onClick={() => match && onConfirm(note)}
+            disabled={!match}
+            className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white font-semibold rounded-xl transition text-sm">
+            ✅ Confirmer le paiement
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // État global pour pré-remplir le formulaire de virement manuel
 let _prefillManualTransfer = null
 
 function SellerPayoutsSection() {
   const qc = useQueryClient()
   const [statusFilter, setStatusFilter] = useState('pending')
-  const [msg, setMsg] = useState('')
-  const [busy, setBusy] = useState(null)  // payout id en cours
+  const [msg,  setMsg]  = useState('')
+  const [busy, setBusy] = useState(null)
+  const [confirmPayout, setConfirmPayout] = useState(null)  // payout en attente de confirmation
 
   const { data: res = {}, isLoading } = useQuery({
     queryKey: ['seller-payouts', statusFilter],
@@ -2711,19 +2811,23 @@ function SellerPayoutsSection() {
     finally { setBusy(null) }
   }
 
-  async function markPaid(payout) {
-    const note = window.prompt('Note (ex: virement manuel, référence…)', '')
-    if (note === null) return
+  async function markPaid(payout, note) {
     setBusy(payout.id); setMsg('')
     try {
-      await adminAPI.markSellerPayoutPaid(payout.id, note)
-      setMsg('✅ Marqué comme versé.')
+      await adminAPI.markSellerPayoutPaid(payout.id, note || 'Virement manuel confirmé')
+      setMsg(`✅ Virement confirmé — ${PROVIDER_LABEL[payout.provider] || payout.provider} · ${(payout.amount_gnf||0).toLocaleString('fr-FR')} GNF`)
       qc.invalidateQueries({ queryKey: ['seller-payouts'] })
     } catch(e) { setMsg(`❌ ${e.response?.data?.error || 'Erreur'}`) }
-    finally { setBusy(null) }
+    finally { setBusy(null); setConfirmPayout(null) }
   }
 
   return (
+    <>
+    <ConfirmManualModal
+      payout={confirmPayout}
+      onClose={() => setConfirmPayout(null)}
+      onConfirm={(note) => markPaid(confirmPayout, note)}
+    />
     <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4 shadow-sm">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-bold text-gray-800">💸 Versements vendeurs</h2>
@@ -2794,34 +2898,19 @@ function SellerPayoutsSection() {
                     )}
                   </div>
 
-                  {/* Instructions visuelles — seulement si en attente */}
+                  {/* Liens rapides — seulement si non complété */}
                   {p.status !== 'completed' && (
-                    <div className="bg-blue-50 border border-blue-100 rounded-xl p-3 space-y-2">
-                      <p className="text-xs font-bold text-blue-700">📋 Étapes pour virer manuellement :</p>
-                      <ol className="text-xs text-blue-700 space-y-1 list-decimal list-inside">
-                        <li>Ouvre ChapChap Pro ou ton app Orange Money / MTN</li>
-                        <li>Envoie <span className="font-black">{amount.toLocaleString('fr-FR')} GNF</span> au numéro <span className="font-black font-mono">{phone || '?'}</span></li>
-                        <li>Reviens ici et clique <span className="font-bold">"✓ Manuel"</span> pour confirmer</li>
-                      </ol>
-                      {/* Liens rapides */}
-                      <div className="flex flex-wrap gap-2 pt-1">
-                        <a href={chapchapLink} target="_blank" rel="noopener noreferrer"
-                          className="text-xs px-3 py-1.5 bg-white border border-blue-200 text-blue-700 font-semibold rounded-lg hover:bg-blue-100 transition">
-                          💰 ChapChap Pro
+                    <div className="flex flex-wrap gap-2">
+                      <a href="https://chapchappay.com/pro" target="_blank" rel="noopener noreferrer"
+                        className="text-xs px-3 py-1.5 bg-indigo-50 border border-indigo-200 text-indigo-700 font-semibold rounded-lg hover:bg-indigo-100 transition">
+                        💰 ChapChap Pro
+                      </a>
+                      {waLink && (
+                        <a href={waLink} target="_blank" rel="noopener noreferrer"
+                          className="text-xs px-3 py-1.5 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition">
+                          💬 WhatsApp
                         </a>
-                        {waLink && (
-                          <a href={waLink} target="_blank" rel="noopener noreferrer"
-                            className="text-xs px-3 py-1.5 bg-green-50 border border-green-200 text-green-700 font-semibold rounded-lg hover:bg-green-100 transition">
-                            💬 WhatsApp vendeur
-                          </a>
-                        )}
-                        {isOM && phone && (
-                          <a href={`tel:*144*1*${phone.replace(/\D/g,'')}*${amount}#`}
-                            className="text-xs px-3 py-1.5 bg-orange-50 border border-orange-200 text-orange-700 font-semibold rounded-lg hover:bg-orange-100 transition">
-                            🟠 USSD Orange Money
-                          </a>
-                        )}
-                      </div>
+                      )}
                     </div>
                   )}
 
@@ -2874,9 +2963,9 @@ function SellerPayoutsSection() {
                     </button>
                   )}
                   {p.status !== 'completed' && (
-                    <button onClick={() => markPaid(p)} disabled={!!busy}
-                      className="flex-1 py-2 bg-gray-600 hover:bg-gray-700 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
-                      {busy === p.id ? '...' : '✓ Confirmer virement fait'}
+                    <button onClick={() => setConfirmPayout(p)} disabled={!!busy}
+                      className="flex-1 py-2 bg-gray-700 hover:bg-gray-800 text-white text-xs font-semibold rounded-xl transition disabled:opacity-50">
+                      {busy === p.id ? '...' : '✅ Confirmer virement manuel'}
                     </button>
                   )}
                 </div>
@@ -2886,6 +2975,7 @@ function SellerPayoutsSection() {
         </div>
       )}
     </div>
+    </>
   )
 }
 
