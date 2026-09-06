@@ -2531,9 +2531,10 @@ function ManualPushTransferSection() {
   const [form, setForm] = useState({
     phone: '', amount: '', payment_channel: 'orange_money', account_name: '', note: '',
   })
-  const [msg,  setMsg]  = useState('')
-  const [busy, setBusy] = useState(false)
-  const [open, setOpen] = useState(false)
+  const [msg,     setMsg]     = useState('')
+  const [busy,    setBusy]    = useState(false)
+  const [open,    setOpen]    = useState(false)
+  const [confirm, setConfirm] = useState(false)  // modal code confirmation (OM/MTN)
 
   // Expose le setter pour pré-remplissage depuis SellerPayoutsSection
   useEffect(() => {
@@ -2546,20 +2547,27 @@ function ManualPushTransferSection() {
   }, [])
 
   const CHANNELS = [
-    { value: 'orange_money',  label: '🟠 Orange Money' },
-    { value: 'mtn_momo',      label: '🟡 MTN MoMo' },
-    { value: 'paycard',       label: '💳 PayCard' },
-    { value: 'kulu',          label: '🔵 Kulu' },
-    { value: 'soutra_money',  label: '🟢 Soutra Money' },
-    { value: 'akiba',         label: '💜 Akiba' },
+    { value: 'orange_money',  label: '🟠 Orange Money',  auto: false },
+    { value: 'mtn_momo',      label: '🟡 MTN MoMo',      auto: false },
+    { value: 'paycard',       label: '💳 PayCard',        auto: true  },
+    { value: 'kulu',          label: '🔵 Kulu',           auto: false },
+    { value: 'soutra_money',  label: '🟢 Soutra Money',   auto: false },
+    { value: 'akiba',         label: '💜 Akiba',          auto: false },
   ]
+  const currentChannel = CHANNELS.find(c => c.value === form.payment_channel) || CHANNELS[0]
+  const isAuto = currentChannel.auto  // PayCard → envoi automatique
 
-  async function handleSend() {
-    if (!form.phone || !form.amount) { setMsg('❌ Numéro et montant requis.'); return }
+  function validate() {
+    if (!form.phone || !form.amount) { setMsg('❌ Numéro et montant requis.'); return false }
     const amt = parseInt(form.amount, 10)
-    if (isNaN(amt) || amt <= 0) { setMsg('❌ Montant invalide.'); return }
-    const label = CHANNELS.find(c => c.value === form.payment_channel)?.label || form.payment_channel
-    if (!window.confirm(`Envoyer ${amt.toLocaleString('fr-FR')} GNF vers ${form.phone} (${label}) ?`)) return
+    if (isNaN(amt) || amt <= 0) { setMsg('❌ Montant invalide.'); return false }
+    return true
+  }
+
+  // PayCard : envoi automatique via API
+  async function handleAutoSend() {
+    if (!validate()) return
+    const amt = parseInt(form.amount, 10)
     setBusy(true); setMsg('')
     try {
       const r = await adminAPI.pushTransfer({ ...form, amount: amt })
@@ -2574,30 +2582,84 @@ function ManualPushTransferSection() {
     } finally { setBusy(false) }
   }
 
+  // OM/MTN : ouvre la modal de confirmation manuelle
+  function handleManualConfirm(note) {
+    setConfirm(false)
+    const amt = parseInt(form.amount, 10)
+    setMsg(`✅ Virement manuel de ${amt.toLocaleString('fr-FR')} GNF vers ${form.phone} (${currentChannel.label}) enregistré.${note ? ' Réf : ' + note : ''}`)
+    setForm({ phone: '', amount: '', payment_channel: 'orange_money', account_name: '', note: '' })
+  }
+
+  const formData = {
+    seller:         form.account_name || form.phone,
+    amount_gnf:     parseInt(form.amount, 10) || 0,
+    payout_phone:   form.phone,
+    provider:       form.payment_channel,
+  }
+
   return (
+    <>
+      {confirm && (
+        <ConfirmManualModal
+          payout={formData}
+          onConfirm={handleManualConfirm}
+          onClose={() => setConfirm(false)}
+        />
+      )}
+
     <div id="manual-push-section" className="bg-white rounded-2xl border border-orange-200 p-5 space-y-3 shadow-sm">
       <button onClick={() => setOpen(o => !o)}
         className="flex items-center gap-2 text-base font-semibold text-gray-800 w-full text-left">
-        <span>💸 Virement manuel OM / MTN / PayCard</span>
+        <span>💸 Virement vendeur / comptabilité</span>
         <span className="ml-auto text-gray-400 text-sm">{open ? '▲' : '▼'}</span>
       </button>
 
       {open && (
-        <div className="space-y-3 pt-1">
-          <p className="text-xs text-gray-500">Envoyer un virement direct vers n'importe quel numéro via ChapChap Push API.</p>
+        <div className="space-y-4 pt-1">
+
+          {/* Bandeau contextuel selon opérateur */}
+          {isAuto ? (
+            <div className="flex items-start gap-2 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-xs text-emerald-800">
+              <span className="text-base">🚀</span>
+              <span><strong>PayCard</strong> — le virement sera envoyé automatiquement via l'API ChapChap. Vérifiez les informations avant de confirmer.</span>
+            </div>
+          ) : (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 text-xs text-amber-800">
+              <span className="text-base">📱</span>
+              <div>
+                <p className="font-semibold mb-0.5">Virement manuel — {currentChannel.label}</p>
+                <p>Effectuez d'abord le virement depuis votre téléphone mobile, puis remplissez ce formulaire et cliquez <strong>"J'ai effectué ce virement"</strong> pour confirmer.</p>
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {/* Opérateur */}
+            <div className="sm:col-span-2">
+              <label className="block text-xs font-medium text-gray-600 mb-1">Opérateur</label>
+              <select
+                value={form.payment_channel}
+                onChange={e => { setForm(f => ({ ...f, payment_channel: e.target.value })); setMsg('') }}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white">
+                {CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}{c.auto ? ' (automatique)' : ' (manuel)'}</option>)}
+              </select>
+            </div>
+
             {/* Numéro */}
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Numéro de compte</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                {form.payment_channel === 'paycard' ? 'Numéro de compte PayCard' : 'Numéro de téléphone'}
+              </label>
               <input
                 type="tel"
-                placeholder="ex : 621 00 00 00"
+                placeholder={form.payment_channel === 'paycard' ? 'ex : 251651749' : 'ex : 621 00 00 00'}
                 value={form.phone}
                 onChange={e => setForm(f => ({ ...f, phone: e.target.value }))}
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300"
               />
-              <p className="text-xs text-gray-400 mt-0.5">Sans indicatif pays (+224 ajouté automatiquement)</p>
+              {form.payment_channel !== 'paycard' && (
+                <p className="text-xs text-gray-400 mt-0.5">Sans indicatif pays (+224 ajouté automatiquement)</p>
+              )}
             </div>
 
             {/* Montant */}
@@ -2613,19 +2675,8 @@ function ManualPushTransferSection() {
               />
             </div>
 
-            {/* Opérateur */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Opérateur</label>
-              <select
-                value={form.payment_channel}
-                onChange={e => setForm(f => ({ ...f, payment_channel: e.target.value }))}
-                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-300 bg-white">
-                {CHANNELS.map(c => <option key={c.value} value={c.value}>{c.label}</option>)}
-              </select>
-            </div>
-
             {/* Nom bénéficiaire */}
-            <div>
+            <div className="sm:col-span-2">
               <label className="block text-xs font-medium text-gray-600 mb-1">Nom bénéficiaire <span className="text-gray-400">(optionnel)</span></label>
               <input
                 type="text"
@@ -2649,12 +2700,22 @@ function ManualPushTransferSection() {
             </div>
           </div>
 
-          <button
-            onClick={handleSend}
-            disabled={busy}
-            className="w-full py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm">
-            {busy ? '⏳ Envoi en cours…' : '💸 Envoyer le virement'}
-          </button>
+          {/* Bouton contextuel */}
+          {isAuto ? (
+            <button
+              onClick={handleAutoSend}
+              disabled={busy}
+              className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm">
+              {busy ? '⏳ Envoi en cours…' : '🚀 Envoyer automatiquement (PayCard)'}
+            </button>
+          ) : (
+            <button
+              onClick={() => { if (validate()) setConfirm(true) }}
+              disabled={busy}
+              className="w-full py-3 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-white font-semibold rounded-xl transition text-sm">
+              📱 J'ai effectué ce virement — Confirmer
+            </button>
+          )}
 
           {msg && (
             <p className={`text-sm font-medium px-3 py-2 rounded-xl ${
@@ -2666,6 +2727,7 @@ function ManualPushTransferSection() {
         </div>
       )}
     </div>
+    </>
   )
 }
 
