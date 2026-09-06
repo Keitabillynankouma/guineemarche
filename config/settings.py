@@ -395,7 +395,11 @@ LOGGING = {
     },
 }
 
-from celery.schedules import crontab
+try:
+    from celery.schedules import crontab
+except ImportError:
+    crontab = None
+
 CELERY_BEAT_SCHEDULE = {
     # Libération escrow — toutes les heures
     'auto-release-escrow': {
