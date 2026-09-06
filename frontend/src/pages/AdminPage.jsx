@@ -2938,27 +2938,31 @@ function SellerPayoutsSection() {
 
                 {/* Détails paiement + actions rapides */}
                 <div className="px-4 py-3 space-y-3">
-                  {/* Numéro + provider */}
-                  <div className="flex items-center gap-3">
-                    <div className="flex-1">
-                      <p className="text-xs text-gray-400 mb-0.5">{PROVIDER_LABEL[p.provider] || p.provider}</p>
-                      {phone ? (
-                        <a href={`tel:${phone}`} className="text-base font-mono font-bold text-gray-800 hover:text-green-700 transition">
+                  {/* Numéro + provider — bloc bien visible */}
+                  {phone ? (
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 flex items-center gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs text-blue-500 font-medium mb-0.5">{PROVIDER_LABEL[p.provider] || p.provider} — numéro à virer</p>
+                        <p className="text-2xl font-black font-mono text-blue-900 tracking-wide leading-tight break-all">
                           {phone}
-                        </a>
-                      ) : (
-                        <p className="text-sm text-red-500 font-semibold">⚠️ Aucun numéro enregistré</p>
-                      )}
-                    </div>
-                    {/* Bouton copier numéro */}
-                    {phone && (
+                        </p>
+                      </div>
                       <button
-                        onClick={() => { navigator.clipboard.writeText(phone); setMsg(`📋 ${phone} copié !`) }}
-                        className="text-xs px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-lg transition"
-                        title="Copier le numéro"
-                      >📋 Copier</button>
-                    )}
-                  </div>
+                        onClick={() => {
+                          navigator.clipboard.writeText(phone.replace(/\s/g, ''))
+                          setMsg(`📋 ${phone} copié !`)
+                        }}
+                        className="shrink-0 flex flex-col items-center gap-1 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition text-xs font-bold"
+                        title="Copier le numéro">
+                        <span className="text-lg leading-none">📋</span>
+                        <span>Copier</span>
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                      <p className="text-sm text-red-600 font-semibold">⚠️ Aucun numéro de paiement enregistré pour ce vendeur</p>
+                    </div>
+                  )}
 
                   {/* Liens rapides — seulement si non complété */}
                   {p.status !== 'completed' && (
