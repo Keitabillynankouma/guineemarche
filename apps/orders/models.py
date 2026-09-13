@@ -263,8 +263,26 @@ class Order(BaseModel):
             if listing.stock_qty is not None and listing.stock_qty > 0:
                 listing.stock_qty -= 1
                 if listing.stock_qty == 0:
-                    # Ne pas marquer comme 'sold' — garder l'annonce visible avec mention "Rupture"
-                    listing.save(update_fields=['stock_qty'])
+                    # Rupture de stock → dépublier l'annonce (elle disparaît du marketplace)
+                    # Le vendeur la réactivera en remettant du stock via son tableau de bord
+                    listing.status = 'expired'
+                    listing.save(update_fields=['stock_qty', 'status'])
+                    # Notifier le vendeur
+                    try:
+                        from apps.notifications.models import Notification
+                        Notification.send(
+                            user=listing.seller,
+                            type=Notification.Type.SYSTEM,
+                            title='📦 Rupture de stock — annonce dépubliée',
+                            body=(
+                                f'Votre annonce « {listing.title} » est en rupture de stock. '
+                                f'Elle a été dépubliée automatiquement. '
+                                f'Mettez à jour votre stock pour la republier.'
+                            ),
+                            data={'listing_id': str(listing.id), 'action': 'update_stock'},
+                        )
+                    except Exception:
+                        pass
                 else:
                     listing.save(update_fields=['stock_qty'])
         except Exception:

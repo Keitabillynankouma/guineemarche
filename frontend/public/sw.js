@@ -1,4 +1,4 @@
-const CACHE_VERSION = 'guineemarche-v2'
+const CACHE_VERSION = 'guimatrix-v3'
 const STATIC_CACHE  = `${CACHE_VERSION}-static`
 const OFFLINE_URLS  = ['/', '/index.html']
 

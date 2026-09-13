@@ -50,7 +50,7 @@ export default function TermsPage() {
             </div>
 
             <div className="text-center text-xs text-gray-400 pb-8">
-                Guimatrix — Conakry, Guinée · contact@guineemarche.com
+                Guimatrix — Conakry, Guinée · contact@guimatrix.com
             </div>
         </div>
     )
@@ -204,7 +204,7 @@ function Privacy() {
                     <li><strong>Suppression :</strong> demander l'effacement de votre compte</li>
                     <li><strong>Opposition :</strong> refuser l'utilisation à des fins marketing</li>
                 </ul>
-                <p className="mt-2">Pour exercer ces droits, contactez-nous à : <strong>contact@guineemarche.com</strong></p>
+                <p className="mt-2">Pour exercer ces droits, contactez-nous à : <strong>contact@guimatrix.com</strong></p>
             </Section>
 
             <Section title="7. Cookies et traceurs">
@@ -317,8 +317,8 @@ function Refund() {
                     <a href="https://wa.me/224620000001" className="inline-flex items-center gap-2 text-green-700 font-medium">
                         💬 WhatsApp support
                     </a>
-                    <a href="mailto:contact@guineemarche.com" className="inline-flex items-center gap-2 text-green-700 font-medium">
-                        ✉️ contact@guineemarche.com
+                    <a href="mailto:contact@guimatrix.com" className="inline-flex items-center gap-2 text-green-700 font-medium">
+                        ✉️ contact@guimatrix.com
                     </a>
                 </div>
             </Section>
@@ -477,8 +477,8 @@ function Decharge() {
                     signalez-le immédiatement :
                 </p>
                 <div className="mt-3 flex flex-col gap-2">
-                    <a href="mailto:contact@guineemarche.com?subject=Signalement%20article%20suspect" className="inline-flex items-center gap-2 text-red-700 font-medium hover:underline">
-                        ✉️ contact@guineemarche.com — objet : "Signalement article suspect"
+                    <a href="mailto:contact@guimatrix.com?subject=Signalement%20article%20suspect" className="inline-flex items-center gap-2 text-red-700 font-medium hover:underline">
+                        ✉️ contact@guimatrix.com — objet : "Signalement article suspect"
                     </a>
                     <a href="https://wa.me/224620000001" className="inline-flex items-center gap-2 text-green-700 font-medium hover:underline">
                         💬 WhatsApp support Guimatrix

@@ -11,6 +11,7 @@ urlpatterns = [
     path('<uuid:pk>/',                views.ListingDetailView.as_view(),      name='listing-detail'),
     path('<uuid:pk>/similar/',          SimilarListingsView.as_view(),          name='listing-similar'),
     path('<uuid:pk>/boost/',            views.BoostListingView.as_view(),       name='listing-boost'),
+    path('<uuid:pk>/stock/',            views.UpdateStockView.as_view(),        name='listing-stock'),
     path('<uuid:pk>/favorite/',       views.FavoriteToggleView.as_view(),     name='listing-favorite-toggle'),
     path('my/',                       views.MyListingsView.as_view(),         name='my-listings'),
     path('my/stats/',                 views.MySellerStatsView.as_view(),      name='my-seller-stats'),

@@ -170,15 +170,35 @@ class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'error': 'Vous ne pouvez modifier que vos propres annonces.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+        # ── Cas spécial : réapprovisionnement de stock ────────────────────────
+        # Si l'annonce est expirée pour rupture de stock ET que le vendeur
+        # envoie un stock_qty > 0 → réactiver sans re-modération (le contenu n'a pas changé)
+        new_stock = request.data.get('stock_qty')
+        stock_reactivation = (
+            instance.status == Listing.Status.EXPIRED
+            and instance.stock_qty == 0
+            and new_stock is not None
+            and str(new_stock).isdigit()
+            and int(new_stock) > 0
+        )
+
         # Détecter si le contenu textuel change → re-modération obligatoire
         content_changed = (
             'title'       in request.data and request.data['title']       != instance.title or
             'description' in request.data and request.data['description'] != instance.description
         )
+
         response = super().update(request, *args, **kwargs)
-        if content_changed:
+
+        instance.refresh_from_db()
+
+        if stock_reactivation and not content_changed:
+            # Réactiver directement — le produit était déjà approuvé avant
+            instance.status = Listing.Status.ACTIVE
+            instance.save(update_fields=['status'])
+        elif content_changed:
             # Repasser en DRAFT le temps de la re-modération
-            instance.refresh_from_db()
             instance.status = Listing.Status.DRAFT
             instance.save(update_fields=['status'])
             try:
@@ -197,6 +217,50 @@ class ListingDetailView(generics.RetrieveUpdateDestroyAPIView):
                 {'error': 'Vous ne pouvez supprimer que vos propres annonces.'},
                 status=status.HTTP_403_FORBIDDEN
             )
+
+
+class UpdateStockView(APIView):
+    """
+    PATCH /api/v1/listings/<pk>/stock/
+    Body: { "stock_qty": <int> }
+
+    Permet au vendeur de mettre à jour uniquement le stock d'un produit.
+    - stock_qty = null  → stock illimité (comportement annonce classique)
+    - stock_qty = 0     → rupture, annonce dépubliée
+    - stock_qty > 0     → si l'annonce était expirée pour rupture → réactivée automatiquement
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request, pk):
+        listing = get_object_or_404(Listing, pk=pk)
+        if listing.seller != request.user:
+            return Response({'error': 'Action non autorisée.'}, status=status.HTTP_403_FORBIDDEN)
+
+        raw = request.data.get('stock_qty')
+        # None ou "" → stock illimité
+        if raw is None or raw == '':
+            listing.stock_qty = None
+            listing.save(update_fields=['stock_qty'])
+            return Response({'stock_qty': None, 'status': listing.status})
+
+        try:
+            new_qty = int(raw)
+            if new_qty < 0:
+                raise ValueError
+        except (ValueError, TypeError):
+            return Response({'error': 'stock_qty doit être un entier ≥ 0.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        was_out_of_stock = (listing.stock_qty == 0 and listing.status == Listing.Status.EXPIRED)
+
+        listing.stock_qty = new_qty
+        if new_qty == 0 and listing.status == Listing.Status.ACTIVE:
+            listing.status = Listing.Status.EXPIRED
+        elif new_qty > 0 and was_out_of_stock:
+            # Réapprovisionnement → réactiver l'annonce
+            listing.status = Listing.Status.ACTIVE
+        listing.save(update_fields=['stock_qty', 'status'])
+
+        return Response({'stock_qty': listing.stock_qty, 'status': listing.status})
         # Soft-delete : suspendre l'annonce
         was_active = instance.status == Listing.Status.ACTIVE
         instance.status = Listing.Status.SUSPENDED

@@ -340,7 +340,7 @@ def disburse_to_livreur(weekly_payout_id: str) -> PaymentResult:
             }
             _channel2    = _ch_map2.get(provider or '', 'orange_money')
             _notify_url2 = getattr(settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
-                                   'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/')
+                                   'https://guimatrix.onrender.com/api/v1/orders/webhook/chachap/payout/')
             _body2 = {
                 'account_number':  phone,
                 'amount':          amount,
@@ -515,7 +515,7 @@ def disburse_to_seller(payout_id: str) -> PaymentResult:
             }
             _channel    = _ch_map.get(payout.provider or '', 'orange_money')
             _notify_url = getattr(settings, 'CHACHAP_PAYOUT_WEBHOOK_URL',
-                                  'https://guineemarche.onrender.com/api/v1/orders/webhook/chachap/payout/')
+                                  'https://guimatrix.onrender.com/api/v1/orders/webhook/chachap/payout/')
             _order_ref  = str(payout.order_id)[:8].upper()
             _body = {
                 'account_number':  phone,

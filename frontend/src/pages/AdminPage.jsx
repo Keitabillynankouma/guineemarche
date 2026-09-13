@@ -1077,7 +1077,7 @@ function TabSettings() {
           {emailEdit ? (
             <div className="flex gap-2">
               <input value={emailVal} onChange={e => setEmailVal(e.target.value)}
-                placeholder="support@guineemarche.com"
+                placeholder="support@guimatrix.com"
                 type="email"
                 className="border border-gray-200 rounded-xl px-3 py-1.5 text-sm w-48 focus:outline-none focus:ring-2 focus:ring-blue-400"
               />

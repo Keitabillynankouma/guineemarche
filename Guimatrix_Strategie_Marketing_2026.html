@@ -1,0 +1,710 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Guimatrix — Stratégie Marketing 2026-2027</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  :root {
+    --primary: #1B4F72;
+    --accent: #E67E22;
+    --accent2: #F39C12;
+    --green: #1E8449;
+    --dark: #1C2833;
+    --gray: #7F8C8D;
+    --light: #EBF5FB;
+    --light-orange: #FEF9E7;
+    --light-green: #EAFAF1;
+    --white: #FFFFFF;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Inter', 'Segoe UI', Arial, sans-serif;
+    font-size: 13px;
+    color: var(--dark);
+    background: #f4f4f4;
+    line-height: 1.65;
+  }
+
+  .page {
+    width: 210mm;
+    min-height: 297mm;
+    margin: 0 auto 20px;
+    background: white;
+    padding: 18mm 18mm 16mm;
+    box-shadow: 0 4px 24px rgba(0,0,0,0.12);
+    position: relative;
+  }
+
+  /* HEADER */
+  .doc-header {
+    border-bottom: 2px solid var(--accent);
+    padding-bottom: 6px;
+    margin-bottom: 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    font-size: 10px;
+    color: var(--gray);
+  }
+  .doc-header .brand { font-weight: 700; color: var(--primary); font-size: 11px; }
+  .doc-header .conf { color: var(--accent); font-weight: 600; }
+
+  /* COVER */
+  .cover {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 240mm;
+    text-align: center;
+    gap: 0;
+  }
+  .cover-logo {
+    width: 80px;
+    height: 80px;
+    background: var(--primary);
+    border-radius: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    margin-bottom: 28px;
+    box-shadow: 0 8px 32px rgba(27,79,114,0.25);
+  }
+  .cover h1 {
+    font-size: 52px;
+    font-weight: 900;
+    color: var(--primary);
+    letter-spacing: -1px;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .cover .tagline {
+    font-size: 16px;
+    color: var(--accent);
+    font-weight: 500;
+    font-style: italic;
+    margin-bottom: 32px;
+  }
+  .cover-divider {
+    width: 80px;
+    height: 4px;
+    background: var(--accent);
+    border-radius: 2px;
+    margin: 0 auto 32px;
+  }
+  .cover h2 {
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--dark);
+    margin-bottom: 10px;
+    letter-spacing: -0.5px;
+  }
+  .cover .subtitle {
+    font-size: 15px;
+    color: var(--gray);
+    margin-bottom: 60px;
+  }
+  .cover-badges {
+    display: flex;
+    gap: 16px;
+    justify-content: center;
+    margin-bottom: 60px;
+  }
+  .badge {
+    background: var(--light);
+    border: 1.5px solid #BCD6E8;
+    border-radius: 12px;
+    padding: 12px 18px;
+    text-align: center;
+  }
+  .badge .icon { font-size: 22px; display: block; margin-bottom: 4px; }
+  .badge .label { font-size: 11px; font-weight: 600; color: var(--primary); }
+  .cover-footer {
+    font-size: 11px;
+    color: var(--gray);
+    font-style: italic;
+    border-top: 1px solid #eee;
+    padding-top: 16px;
+    width: 100%;
+  }
+
+  /* CONTENT STYLES */
+  h1.section {
+    font-size: 22px;
+    font-weight: 800;
+    color: var(--primary);
+    margin: 28px 0 14px;
+    padding-bottom: 8px;
+    border-bottom: 3px solid var(--accent);
+    letter-spacing: -0.3px;
+  }
+  h2.sub {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 20px 0 8px;
+  }
+  h3.mini {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--accent);
+    margin: 16px 0 6px;
+  }
+  h3.mini.green { color: var(--green); }
+  p { margin-bottom: 9px; text-align: justify; font-size: 12.5px; }
+
+  /* PHASE HEADER */
+  .phase-header {
+    border-radius: 10px;
+    padding: 14px 20px;
+    margin: 24px 0 14px;
+    color: white;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  .phase-header.blue { background: var(--primary); }
+  .phase-header.orange { background: var(--accent); }
+  .phase-header.green { background: var(--green); }
+  .phase-header .num {
+    font-size: 32px;
+    font-weight: 900;
+    opacity: 0.3;
+    line-height: 1;
+  }
+  .phase-header .info { flex: 1; }
+  .phase-header .title { font-size: 16px; font-weight: 800; }
+  .phase-header .period { font-size: 11px; opacity: 0.85; margin-top: 2px; }
+  .phase-header .goal { font-size: 11px; background: rgba(255,255,255,0.2); border-radius: 6px; padding: 3px 10px; white-space: nowrap; font-weight: 600; }
+
+  /* CARDS */
+  .card-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin: 12px 0;
+  }
+  .card {
+    background: var(--light);
+    border: 1px solid #BCD6E8;
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .card .card-title { font-weight: 700; color: var(--primary); font-size: 12px; margin-bottom: 5px; }
+  .card p { font-size: 11.5px; text-align: left; margin: 0; }
+
+  /* TABLES */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0;
+    font-size: 11.5px;
+  }
+  th {
+    background: var(--primary);
+    color: white;
+    font-weight: 700;
+    padding: 8px 10px;
+    text-align: left;
+  }
+  td {
+    padding: 7px 10px;
+    border-bottom: 1px solid #E8F4F8;
+  }
+  tr:nth-child(even) td { background: var(--light); }
+  tr:last-child td { background: var(--light-orange); font-weight: 700; color: var(--accent); }
+
+  /* COMPETITOR TABLE */
+  .comp-table th:first-child { border-radius: 6px 0 0 0; }
+  .comp-table th:last-child { border-radius: 0 6px 0 0; }
+  .comp-table tr:last-child td { background: #f9f9f9; font-weight: 400; color: var(--dark); }
+
+  /* KPI TABLE */
+  .kpi-table th { background: var(--dark); }
+  .kpi-table tr:last-child td { background: var(--light-green); color: var(--green); font-weight: 700; }
+
+  /* HIGHLIGHT BOXES */
+  .info-box {
+    border-radius: 10px;
+    padding: 14px 16px;
+    margin: 12px 0;
+    border-left: 4px solid;
+  }
+  .info-box.blue { background: var(--light); border-color: var(--primary); }
+  .info-box.orange { background: var(--light-orange); border-color: var(--accent); }
+  .info-box.green { background: var(--light-green); border-color: var(--green); }
+  .info-box strong { display: block; margin-bottom: 4px; font-size: 12px; }
+  .info-box.blue strong { color: var(--primary); }
+  .info-box.orange strong { color: var(--accent); }
+  .info-box.green strong { color: var(--green); }
+  .info-box p { font-size: 12px; margin: 0; text-align: left; }
+
+  /* BULLET LIST */
+  ul.styled { list-style: none; padding: 0; margin: 8px 0; }
+  ul.styled li { padding: 5px 0 5px 20px; position: relative; font-size: 12px; border-bottom: 1px solid #f0f0f0; }
+  ul.styled li::before { content: '▸'; position: absolute; left: 0; color: var(--accent); font-weight: 700; }
+  ul.styled li:last-child { border-bottom: none; }
+  ul.styled li strong { color: var(--primary); }
+
+  /* QUOTE BOX */
+  .quote-box {
+    background: var(--primary);
+    border-radius: 12px;
+    padding: 20px 24px;
+    margin: 20px 0;
+    text-align: center;
+    color: white;
+  }
+  .quote-box .quote { font-size: 15px; font-weight: 700; font-style: italic; margin-bottom: 8px; }
+  .quote-box .author { font-size: 11px; color: var(--accent2); font-weight: 600; }
+
+  /* FOOTER */
+  .doc-footer {
+    border-top: 1px solid #eee;
+    padding-top: 8px;
+    margin-top: 20px;
+    display: flex;
+    justify-content: space-between;
+    font-size: 10px;
+    color: var(--gray);
+  }
+
+  /* EXEC SUMMARY CARDS */
+  .kpi-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin: 14px 0;
+  }
+  .kpi-card {
+    background: var(--light);
+    border: 1.5px solid #BCD6E8;
+    border-radius: 10px;
+    padding: 12px;
+    text-align: center;
+  }
+  .kpi-card .icon { font-size: 24px; margin-bottom: 4px; }
+  .kpi-card .label { font-size: 11px; font-weight: 700; color: var(--primary); }
+  .kpi-card .value { font-size: 10px; color: var(--gray); margin-top: 2px; }
+
+  @media print {
+    body { background: white; }
+    .page { margin: 0; box-shadow: none; page-break-after: always; }
+    .page:last-child { page-break-after: avoid; }
+    @page { size: A4; margin: 0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: COUVERTURE -->
+<div class="page">
+  <div class="cover">
+    <div class="cover-logo">🛍️</div>
+    <h1>GUIMATRIX</h1>
+    <p class="tagline">Marketplace de confiance — Guinée Conakry</p>
+    <div class="cover-divider"></div>
+    <h2>STRATÉGIE MARKETING</h2>
+    <p class="subtitle">Lancement &amp; Croissance 2026 – 2027</p>
+
+    <div class="cover-badges">
+      <div class="badge">
+        <span class="icon">🛡️</span>
+        <span class="label">Escrow<br>Intégré</span>
+      </div>
+      <div class="badge">
+        <span class="icon">📱</span>
+        <span class="label">App Mobile<br>Native</span>
+      </div>
+      <div class="badge">
+        <span class="icon">🚚</span>
+        <span class="label">GPS<br>Temps réel</span>
+      </div>
+      <div class="badge">
+        <span class="icon">💰</span>
+        <span class="label">OM · MTN<br>PayCard</span>
+      </div>
+    </div>
+
+    <div class="cover-footer">
+      Document confidentiel — Réservé aux partenaires &nbsp;|&nbsp; Septembre 2026
+    </div>
+  </div>
+</div>
+
+<!-- PAGE 2: RÉSUMÉ EXÉCUTIF + MARCHÉ -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Stratégie Marketing 2026-2027</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <h1 class="section">01 — Résumé Exécutif</h1>
+
+  <p>Guimatrix est la première marketplace guinéenne intégrant un système d'<strong>escrow (séquestre)</strong> qui protège l'argent de l'acheteur jusqu'à la livraison confirmée. L'application connecte acheteurs, vendeurs et livreurs au sein d'un écosystème digital sécurisé, entièrement adapté aux réalités du marché guinéen.</p>
+
+  <p>Ce document présente la stratégie marketing sur <strong>12 mois en trois phases progressives</strong>, pour établir Guimatrix comme la référence du commerce en ligne en Guinée.</p>
+
+  <div class="kpi-row">
+    <div class="kpi-card">
+      <div class="icon">🛡️</div>
+      <div class="label">Escrow Unique</div>
+      <div class="value">Aucun concurrent ne l'a</div>
+    </div>
+    <div class="kpi-card">
+      <div class="icon">📍</div>
+      <div class="label">GPS Live</div>
+      <div class="value">Suivi livreur en temps réel</div>
+    </div>
+    <div class="kpi-card">
+      <div class="icon">💸</div>
+      <div class="label">Paiement Auto</div>
+      <div class="value">OM / MTN / PayCard</div>
+    </div>
+    <div class="kpi-card">
+      <div class="icon">📱</div>
+      <div class="label">App Native</div>
+      <div class="value">iOS &amp; Android</div>
+    </div>
+  </div>
+
+  <h1 class="section">02 — Analyse du Marché</h1>
+
+  <h2 class="sub">Contexte e-commerce en Guinée</h2>
+  <p>Le marché guinéen du e-commerce est en pleine émergence. La pénétration mobile dépasse <strong>80% à Conakry</strong> et le Mobile Money (Orange Money, MTN MoMo) est devenu le moyen de paiement dominant, avec plus de 5 millions d'utilisateurs actifs. Cette infrastructure crée une opportunité historique pour une marketplace locale adaptée aux usages réels.</p>
+
+  <div class="info-box orange">
+    <strong>🔑 Le problème fondamental du marché</strong>
+    <p>Le principal frein à l'adoption du e-commerce en Guinée n'est pas technologique : c'est la <strong>méfiance</strong>. Les consommateurs ont peur de payer sans garantie de recevoir leur commande. Guimatrix adresse directement ce problème avec son système d'escrow — une première absolue sur le marché guinéen.</p>
+  </div>
+
+  <h2 class="sub">Analyse Concurrentielle</h2>
+
+  <table class="comp-table">
+    <thead>
+      <tr>
+        <th>Concurrent</th>
+        <th>Modèle</th>
+        <th>Forces</th>
+        <th>Faiblesses vs Guimatrix</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>CoinAfrique</strong></td>
+        <td>Petites annonces</td>
+        <td>Large audience, app mobile</td>
+        <td>Pas de paiement ni livraison ni escrow</td>
+      </tr>
+      <tr>
+        <td><strong>Margaarou</strong></td>
+        <td>Marketplace locale</td>
+        <td>Interface moderne</td>
+        <td>Pas d'escrow, peu connue, pas d'app native</td>
+      </tr>
+      <tr>
+        <td><strong>MadinaStores</strong></td>
+        <td>Boutique en ligne</td>
+        <td>Visa / PayPal acceptés</td>
+        <td>Pas marketplace P2P, pas de GPS livreur</td>
+      </tr>
+      <tr>
+        <td><strong>Jemadina</strong></td>
+        <td>Livraison rapide</td>
+        <td>2h à Conakry, paiement livraison</td>
+        <td>WhatsApp only, pas de vraie plateforme</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h2 class="sub">Avantages Concurrentiels Exclusifs de Guimatrix</h2>
+  <ul class="styled">
+    <li><strong>Système escrow :</strong> L'argent est bloqué à la commande et libéré seulement après confirmation. Unique en Guinée.</li>
+    <li><strong>GPS tracking temps réel :</strong> L'acheteur suit son livreur sur carte. Aucun concurrent ne propose cette transparence.</li>
+    <li><strong>App mobile native :</strong> Interface dédiée pour acheteurs, vendeurs et livreurs avec tableau de bord complet.</li>
+    <li><strong>Virements automatiques vendeurs :</strong> Paiement direct sur Orange Money ou PayCard après chaque commande complétée.</li>
+    <li><strong>Système de retours structuré :</strong> Remboursements gérés avec traçabilité complète — absent chez tous les concurrents.</li>
+  </ul>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- PAGE 3: STRATÉGIE PHASE 1 & 2 -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Stratégie Marketing 2026-2027</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <h1 class="section">03 — Stratégie Marketing — 3 Phases sur 12 Mois</h1>
+
+  <p>La stratégie se déploie en trois phases progressives, chacune construisant sur les acquis de la précédente, avec des objectifs mesurables et des budgets adaptés au marché guinéen.</p>
+
+  <!-- PHASE 1 -->
+  <div class="phase-header blue">
+    <div class="num">01</div>
+    <div class="info">
+      <div class="title">Lancement &amp; Construction de la base</div>
+      <div class="period">Mois 1 à 3</div>
+    </div>
+    <div class="goal">🎯 500 vendeurs actifs</div>
+  </div>
+
+  <p>La priorité absolue est de construire une masse critique de vendeurs avant de pousser les acheteurs. Sans catalogue suffisant, aucune campagne ne sera efficace.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title">📱 WhatsApp — Canal principal</div>
+      <p>Groupe "Vendeurs Guimatrix", canal "Bons plans", stories quotidiennes de transactions réussies. Publication journalière : annonce mise en avant + témoignage vendeur + argument sécurité. Coût : nul. Impact : immédiat.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🏪 Terrain — Marchés de Conakry</div>
+      <p>Équipe terrain sur les marchés de Madina, Cosa, Niger et Kaloum. Démonstrations live sur téléphone. Objectif : inscrire les commerçants sur place en 5 minutes. Budget : ~3 500 000 GNF. Estimation : 200 vendeurs inscrits.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">🔗 Programme de Parrainage Viral</div>
+      <p>Chaque vendeur qui parraine un autre actif reçoit une réduction de commission pendant 1 mois. Le nouveau vendeur démarre à 3% au lieu du taux standard. Ce mécanisme transforme chaque vendeur en ambassadeur actif.</p>
+    </div>
+    <div class="card">
+      <div class="card-title">📸 Collecte de Témoignages</div>
+      <p>Photographier et citer 10 premiers vendeurs satisfaits. Ces preuves sociales locales sont le fondement de toute la communication future. Sans témoignages authentiques, aucune publicité ne sera crédible.</p>
+    </div>
+  </div>
+
+  <!-- PHASE 2 -->
+  <div class="phase-header orange">
+    <div class="num">02</div>
+    <div class="info">
+      <div class="title">Croissance &amp; Confiance Publique</div>
+      <div class="period">Mois 4 à 6</div>
+    </div>
+    <div class="goal">🎯 2 000 utilisateurs actifs</div>
+  </div>
+
+  <p>Cette phase établit Guimatrix comme une marque reconnue et digne de confiance à Conakry, en multipliant les preuves sociales et en s'appuyant sur des partenariats stratégiques.</p>
+
+  <h3 class="mini">2.1 — Campagne Témoignages Vidéo</h3>
+  <p>Filmer 10 vendeurs et 10 acheteurs satisfaits en format 30 secondes. Visage guinéen, histoire authentique, montant reçu. Diffusion sur WhatsApp, Facebook et TikTok Guinée. Exemple de script : <em>"Je m'appelle Mamadou, je vends des téléphones au marché Madina. J'ai mis mon annonce sur Guimatrix un lundi, j'ai reçu mon argent sur Orange Money le mercredi."</em></p>
+
+  <h3 class="mini">2.2 — Publicité Facebook &amp; Instagram ciblée</h3>
+  <div class="info-box blue">
+    <strong>💡 Opportunité : Coût publicitaire parmi les plus bas du monde</strong>
+    <p>Le CPM Facebook en Guinée est inférieur à <strong>1 USD</strong>. Un budget de <strong>200$/mois</strong> touche 200 000 personnes à Conakry. Ciblage : 18-45 ans, Conakry et périphérie, intérêts commerce et mobile money. A/B test : "Achetez en sécurité" vs "Vendez et soyez payé automatiquement".</p>
+  </div>
+
+  <h3 class="mini">2.3 — Partenariat Livreurs &amp; Radio</h3>
+  <p>Recruter des moto-taxis comme livreurs partenaires avec un revenu hebdomadaire garanti. Chaque livreur devient un ambassadeur mobile. En parallèle, un spot radio 30 secondes sur Espace FM ou Djoma FM (3 passages/jour) touche une audience massive pour ~2 000 000 GNF/mois.</p>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- PAGE 4: PHASE 3 + BUDGET + KPIs -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Stratégie Marketing 2026-2027</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <!-- PHASE 3 -->
+  <div class="phase-header green">
+    <div class="num">03</div>
+    <div class="info">
+      <div class="title">Domination &amp; Ouverture Diaspora</div>
+      <div class="period">Mois 7 à 12</div>
+    </div>
+    <div class="goal">🎯 5 000 vendeurs · 20 000 acheteurs</div>
+  </div>
+
+  <p>Cette phase consolide la position dominante de Guimatrix et ouvre des segments de marché à fort potentiel inexploités par les concurrents.</p>
+
+  <div class="card-grid">
+    <div class="card">
+      <div class="card-title" style="color: var(--green);">⭐ Programme Vendeur Vedette</div>
+      <p>Chaque semaine, mettre en avant un vendeur sur tous les canaux avec sa photo, son histoire et ses produits. Les vendeurs partagent spontanément cette publication — publicité virale et gratuite. Crée aussi fidélité et appartenance.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color: var(--green);">✈️ Segment Diaspora Guinéenne</div>
+      <p>+500 000 Guinéens en France, USA, Canada veulent envoyer des cadeaux à Conakry sans passer par Western Union. Intégrer un paiement par carte internationale ouvre un marché inexploité par tous les concurrents locaux.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color: var(--green);">🔍 SEO — Annonces publiques Google</div>
+      <p>Rendre les annonces indexables sur Google. Chaque annonce devient une page visible pour "vendre iPhone Conakry" ou "acheter moto Guinée". Trafic permanent et gratuit, sans dépense publicitaire récurrente.</p>
+    </div>
+    <div class="card">
+      <div class="card-title" style="color: var(--green);">🎓 Partenariat Universités</div>
+      <p>Commission préférentielle pour les étudiants inscrits avec leur carte (Gamal Abdel Nasser, Kofi Annan, ISIG). Des dizaines de milliers d'utilisateurs jeunes et connectés — les meilleurs ambassadeurs d'une app.</p>
+    </div>
+  </div>
+
+  <h1 class="section">04 — Budget Marketing Estimé</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">Action marketing</th>
+        <th>Phase 1 (mois 1-3)</th>
+        <th>Phase 2 (mois 4-6)</th>
+        <th>Phase 3 (mois 7-12)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Terrain, flyers &amp; démonstrations</td>
+        <td>3 500 000 GNF</td>
+        <td>2 000 000 GNF</td>
+        <td>1 000 000 GNF</td>
+      </tr>
+      <tr>
+        <td>Facebook / Instagram Ads</td>
+        <td>1 000 000 GNF</td>
+        <td>3 000 000 GNF</td>
+        <td>5 000 000 GNF</td>
+      </tr>
+      <tr>
+        <td>Radio (Espace FM / Djoma FM)</td>
+        <td>—</td>
+        <td>2 000 000 GNF</td>
+        <td>2 000 000 GNF</td>
+      </tr>
+      <tr>
+        <td>Production vidéo témoignages</td>
+        <td>—</td>
+        <td>1 500 000 GNF</td>
+        <td>1 000 000 GNF</td>
+      </tr>
+      <tr>
+        <td>Programme parrainage (bonus)</td>
+        <td>1 500 000 GNF</td>
+        <td>1 500 000 GNF</td>
+        <td>2 000 000 GNF</td>
+      </tr>
+      <tr>
+        <td><strong>TOTAL MENSUEL ESTIMÉ</strong></td>
+        <td>~4 000 000 GNF</td>
+        <td>~8 000 000 GNF</td>
+        <td>~11 000 000 GNF</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h1 class="section">05 — Indicateurs de Performance (KPIs)</h1>
+
+  <table class="kpi-table">
+    <thead>
+      <tr>
+        <th style="width:40%">Indicateur clé</th>
+        <th>Fin Phase 1</th>
+        <th>Fin Phase 2</th>
+        <th>Fin Phase 3</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Vendeurs actifs</td>
+        <td>500</td>
+        <td>1 500</td>
+        <td>5 000</td>
+      </tr>
+      <tr>
+        <td>Acheteurs inscrits</td>
+        <td>1 000</td>
+        <td>5 000</td>
+        <td>20 000</td>
+      </tr>
+      <tr>
+        <td>Commandes / mois</td>
+        <td>200</td>
+        <td>1 000</td>
+        <td>5 000</td>
+      </tr>
+      <tr>
+        <td>Livreurs partenaires</td>
+        <td>20</td>
+        <td>50</td>
+        <td>150</td>
+      </tr>
+      <tr>
+        <td>Volume GMV (GNF / mois)</td>
+        <td>50 000 000</td>
+        <td>300 000 000</td>
+        <td>1 500 000 000</td>
+      </tr>
+      <tr>
+        <td><strong>Note moyenne app stores</strong></td>
+        <td>4.0 / 5</td>
+        <td>4.2 / 5</td>
+        <td><strong>4.5 / 5</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 4</span>
+  </div>
+</div>
+
+<!-- PAGE 5: CONCLUSION -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Stratégie Marketing 2026-2027</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <h1 class="section">06 — Conclusion &amp; Vision</h1>
+
+  <p>Guimatrix dispose d'un avantage concurrentiel unique et défendable : le <strong>seul système d'escrow opérationnel</strong> sur le marché guinéen. Dans un environnement où la confiance est le frein principal à l'adoption du e-commerce, cette fonctionnalité est un argument marketing d'une puissance exceptionnelle qu'aucun concurrent ne peut revendiquer aujourd'hui.</p>
+
+  <p>La stratégie présentée est délibérément ancrée dans les réalités guinéennes : prédominance de WhatsApp, importance du bouche-à-oreille, marchés physiques comme lieux d'acquisition, Mobile Money comme infrastructure de paiement. Elle ne cherche pas à importer un modèle occidental mais à construire une plateforme <strong>profondément locale et adaptée</strong>.</p>
+
+  <div class="info-box green">
+    <strong>🚀 Pourquoi Guimatrix va gagner</strong>
+    <p>Avec une exécution rigoureuse des trois phases et un investissement marketing progressif et maîtrisé, Guimatrix a la capacité de devenir <strong>la référence incontournable du commerce en ligne en Guinée d'ici fin 2027</strong>. L'écosystème complet — marketplace + livreurs + paiements automatiques + escrow — représente une barrière à l'entrée que les concurrents ne peuvent pas répliquer rapidement.</p>
+  </div>
+
+  <h2 class="sub">Priorité immédiate — Action à lancer cette semaine</h2>
+  <ul class="styled">
+    <li><strong>Collecter 10 témoignages vidéo</strong> de vendeurs et acheteurs satisfaits. Sans preuve sociale locale, aucune publicité ne sera crédible.</li>
+    <li><strong>Créer le groupe WhatsApp "Vendeurs Guimatrix"</strong> et commencer la publication quotidienne dès aujourd'hui.</li>
+    <li><strong>Planifier la première journée terrain</strong> au marché de Madina avec démonstration live.</li>
+    <li><strong>Activer le programme de parrainage</strong> pour les premiers 50 vendeurs inscrits.</li>
+  </ul>
+
+  <div class="quote-box">
+    <div class="quote">"Achetez et vendez en toute sécurité — votre argent protégé jusqu'à la livraison."</div>
+    <div class="author">Guimatrix — La marketplace de confiance de la Guinée</div>
+  </div>
+
+  <div style="margin-top: 32px; padding-top: 16px; border-top: 2px solid var(--light); display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+      <p style="font-size: 11px; color: var(--gray); margin: 0;">Document préparé par</p>
+      <p style="font-size: 13px; font-weight: 700; color: var(--primary); margin: 2px 0;">Équipe Guimatrix</p>
+      <p style="font-size: 11px; color: var(--gray); margin: 0;">bnkeita020@gmail.com</p>
+    </div>
+    <div style="text-align: right;">
+      <p style="font-size: 11px; color: var(--gray); margin: 0;">Conakry, Guinée</p>
+      <p style="font-size: 11px; color: var(--gray); margin: 0;">Septembre 2026</p>
+      <p style="font-size: 11px; color: var(--accent); font-weight: 600; margin-top: 4px;">CONFIDENTIEL</p>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 5</span>
+  </div>
+</div>
+
+</body>
+</html>
