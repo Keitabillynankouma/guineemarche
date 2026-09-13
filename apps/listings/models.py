@@ -89,6 +89,12 @@ class Listing(BaseModel):
     # Attributs dynamiques selon catégorie (ex: {"brand":"Toyota","year":"2020"})
     attributes  = models.JSONField(default=dict, blank=True)
 
+    # Gestion du stock — null = illimité (annonce classique), int ≥ 0 = stock géré
+    stock_qty   = models.PositiveIntegerField(
+        null=True, blank=True,
+        help_text="Quantité en stock. Null = illimité. 0 = rupture (annonce gardée mais non commandable)."
+    )
+
     # Stats & boost
     view_count      = models.PositiveIntegerField(default=0)
     is_boosted      = models.BooleanField(default=False, db_index=True)

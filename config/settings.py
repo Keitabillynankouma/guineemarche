@@ -82,6 +82,7 @@ LOCAL_APPS = [
     'apps.orders',
     'apps.reviews',
     'apps.notifications',
+    'apps.affiliates',
     'core',
 ]
 

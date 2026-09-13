@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Guimatrix — Sources de Revenus & Tarifs</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  :root {
+    --primary: #1B4F72; --accent: #E67E22; --green: #1E8449;
+    --dark: #1C2833; --gray: #7F8C8D; --light: #EBF5FB;
+    --light-orange: #FEF9E7; --light-green: #EAFAF1; --white: #fff;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; font-size:13px; color:var(--dark); background:#f4f4f4; }
+  .page { width:210mm; min-height:297mm; margin:0 auto 20px; background:white; padding:16mm 18mm; box-shadow:0 4px 24px rgba(0,0,0,.12); }
+  .doc-header { border-bottom:2px solid var(--accent); padding-bottom:6px; margin-bottom:20px; display:flex; justify-content:space-between; align-items:flex-end; font-size:10px; color:var(--gray); }
+  .doc-header .brand { font-weight:700; color:var(--primary); font-size:11px; }
+  .doc-header .conf { color:var(--accent); font-weight:600; }
+  .doc-footer { border-top:1px solid #eee; padding-top:8px; margin-top:20px; display:flex; justify-content:space-between; font-size:10px; color:var(--gray); }
+
+  /* COVER */
+  .cover { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:240mm; text-align:center; }
+  .cover-logo { width:72px; height:72px; background:var(--primary); border-radius:18px; display:flex; align-items:center; justify-content:center; font-size:32px; margin-bottom:24px; }
+  .cover h1 { font-size:48px; font-weight:900; color:var(--primary); margin-bottom:6px; }
+  .cover .tagline { font-size:15px; color:var(--accent); font-style:italic; margin-bottom:24px; }
+  .cover-divider { width:60px; height:3px; background:var(--accent); border-radius:2px; margin:0 auto 24px; }
+  .cover h2 { font-size:24px; font-weight:800; color:var(--dark); margin-bottom:8px; }
+  .cover .sub { font-size:13px; color:var(--gray); margin-bottom:48px; }
+  .cover-badges { display:flex; gap:12px; justify-content:center; margin-bottom:48px; }
+  .badge { background:var(--light); border:1.5px solid #BCD6E8; border-radius:10px; padding:10px 14px; text-align:center; }
+  .badge .icon { font-size:20px; display:block; margin-bottom:3px; }
+  .badge .label { font-size:10px; font-weight:700; color:var(--primary); }
+  .cover-footer { font-size:11px; color:var(--gray); font-style:italic; border-top:1px solid #eee; padding-top:14px; width:100%; }
+
+  /* SECTIONS */
+  h1.section { font-size:20px; font-weight:800; color:var(--primary); margin:24px 0 12px; padding-bottom:7px; border-bottom:3px solid var(--accent); }
+  h2.sub { font-size:14px; font-weight:700; color:var(--primary); margin:18px 0 8px; }
+  p { margin-bottom:8px; text-align:justify; font-size:12.5px; line-height:1.6; }
+
+  /* REVENUE CARDS */
+  .rev-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:14px 0; }
+  .rev-card { border-radius:12px; overflow:hidden; box-shadow:0 2px 8px rgba(0,0,0,.06); }
+  .rev-card-header { padding:12px 14px 8px; display:flex; align-items:center; gap:10px; }
+  .rev-card-header .emoji { font-size:22px; }
+  .rev-card-header .info .title { font-size:13px; font-weight:700; }
+  .rev-card-header .info .type { font-size:10px; opacity:.8; font-weight:500; }
+  .rev-card-body { background:white; padding:10px 14px 12px; }
+  .rev-card-body .rate { font-size:22px; font-weight:900; margin-bottom:4px; }
+  .rev-card-body .desc { font-size:11px; color:var(--gray); line-height:1.5; }
+  .rev-card-body .example { margin-top:6px; font-size:11px; background:#f8f8f8; border-radius:6px; padding:6px 8px; border-left:3px solid; }
+
+  .card-blue .rev-card-header { background:var(--primary); color:white; }
+  .card-blue .rev-card-body .rate { color:var(--primary); }
+  .card-blue .rev-card-body .example { border-color:var(--primary); color:var(--primary); }
+
+  .card-orange .rev-card-header { background:var(--accent); color:white; }
+  .card-orange .rev-card-body .rate { color:var(--accent); }
+  .card-orange .rev-card-body .example { border-color:var(--accent); color:#8a4a00; }
+
+  .card-green .rev-card-header { background:var(--green); color:white; }
+  .card-green .rev-card-body .rate { color:var(--green); }
+  .card-green .rev-card-body .example { border-color:var(--green); color:var(--green); }
+
+  .card-purple .rev-card-header { background:#6C3483; color:white; }
+  .card-purple .rev-card-body .rate { color:#6C3483; }
+  .card-purple .rev-card-body .example { border-color:#6C3483; color:#6C3483; }
+
+  /* TABLES */
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:11.5px; }
+  th { background:var(--primary); color:white; font-weight:700; padding:8px 10px; text-align:left; }
+  td { padding:7px 10px; border-bottom:1px solid #E8F4F8; }
+  tr:nth-child(even) td { background:var(--light); }
+  tr.total td { background:var(--light-orange); font-weight:700; color:var(--accent); }
+
+  /* AFFILIATE TREE */
+  .tree-box { background:var(--light); border:1.5px solid #BCD6E8; border-radius:12px; padding:16px 20px; margin:14px 0; }
+  .tree-level { display:flex; align-items:flex-start; gap:12px; margin-bottom:14px; }
+  .tree-level:last-child { margin-bottom:0; }
+  .tree-dot { width:36px; height:36px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:16px; shrink:0; flex-shrink:0; }
+  .dot-1 { background:#E74C3C; }
+  .dot-2 { background:var(--accent); }
+  .dot-3 { background:var(--primary); }
+  .dot-4 { background:var(--green); }
+  .tree-content .who { font-size:12px; font-weight:700; margin-bottom:2px; }
+  .tree-content .what { font-size:11px; color:var(--gray); }
+  .tree-content .rate-badge { display:inline-block; background:white; border-radius:20px; padding:2px 10px; font-size:11px; font-weight:700; margin-top:4px; border:1.5px solid; }
+  .badge-red { color:#E74C3C; border-color:#E74C3C; }
+  .badge-orange { color:var(--accent); border-color:var(--accent); }
+  .badge-blue { color:var(--primary); border-color:var(--primary); }
+  .badge-green { color:var(--green); border-color:var(--green); }
+  .tree-arrow { font-size:20px; color:#ccc; margin:0 0 10px 16px; }
+
+  /* INFO BOX */
+  .info-box { border-radius:10px; padding:12px 16px; margin:12px 0; border-left:4px solid; }
+  .info-box.blue { background:var(--light); border-color:var(--primary); }
+  .info-box.orange { background:var(--light-orange); border-color:var(--accent); }
+  .info-box.green { background:var(--light-green); border-color:var(--green); }
+  .info-box strong { display:block; margin-bottom:4px; font-size:12px; }
+  .info-box.blue strong { color:var(--primary); }
+  .info-box.orange strong { color:var(--accent); }
+  .info-box.green strong { color:var(--green); }
+  .info-box p { font-size:12px; margin:0; text-align:left; }
+
+  /* SUMMARY BOX */
+  .summary-box { background:var(--primary); border-radius:12px; padding:18px 22px; color:white; margin:16px 0; }
+  .summary-box h3 { font-size:14px; font-weight:800; margin-bottom:12px; color:var(--accent2, #F39C12); }
+  .summary-row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border-bottom:1px solid rgba(255,255,255,.15); font-size:12px; }
+  .summary-row:last-child { border-bottom:none; font-weight:700; font-size:13px; color:#F1C40F; }
+  .summary-row .label { opacity:.9; }
+  .summary-row .val { font-weight:700; }
+
+  ul.styled { list-style:none; padding:0; margin:8px 0; }
+  ul.styled li { padding:5px 0 5px 18px; position:relative; font-size:12px; border-bottom:1px solid #f0f0f0; }
+  ul.styled li::before { content:'▸'; position:absolute; left:0; color:var(--accent); font-weight:700; }
+  ul.styled li:last-child { border-bottom:none; }
+  ul.styled li strong { color:var(--primary); }
+
+  @media print {
+    body { background:white; }
+    .page { margin:0; box-shadow:none; page-break-after:always; }
+    .page:last-child { page-break-after:avoid; }
+    @page { size:A4; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: COUVERTURE -->
+<div class="page">
+  <div class="cover">
+    <div class="cover-logo">💰</div>
+    <h1>GUIMATRIX</h1>
+    <p class="tagline">Marketplace de confiance — Guinée Conakry</p>
+    <div class="cover-divider"></div>
+    <h2>SOURCES DE REVENUS & TARIFS</h2>
+    <p class="sub">Modèle économique complet · Système d'affiliation · Tarification</p>
+    <div class="cover-badges">
+      <div class="badge"><span class="icon">📊</span><span class="label">Commission<br>Ventes</span></div>
+      <div class="badge"><span class="icon">🚚</span><span class="label">Frais<br>Livraison</span></div>
+      <div class="badge"><span class="icon">⭐</span><span class="label">Annonces<br>Premium</span></div>
+      <div class="badge"><span class="icon">🔗</span><span class="label">Affiliation<br>Influenceurs</span></div>
+    </div>
+    <div class="cover-footer">Document confidentiel — Réservé aux partenaires · Septembre 2026</div>
+  </div>
+</div>
+
+<!-- PAGE 2: SOURCES DE REVENUS -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Sources de Revenus & Tarifs</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <h1 class="section">01 — Sources de Revenus Principales</h1>
+  <p>Guimatrix génère des revenus à travers quatre sources complémentaires. Chacune peut fonctionner indépendamment et se renforce mutuellement au fur et à mesure de la croissance de la plateforme.</p>
+
+  <div class="rev-grid">
+
+    <div class="rev-card card-blue">
+      <div class="rev-card-header">
+        <span class="emoji">📊</span>
+        <div class="info"><div class="title">Commission sur Ventes</div><div class="type">Revenu principal · Par transaction</div></div>
+      </div>
+      <div class="rev-card-body">
+        <div class="rate">7 – 8 %</div>
+        <div class="desc">Prélevée automatiquement sur chaque vente complétée via l'escrow. Le vendeur reçoit le montant net après déduction de la commission et des frais ChapChap.</div>
+        <div class="example">💡 Ex : Vente 500 000 GNF → Commission Guimatrix : 35 000 GNF → Vendeur reçoit : ~460 000 GNF</div>
+      </div>
+    </div>
+
+    <div class="rev-card card-orange">
+      <div class="rev-card-header">
+        <span class="emoji">🚚</span>
+        <div class="info"><div class="title">Frais de Livraison</div><div class="type">Revenu secondaire · Par livraison</div></div>
+      </div>
+      <div class="rev-card-body">
+        <div class="rate">Marge sur livraison</div>
+        <div class="desc">L'acheteur paie les frais de livraison. Guimatrix verse une partie aux livreurs et garde une marge. Le livreur reçoit ~80% des frais, Guimatrix garde ~20%.</div>
+        <div class="example">💡 Ex : Frais livraison 15 000 GNF → Livreur : 12 000 GNF → Guimatrix : 3 000 GNF</div>
+      </div>
+    </div>
+
+    <div class="rev-card card-green">
+      <div class="rev-card-header">
+        <span class="emoji">⭐</span>
+        <div class="info"><div class="title">Annonces Premium / Boost</div><div class="type">Revenu additionnel · Abonnement</div></div>
+      </div>
+      <div class="rev-card-body">
+        <div class="rate">50 000 – 200 000 GNF/mois</div>
+        <div class="desc">Vendeurs qui veulent apparaître en tête de liste, badge "Vendeur Vérifié", ou boost de visibilité sur l'accueil. Trois formules : Starter, Pro, Business.</div>
+        <div class="example">💡 Starter 50k/mois · Pro 100k/mois (badge + top) · Business 200k/mois (accueil)</div>
+      </div>
+    </div>
+
+    <div class="rev-card card-purple">
+      <div class="rev-card-header">
+        <span class="emoji">🔗</span>
+        <div class="info"><div class="title">Programme Affiliation Influenceurs</div><div class="type">Revenu croissance · Commission partagée</div></div>
+      </div>
+      <div class="rev-card-body">
+        <div class="rate">1 – 3 % par vente</div>
+        <div class="desc">L'influenceur reçoit une commission sur chaque vente générée via son lien ou code promo. Le système est en arborescence : chaque niveau rapporte une part décroissante.</div>
+        <div class="example">💡 Influenceur niveau 1 : 3% · Niveau 2 : 1.5% · Niveau 3 : 0.5%</div>
+      </div>
+    </div>
+
+  </div>
+
+  <h1 class="section">02 — Tableau des Tarifs Détaillés</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:30%">Source de revenu</th>
+        <th style="width:20%">Taux / Montant</th>
+        <th style="width:25%">Qui paie</th>
+        <th style="width:25%">Fréquence</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Commission vente standard</strong></td><td>7%</td><td>Vendeur (déduit auto)</td><td>Par transaction</td></tr>
+      <tr><td><strong>Commission vente premium</strong></td><td>8%</td><td>Vendeur (catégories premium)</td><td>Par transaction</td></tr>
+      <tr><td><strong>Frais livraison Conakry intra</strong></td><td>10 000 – 20 000 GNF</td><td>Acheteur</td><td>Par livraison</td></tr>
+      <tr><td><strong>Frais livraison Conakry inter-zones</strong></td><td>20 000 – 40 000 GNF</td><td>Acheteur</td><td>Par livraison</td></tr>
+      <tr><td><strong>Frais livraison hors Conakry</strong></td><td>50 000 – 100 000 GNF</td><td>Acheteur</td><td>Par livraison</td></tr>
+      <tr><td><strong>Boost annonce Starter</strong></td><td>50 000 GNF / mois</td><td>Vendeur</td><td>Mensuel</td></tr>
+      <tr><td><strong>Boost annonce Pro</strong></td><td>100 000 GNF / mois</td><td>Vendeur</td><td>Mensuel</td></tr>
+      <tr><td><strong>Boost annonce Business</strong></td><td>200 000 GNF / mois</td><td>Vendeur</td><td>Mensuel</td></tr>
+      <tr><td><strong>Commission affiliation N1</strong></td><td>3% de la vente</td><td>Guimatrix (sur sa commission)</td><td>Par vente générée</td></tr>
+      <tr><td><strong>Commission affiliation N2</strong></td><td>1,5% de la vente</td><td>Guimatrix (sur sa commission)</td><td>Par vente générée</td></tr>
+      <tr><td><strong>Commission affiliation N3</strong></td><td>0,5% de la vente</td><td>Guimatrix (sur sa commission)</td><td>Par vente générée</td></tr>
+      <tr class="total"><td><strong>REVENU NET estimé / 1000 ventes de 200k GNF</strong></td><td colspan="3">~98 000 000 GNF (~11 600 USD)</td></tr>
+    </tbody>
+  </table>
+
+  <div class="info-box blue">
+    <strong>📌 Note sur les frais ChapChap</strong>
+    <p>ChapChap prélève ~4% à l'encaissement (PayCard) + ~1% au décaissement (virement vendeur) = ~5% de frais totaux. Avec une commission de 7%, le bénéfice net Guimatrix est de ~2% par transaction. À 8% : ~3% net. La commission doit rester ≥ 7% pour être rentable.</p>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- PAGE 3: SYSTÈME AFFILIATION -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Sources de Revenus & Tarifs</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <h1 class="section">03 — Système d'Affiliation Influenceurs (Arborescence)</h1>
+
+  <p>Le système d'affiliation permet à des influenceurs, ambassadeurs ou utilisateurs de générer des revenus en recommandant Guimatrix via un lien ou code promo unique. Le système fonctionne en arborescence sur 3 niveaux : l'influenceur gagne sur les ventes directes <em>et</em> sur les ventes générées par ceux qu'il a parrainés.</p>
+
+  <div class="tree-box">
+    <div class="tree-level">
+      <div class="tree-dot dot-1">🌟</div>
+      <div class="tree-content">
+        <div class="who">NIVEAU 1 — Influenceur principal</div>
+        <div class="what">Partage son lien/code. Un acheteur achète via ce lien → vente de 200 000 GNF.</div>
+        <span class="rate-badge badge-red">+3% = 6 000 GNF</span>
+      </div>
+    </div>
+    <div class="tree-arrow">↓ L'acheteur devient lui-même vendeur et partage son code</div>
+    <div class="tree-level">
+      <div class="tree-dot dot-2">👤</div>
+      <div class="tree-content">
+        <div class="who">NIVEAU 2 — Filleul de l'influenceur</div>
+        <div class="what">L'acheteur du N1 partage son propre code. Un de ses contacts achète pour 150 000 GNF.</div>
+        <span class="rate-badge badge-orange">L'influenceur N1 reçoit : +1,5% = 2 250 GNF</span>
+      </div>
+    </div>
+    <div class="tree-arrow">↓ Ce filleul partage aussi son code</div>
+    <div class="tree-level">
+      <div class="tree-dot dot-3">👤</div>
+      <div class="tree-content">
+        <div class="who">NIVEAU 3 — Arrière-filleul</div>
+        <div class="what">Le filleul du N2 partage. Un achat de 100 000 GNF est généré.</div>
+        <span class="rate-badge badge-blue">L'influenceur N1 reçoit encore : +0,5% = 500 GNF</span>
+      </div>
+    </div>
+    <div class="tree-arrow">↓ Pas de niveau 4 — limite à 3 niveaux</div>
+    <div class="tree-level">
+      <div class="tree-dot dot-4">🛑</div>
+      <div class="tree-content">
+        <div class="who">LIMITE — 3 niveaux maximum</div>
+        <div class="what">Au-delà de 3 niveaux, les commissions d'affiliation ne remontent plus. Cela évite les dérives de type pyramide et reste soutenable pour Guimatrix.</div>
+        <span class="rate-badge badge-green">L'influenceur N1 a gagné au total : 8 750 GNF sur ces 3 ventes</span>
+      </div>
+    </div>
+  </div>
+
+  <h2 class="sub">Comment ça fonctionne techniquement</h2>
+  <ul class="styled">
+    <li><strong>Lien unique :</strong> Chaque influenceur reçoit un lien tracé (ex : guimatrix.com/?ref=MAMADOU). Quand quelqu'un clique et achète, la vente est attribuée à l'influenceur.</li>
+    <li><strong>Code promo :</strong> L'influenceur peut aussi avoir un code court (ex : MAMADOU10) que l'acheteur saisit au moment du paiement. Ce code donne une réduction de 2% à l'acheteur.</li>
+    <li><strong>Tableau de bord influenceur :</strong> Chaque influenceur voit ses clics, ses ventes générées, ses gains cumulés et peut demander un virement sur Orange Money ou MTN MoMo.</li>
+    <li><strong>Seuil de paiement :</strong> Minimum de 50 000 GNF pour demander un virement. Les gains s'accumulent jusqu'au seuil.</li>
+    <li><strong>Traçabilité 30 jours :</strong> Si quelqu'un clique sur le lien mais achète 15 jours plus tard, l'influenceur est quand même crédité (cookie 30 jours).</li>
+  </ul>
+
+  <div class="info-box orange">
+    <strong>⚖️ Équilibre économique du système d'affiliation</strong>
+    <p>Sur une commission Guimatrix de 7% = 14 000 GNF pour une vente de 200k GNF, les commissions d'affiliation (max 3% N1 + 1,5% N2 + 0,5% N3 = 5% max) restent dans la commission Guimatrix. Guimatrix garde toujours au minimum 2% net même avec affiliation maximum active.</p>
+  </div>
+
+  <h2 class="sub">Résumé des taux par niveau</h2>
+  <table>
+    <thead>
+      <tr><th>Niveau</th><th>Qui reçoit</th><th>Taux</th><th>Sur une vente de 500 000 GNF</th><th>Condition</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>N1 — Direct</strong></td><td>Influenceur dont le lien/code a été utilisé</td><td>3%</td><td>15 000 GNF</td><td>Lien/code utilisé directement</td></tr>
+      <tr><td><strong>N2 — Filleul</strong></td><td>L'influenceur qui a parrainé le vendeur/acheteur N1</td><td>1,5%</td><td>7 500 GNF</td><td>Si N1 a lui-même un parrain</td></tr>
+      <tr><td><strong>N3 — Arrière-filleul</strong></td><td>L'influenceur 2 niveaux au-dessus</td><td>0,5%</td><td>2 500 GNF</td><td>Si N2 a lui-même un parrain</td></tr>
+      <tr class="total"><td colspan="2"><strong>Maximum total redistribué en affiliation</strong></td><td>5%</td><td>25 000 GNF</td><td>Cas extrême 3 niveaux actifs</td></tr>
+    </tbody>
+  </table>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- PAGE 4: BOUTIQUES + PROJECTIONS -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Sources de Revenus & Tarifs</span>
+    <span class="conf">CONFIDENTIEL</span>
+  </div>
+
+  <h1 class="section">04 — Boutiques Vendeurs avec Gestion de Stock</h1>
+  <p>Chaque vendeur aura sa propre page boutique publique avec son catalogue de produits. Chaque produit a un stock défini — quand le stock tombe à 0, le produit s'affiche comme "Rupture de stock" sans être supprimé. Quand le vendeur reçoit du stock, il met à jour le nombre et le produit redevient disponible à la commande.</p>
+
+  <h2 class="sub">Fonctionnement de la boutique vendeur</h2>
+  <ul class="styled">
+    <li><strong>Page publique :</strong> URL de type <code>guimatrix.com/boutique/mamadou-diallo</code> accessible sans connexion, partageable sur WhatsApp.</li>
+    <li><strong>Produits avec stock :</strong> Le vendeur crée un produit une seule fois avec photos, description, prix et quantité disponible.</li>
+    <li><strong>Décrément auto :</strong> À chaque commande validée, le stock diminue de 1. À 0 → "Rupture de stock" affiché.</li>
+    <li><strong>Réapprovisionnement :</strong> Le vendeur va dans "Mon stock" et met à jour la quantité sans republier l'annonce.</li>
+    <li><strong>Avis clients :</strong> Les acheteurs laissent des notes sur les produits et la boutique. La note moyenne s'affiche sur la page boutique.</li>
+    <li><strong>Badge Vendeur Vérifié :</strong> Accordé après vérification d'identité et 10 ventes réussies. Affiché en évidence sur la boutique.</li>
+  </ul>
+
+  <div class="info-box green">
+    <strong>🎯 Avantage compétitif majeur</strong>
+    <p>Aucun concurrent guinéen (CoinAfrique, Margaarou, Jemadina) ne propose de vraies boutiques avec gestion de stock. C'est un saut qualitatif qui transforme Guimatrix de "site d'annonces" en "vrai e-commerce professionnel".</p>
+  </div>
+
+  <h1 class="section">05 — Projections de Revenus</h1>
+  <p>Estimations basées sur les objectifs de la stratégie marketing 3 phases sur 12 mois.</p>
+
+  <table>
+    <thead>
+      <tr><th>Scénario</th><th>Ventes / mois</th><th>Valeur moy.</th><th>Commission (7%)</th><th>Livraisons</th><th>Premium</th><th>TOTAL / mois</th></tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Phase 1</strong> (mois 1-3)</td><td>200</td><td>150 000 GNF</td><td>2 100 000 GNF</td><td>600 000 GNF</td><td>500 000 GNF</td><td><strong>3 200 000 GNF</strong></td></tr>
+      <tr><td><strong>Phase 2</strong> (mois 4-6)</td><td>1 000</td><td>200 000 GNF</td><td>14 000 000 GNF</td><td>3 000 000 GNF</td><td>2 000 000 GNF</td><td><strong>19 000 000 GNF</strong></td></tr>
+      <tr><td><strong>Phase 3</strong> (mois 7-12)</td><td>5 000</td><td>250 000 GNF</td><td>87 500 000 GNF</td><td>15 000 000 GNF</td><td>8 000 000 GNF</td><td><strong>110 500 000 GNF</strong></td></tr>
+      <tr class="total"><td colspan="6"><strong>Revenu annuel estimé fin de première année</strong></td><td><strong>~800 000 000 GNF (~95 000 USD)</strong></td></tr>
+    </tbody>
+  </table>
+
+  <div class="summary-box">
+    <h3>💰 Résumé du modèle économique Guimatrix</h3>
+    <div class="summary-row"><span class="label">Commission vente (taux recommandé)</span><span class="val">7 – 8%</span></div>
+    <div class="summary-row"><span class="label">Marge nette après frais ChapChap (~5%)</span><span class="val">2 – 3% net / vente</span></div>
+    <div class="summary-row"><span class="label">Marge livraison (20% des frais livreur)</span><span class="val">2 000 – 8 000 GNF / livraison</span></div>
+    <div class="summary-row"><span class="label">Annonces Premium (3 formules)</span><span class="val">50k – 200k GNF / mois / vendeur</span></div>
+    <div class="summary-row"><span class="label">Affiliation influenceurs (reversé sur commission)</span><span class="val">Max 5% de la commission (N1+N2+N3)</span></div>
+    <div class="summary-row"><span class="label">Objectif revenu mensuel fin d'année 1</span><span class="val">+100 000 000 GNF / mois (~12 000 USD)</span></div>
+  </div>
+
+  <div style="margin-top:24px; font-size:11px; color:var(--gray); text-align:center; font-style:italic;">
+    Document préparé par l'équipe Guimatrix · contact@guimatrix.com · Conakry, Guinée · Septembre 2026
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026 — Document réservé aux partenaires</span>
+    <span>Page 4</span>
+  </div>
+</div>
+
+</body>
+</html>

@@ -257,6 +257,19 @@ class Order(BaseModel):
             'commission_gnf', 'seller_payout_gnf',
             'escrow_status', 'escrow_released_at', 'updated_at',
         ])
+        # Décrémenter le stock de l'annonce (si stock géré)
+        try:
+            listing = self.listing
+            if listing.stock_qty is not None and listing.stock_qty > 0:
+                listing.stock_qty -= 1
+                if listing.stock_qty == 0:
+                    # Ne pas marquer comme 'sold' — garder l'annonce visible avec mention "Rupture"
+                    listing.save(update_fields=['stock_qty'])
+                else:
+                    listing.save(update_fields=['stock_qty'])
+        except Exception:
+            pass
+
         # Incrémenter le compteur de ventes du vendeur
         profile = self.seller.profile
         profile.total_sales += 1
@@ -264,6 +277,13 @@ class Order(BaseModel):
         # Vérifier les badges après chaque vente
         from apps.accounts.models import Badge
         Badge.check_and_award(self.seller)
+        # ── Commissions affiliés (arborescence 3 niveaux) ────────────────────
+        try:
+            from apps.affiliates.models import process_affiliate_commissions
+            process_affiliate_commissions(self)
+        except Exception:
+            pass  # Ne jamais bloquer le release_escrow pour les affiliés
+
         # Créer un enregistrement de paiement vendeur (PENDING → traitement async ou admin)
         # Priorité : champ User.payout_phone, puis UserProfile.payout_phone
         payout_phone    = self.seller.payout_phone or getattr(profile, 'payout_phone', '') or ''
