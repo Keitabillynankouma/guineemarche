@@ -456,7 +456,7 @@ export default function CreateListingPage() {
                                     key:   'meeting_point',
                                     icon:  '🤝',
                                     label: 'Remise en main propre',
-                                    desc:  'Vous vous retrouvez dans un lieu public convenu (marché, carrefour, mosquée…). Le plus courant en Guinée.',
+                                    desc:  'Vous vous retrouvez dans un lieu public convenu (marché, carrefour, mosquée…).',
                                     color: 'amber',
                                 },
                                 {
@@ -470,7 +470,7 @@ export default function CreateListingPage() {
                                     key:   'home_delivery',
                                     icon:  '🚚',
                                     label: 'Livraison à domicile',
-                                    desc:  'Un livreur GuinéeMarché récupère l\'article et le livre chez l\'acheteur.',
+                                    desc:  'Un livreur Guimatrix récupère l\'article et le livre chez l\'acheteur.',
                                     color: 'green',
                                 },
                             ].map(({ key, icon, label, desc, color }) => {
