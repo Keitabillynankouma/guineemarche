@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Guimatrix — Script Vidéo de Démonstration</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  :root {
+    --primary: #1B4F72; --accent: #E67E22; --green: #1E8449;
+    --gray: #7F8C8D; --dark: #1C2833;
+    --light: #EBF5FB; --light-orange: #FEF9E7; --light-green: #EAFAF1;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#f0f0f0; color:var(--dark); font-size:13px; }
+  .page { width:210mm; margin:0 auto 20px; background:white; padding:14mm 16mm; box-shadow:0 4px 24px rgba(0,0,0,.1); }
+
+  /* COUVERTURE */
+  .cover { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:230mm; text-align:center; }
+  .cover h1 { font-size:44px; font-weight:900; color:var(--primary); margin-bottom:4px; }
+  .cover .sub { font-size:14px; color:var(--gray); font-style:italic; margin-bottom:20px; }
+  .cover h2 { font-size:22px; font-weight:800; color:var(--accent); margin-bottom:8px; }
+  .cover .desc { font-size:13px; color:var(--gray); margin-bottom:40px; line-height:1.7; }
+  .cover .stats { display:flex; gap:20px; justify-content:center; margin-bottom:40px; }
+  .stat-box { background:var(--light); border:1.5px solid #BCD6E8; border-radius:10px; padding:12px 16px; text-align:center; }
+  .stat-box .n { font-size:22px; font-weight:900; color:var(--primary); }
+  .stat-box .l { font-size:10px; color:var(--gray); font-weight:600; }
+  .cover .date { font-size:11px; color:var(--gray); border-top:1px solid #eee; padding-top:14px; width:100%; font-style:italic; }
+
+  /* EN-TÊTE PAGE */
+  .doc-header { border-bottom:2px solid var(--accent); padding-bottom:6px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:flex-end; font-size:10px; color:var(--gray); }
+  .doc-header .brand { font-weight:700; color:var(--primary); font-size:11px; }
+  .doc-footer { border-top:1px solid #eee; padding-top:8px; margin-top:16px; display:flex; justify-content:space-between; font-size:10px; color:var(--gray); }
+
+  /* SCÈNES */
+  .scenario-title { font-size:18px; font-weight:900; color:var(--primary); margin:20px 0 12px; padding:10px 14px; border-radius:10px; display:flex; align-items:center; gap:10px; }
+  .scenario-title.blue { background:var(--light); border-left:5px solid var(--primary); }
+  .scenario-title.orange { background:var(--light-orange); border-left:5px solid var(--accent); }
+  .scenario-title.green { background:var(--light-green); border-left:5px solid var(--green); }
+  .scenario-title.purple { background:#F5EEF8; border-left:5px solid #7D3C98; }
+  .scenario-title.red { background:#FDECEA; border-left:5px solid #C0392B; }
+
+  .scene { margin:10px 0; border-radius:10px; overflow:hidden; border:1px solid #E0E0E0; page-break-inside:avoid; }
+  .scene-header { padding:8px 12px; display:flex; align-items:center; gap:8px; font-size:11px; font-weight:700; }
+  .scene-header.blue { background:var(--primary); color:white; }
+  .scene-header.orange { background:var(--accent); color:white; }
+  .scene-header.green { background:var(--green); color:white; }
+  .scene-header.purple { background:#7D3C98; color:white; }
+  .scene-header.red { background:#C0392B; color:white; }
+  .scene-num { background:rgba(255,255,255,.25); border-radius:6px; padding:2px 7px; font-size:10px; font-weight:800; }
+  .scene-dur { margin-left:auto; opacity:.85; font-size:10px; }
+
+  .scene-body { display:grid; grid-template-columns:1fr 1fr; }
+  .scene-col { padding:10px 14px; }
+  .scene-col:first-child { border-right:1px solid #eee; background:#FAFAFA; }
+  .scene-col h4 { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--gray); margin-bottom:6px; }
+  .scene-col p { font-size:11.5px; line-height:1.65; color:#2C3E50; }
+  .screen-action { font-size:11px; line-height:1.6; color:#2C3E50; }
+  .screen-action .step { display:flex; gap:6px; margin-bottom:5px; }
+  .screen-action .step .num { background:var(--primary); color:white; border-radius:50%; width:16px; height:16px; display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:700; flex-shrink:0; margin-top:1px; }
+
+  .narration { font-size:12px; line-height:1.75; color:#2C3E50; font-style:italic; border-left:3px solid var(--accent); padding-left:10px; margin-top:4px; }
+
+  .tip-box { background:#FFFDE7; border:1px solid #F9A825; border-radius:8px; padding:8px 12px; margin:8px 0; font-size:11px; color:#5D4037; }
+  .tip-box strong { color:#E65100; }
+
+  /* RÉCAP */
+  table { width:100%; border-collapse:collapse; margin:10px 0; font-size:11.5px; }
+  th { background:var(--primary); color:white; padding:8px 10px; text-align:left; font-weight:700; }
+  td { padding:7px 10px; border-bottom:1px solid #eee; }
+  tr:nth-child(even) td { background:var(--light); }
+
+  @media print {
+    body { background:white; }
+    .page { margin:0; box-shadow:none; page-break-after:always; }
+    .page:last-child { page-break-after:avoid; }
+    @page { size:A4; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- COUVERTURE -->
+<div class="page">
+  <div class="cover">
+    <div style="font-size:52px;margin-bottom:14px;">🎬</div>
+    <h1>GUIMATRIX</h1>
+    <p class="sub">Marketplace de confiance — Guinée Conakry</p>
+    <h2>SCRIPT VIDÉO DE DÉMONSTRATION</h2>
+    <p class="desc">Guide complet pour filmer la vidéo de présentation de l'application.<br>Chaque scène indique ce qu'on montre à l'écran et ce qu'on dit.</p>
+    <div class="stats">
+      <div class="stat-box"><div class="n">5</div><div class="l">Scénarios</div></div>
+      <div class="stat-box"><div class="n">~8 min</div><div class="l">Durée totale</div></div>
+      <div class="stat-box"><div class="n">25+</div><div class="l">Scènes</div></div>
+    </div>
+    <p class="desc" style="font-size:11.5px;">
+      <strong>Scénario 0</strong> — Inscription &nbsp;·&nbsp;
+      <strong>Scénario 1</strong> — Acheteur &nbsp;·&nbsp;
+      <strong>Scénario 2</strong> — Vendeur &nbsp;·&nbsp;
+      <strong>Scénario 3</strong> — Livreur &nbsp;·&nbsp;
+      <strong>Scénario 4</strong> — Administrateur
+    </p>
+    <p class="date">Usage interne · Guimatrix · Septembre 2026</p>
+  </div>
+</div>
+
+<!-- PAGE 2 : INTRO + SCÉNARIO 0 -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Script Vidéo</span>
+    <span>Scénario 0 — Inscription</span>
+  </div>
+
+  <!-- INTRO GÉNÉRALE -->
+  <div class="scenario-title blue">🎬 Introduction générale <span style="font-size:12px;font-weight:500;color:var(--gray);">(~30 secondes)</span></div>
+
+  <div class="scene">
+    <div class="scene-header blue">
+      <span class="scene-num">INTRO</span>
+      <span>Logo Guimatrix à l'écran · Musique douce</span>
+      <span class="scene-dur">⏱ 30 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Afficher le logo Guimatrix centré sur fond blanc</p></div>
+          <div class="step"><div class="num">2</div><p>Afficher la phrase "La première marketplace de Guinée" en dessous</p></div>
+          <div class="step"><div class="num">3</div><p>Faire apparaître 4 icônes : 🛒 Acheteur · 🏪 Vendeur · 🚚 Livreur · ⚙️ Admin</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Bienvenue sur Guimatrix — la première marketplace en ligne de Guinée. Avec Guimatrix, vous pouvez acheter et vendre des produits en toute sécurité, avec paiement sécurisé, livraison à domicile et service client disponible. Dans cette vidéo, nous allons vous montrer comment fonctionne l'application, étape par étape."</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- SCÉNARIO 0 : INSCRIPTION -->
+  <div class="scenario-title red">📝 Scénario 0 — L'Inscription <span style="font-size:12px;font-weight:500;color:var(--gray);">(~1 min)</span></div>
+
+  <div class="scene">
+    <div class="scene-header red">
+      <span class="scene-num">S0 · 01</span>
+      <span>Page d'accueil de l'application</span>
+      <span class="scene-dur">⏱ 15 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Ouvrir l'application sur téléphone ou navigateur</p></div>
+          <div class="step"><div class="num">2</div><p>Appuyer sur "Créer un compte"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Pour commencer, ouvrez l'application Guimatrix. Si vous n'avez pas encore de compte, appuyez sur 'Créer un compte'. L'inscription est gratuite et prend moins de 2 minutes."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header red">
+      <span class="scene-num">S0 · 02</span>
+      <span>Formulaire d'inscription</span>
+      <span class="scene-dur">⏱ 25 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Remplir le nom complet : "Mamadou Diallo"</p></div>
+          <div class="step"><div class="num">2</div><p>Saisir le numéro de téléphone : +224 622 000 000</p></div>
+          <div class="step"><div class="num">3</div><p>Choisir le rôle : Acheteur ou Vendeur</p></div>
+          <div class="step"><div class="num">4</div><p>Appuyer sur "Recevoir le code OTP"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Entrez votre nom complet, votre numéro de téléphone, et choisissez votre rôle : acheteur si vous voulez acheter des produits, vendeur si vous voulez publier des annonces. Ensuite, appuyez pour recevoir un code de confirmation par SMS."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header red">
+      <span class="scene-num">S0 · 03</span>
+      <span>Vérification OTP + Connexion</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Afficher l'écran de saisie du code OTP à 6 chiffres</p></div>
+          <div class="step"><div class="num">2</div><p>Saisir le code reçu par SMS</p></div>
+          <div class="step"><div class="num">3</div><p>Arriver sur la page d'accueil — compte créé ✅</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Vous recevez un code à 6 chiffres par SMS. Saisissez-le pour confirmer votre numéro. Votre compte est créé — vous êtes maintenant connecté à Guimatrix."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- PAGE 3 : SCÉNARIO 1 — ACHETEUR -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Script Vidéo</span>
+    <span>Scénario 1 — Acheteur</span>
+  </div>
+
+  <div class="scenario-title blue">🛒 Scénario 1 — L'Acheteur trouve et commande un produit <span style="font-size:12px;font-weight:500;color:var(--gray);">(~2 min)</span></div>
+
+  <div class="scene">
+    <div class="scene-header blue">
+      <span class="scene-num">S1 · 01</span>
+      <span>Recherche d'un produit</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Page d'accueil avec les annonces récentes visibles</p></div>
+          <div class="step"><div class="num">2</div><p>Appuyer sur la barre de recherche</p></div>
+          <div class="step"><div class="num">3</div><p>Taper "iPhone" — les résultats apparaissent instantanément</p></div>
+          <div class="step"><div class="num">4</div><p>Utiliser les filtres : ville = Conakry, prix max = 5 000 000 GNF</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Sur la page d'accueil, vous voyez toutes les annonces disponibles. Pour trouver un produit précis, utilisez la barre de recherche. Par exemple, tapez 'iPhone'. Vous pouvez filtrer par ville, par prix ou par catégorie pour affiner les résultats."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header blue">
+      <span class="scene-num">S1 · 02</span>
+      <span>Détail de l'annonce</span>
+      <span class="scene-dur">⏱ 25 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Appuyer sur une annonce "iPhone 13 — 4 500 000 GNF"</p></div>
+          <div class="step"><div class="num">2</div><p>Faire défiler les photos du produit</p></div>
+          <div class="step"><div class="num">3</div><p>Lire la description, l'état (Comme neuf), la localisation (Ratoma)</p></div>
+          <div class="step"><div class="num">4</div><p>Voir le profil du vendeur avec sa note et ses badges</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Appuyez sur l'annonce pour voir tous les détails : les photos, la description complète, l'état du produit et la localisation du vendeur. Vous voyez aussi le profil du vendeur, sa note moyenne et ses badges de confiance."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header blue">
+      <span class="scene-num">S1 · 03</span>
+      <span>Choix du mode de livraison + Paiement</span>
+      <span class="scene-dur">⏱ 30 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Appuyer sur "Commander ce produit"</p></div>
+          <div class="step"><div class="num">2</div><p>Choisir "Livraison à domicile" — entrer l'adresse</p></div>
+          <div class="step"><div class="num">3</div><p>Voir le récapitulatif : 4 500 000 GNF + 15 000 GNF livraison</p></div>
+          <div class="step"><div class="num">4</div><p>Choisir Orange Money → saisir le numéro → appuyer sur "Payer"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Appuyez sur 'Commander'. Choisissez comment vous voulez recevoir le produit : livraison à domicile, point de retrait, ou rencontre avec le vendeur. Ensuite, payez en toute sécurité via Orange Money, MTN ou PayCard. L'argent est bloqué en sécurité jusqu'à ce que vous receviez le produit."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header blue">
+      <span class="scene-num">S1 · 04</span>
+      <span>Suivi de commande + Confirmation de réception</span>
+      <span class="scene-dur">⏱ 25 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Page "Mes commandes" → voir le statut "En cours de livraison"</p></div>
+          <div class="step"><div class="num">2</div><p>Voir la position GPS du livreur sur la carte en temps réel</p></div>
+          <div class="step"><div class="num">3</div><p>Donner le code de confirmation au livreur à la réception</p></div>
+          <div class="step"><div class="num">4</div><p>Notification : "Votre paiement a été libéré au vendeur ✅"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Dans 'Mes commandes', vous suivez votre livraison en temps réel sur la carte. Quand le livreur arrive, donnez-lui le code de confirmation. À ce moment seulement, le paiement est libéré au vendeur. Vous êtes entièrement protégé."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="tip-box">
+    <strong>💡 Point à souligner à la caméra :</strong> "Avec Guimatrix, vous ne perdez jamais votre argent. Si vous ne recevez pas le produit, vous êtes remboursé automatiquement. C'est ça la différence avec les autres plateformes."
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- PAGE 4 : SCÉNARIO 2 — VENDEUR -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Script Vidéo</span>
+    <span>Scénario 2 — Vendeur</span>
+  </div>
+
+  <div class="scenario-title orange">🏪 Scénario 2 — Le Vendeur publie une annonce et reçoit son paiement <span style="font-size:12px;font-weight:500;color:var(--gray);">(~2 min)</span></div>
+
+  <div class="scene">
+    <div class="scene-header orange">
+      <span class="scene-num">S2 · 01</span>
+      <span>Création d'une annonce</span>
+      <span class="scene-dur">⏱ 35 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Appuyer sur le bouton "+" ou "Publier une annonce"</p></div>
+          <div class="step"><div class="num">2</div><p>Remplir : Titre "Télévision Samsung 55 pouces", Catégorie : Électronique</p></div>
+          <div class="step"><div class="num">3</div><p>Ajouter 4 photos depuis la galerie du téléphone</p></div>
+          <div class="step"><div class="num">4</div><p>Prix : 3 500 000 GNF, État : Bon état, Ville : Conakry – Kaloum</p></div>
+          <div class="step"><div class="num">5</div><p>Renseigner le stock disponible : 2 unités</p></div>
+          <div class="step"><div class="num">6</div><p>Appuyer sur "Publier"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Pour vendre, appuyez sur 'Publier une annonce'. Remplissez le titre, choisissez la catégorie, ajoutez vos photos depuis votre téléphone — plus il y a de photos, plus vite vous vendez. Entrez le prix, l'état du produit et votre ville. Si vous avez plusieurs unités en stock, indiquez la quantité. Quand le stock tombe à zéro, l'annonce se retire automatiquement."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header orange">
+      <span class="scene-num">S2 · 02</span>
+      <span>Modération et mise en ligne</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Message "Votre annonce est en cours de vérification"</p></div>
+          <div class="step"><div class="num">2</div><p>Quelques secondes plus tard : notification "Annonce approuvée ✅"</p></div>
+          <div class="step"><div class="num">3</div><p>L'annonce apparaît dans la liste des annonces actives</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Votre annonce est vérifiée automatiquement par notre système. En quelques secondes, vous recevez une notification de confirmation et votre annonce est visible par tous les acheteurs de Guinée."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header orange">
+      <span class="scene-num">S2 · 03</span>
+      <span>Commande reçue + Gestion</span>
+      <span class="scene-dur">⏱ 25 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Notification : "🎉 Nouvelle commande pour votre TV Samsung !"</p></div>
+          <div class="step"><div class="num">2</div><p>Page "Mes ventes" → voir la commande avec le statut "Paiement reçu"</p></div>
+          <div class="step"><div class="num">3</div><p>Voir les informations de livraison : adresse de l'acheteur, livreur assigné</p></div>
+          <div class="step"><div class="num">4</div><p>Préparer le colis — le livreur viendra le récupérer</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Quand quelqu'un commande votre produit, vous recevez une notification immédiate. Le paiement de l'acheteur est sécurisé — vous êtes certain d'être payé. Un livreur est assigné pour récupérer le colis chez vous et le livrer à l'acheteur."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header orange">
+      <span class="scene-num">S2 · 04</span>
+      <span>Réception du virement vendeur</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Notification : "💰 Votre virement de 3 360 000 GNF est en cours"</p></div>
+          <div class="step"><div class="num">2</div><p>Afficher le profil vendeur avec le numéro Orange Money configuré</p></div>
+          <div class="step"><div class="num">3</div><p>Message de confirmation de réception sur Orange Money</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Une fois que l'acheteur a bien reçu son produit, votre argent est libéré et viré directement sur votre Orange Money ou MTN MoMo. Rapide, sécurisé, sans complication."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 4</span>
+  </div>
+</div>
+
+<!-- PAGE 5 : SCÉNARIOS 3 & 4 -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Script Vidéo</span>
+    <span>Scénario 3 — Livreur · Scénario 4 — Administrateur</span>
+  </div>
+
+  <div class="scenario-title green">🚚 Scénario 3 — Le Livreur accepte et livre une commande <span style="font-size:12px;font-weight:500;color:var(--gray);">(~1 min 30)</span></div>
+
+  <div class="scene">
+    <div class="scene-header green">
+      <span class="scene-num">S3 · 01</span>
+      <span>Notification de nouvelle livraison</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Application livreur — notification "📦 Nouvelle livraison disponible"</p></div>
+          <div class="step"><div class="num">2</div><p>Détail : adresse vendeur (Ratoma), adresse acheteur (Kaloum), montant : 15 000 GNF</p></div>
+          <div class="step"><div class="num">3</div><p>Appuyer sur "Accepter la livraison"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Le livreur reçoit une notification pour chaque nouvelle livraison disponible. Il voit l'adresse du vendeur, l'adresse de l'acheteur et son gain pour cette livraison. S'il accepte, il est assigné à la commande."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header green">
+      <span class="scene-num">S3 · 02</span>
+      <span>Collecte chez le vendeur + Livraison GPS</span>
+      <span class="scene-dur">⏱ 30 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Carte GPS avec l'itinéraire vers le vendeur affiché</p></div>
+          <div class="step"><div class="num">2</div><p>Chez le vendeur : afficher le code de collecte — le vendeur le confirme</p></div>
+          <div class="step"><div class="num">3</div><p>Statut passe à "En route vers l'acheteur"</p></div>
+          <div class="step"><div class="num">4</div><p>L'acheteur suit la position du livreur en temps réel sur sa propre app</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"L'application guide le livreur avec le GPS jusqu'au vendeur. Le vendeur vérifie le code de collecte affiché sur le téléphone du livreur. Pendant tout le trajet, l'acheteur voit en temps réel où se trouve son colis sur la carte."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header green">
+      <span class="scene-num">S3 · 03</span>
+      <span>Livraison et confirmation</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Livreur arrive chez l'acheteur — l'acheteur donne son code à 6 chiffres</p></div>
+          <div class="step"><div class="num">2</div><p>Livreur saisit le code dans l'app → livraison confirmée ✅</p></div>
+          <div class="step"><div class="num">3</div><p>Notification livreur : "15 000 GNF ajoutés à votre solde de la semaine"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"À la livraison, l'acheteur donne un code secret au livreur. Ce code confirme que le colis est bien remis. Le gain du livreur est automatiquement enregistré et versé chaque semaine."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scenario-title purple">⚙️ Scénario 4 — L'Administrateur gère la plateforme <span style="font-size:12px;font-weight:500;color:var(--gray);">(~1 min)</span></div>
+
+  <div class="scene">
+    <div class="scene-header purple">
+      <span class="scene-num">S4 · 01</span>
+      <span>Tableau de bord admin</span>
+      <span class="scene-dur">⏱ 20 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Connexion au panel admin — tableau de bord avec KPIs</p></div>
+          <div class="step"><div class="num">2</div><p>Chiffres visibles : commandes du jour, revenus, annonces en attente</p></div>
+          <div class="step"><div class="num">3</div><p>Liste des annonces "En attente de modération"</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"L'administrateur dispose d'un tableau de bord complet. Il voit en un coup d'œil le nombre de commandes du jour, les revenus de la plateforme et les annonces qui attendent une validation."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="scene">
+    <div class="scene-header purple">
+      <span class="scene-num">S4 · 02</span>
+      <span>Virements vendeurs + gestion livreurs</span>
+      <span class="scene-dur">⏱ 25 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Section "Paiements vendeurs" — liste des virements en attente</p></div>
+          <div class="step"><div class="num">2</div><p>Voir le numéro Orange Money du vendeur affiché en grand avec bouton "Copier"</p></div>
+          <div class="step"><div class="num">3</div><p>Confirmer le virement → statut passe à "Versé ✅"</p></div>
+          <div class="step"><div class="num">4</div><p>Section livreurs : voir les gains hebdomadaires, affecter un livreur</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"L'admin gère les virements : il voit clairement le numéro mobile money de chaque vendeur, le copie en un clic, effectue le virement depuis son téléphone, puis confirme. Il gère aussi les livreurs, leurs gains hebdomadaires et leurs performances."</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 5</span>
+  </div>
+</div>
+
+<!-- PAGE 6 : CONCLUSION + RÉCAP -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Script Vidéo</span>
+    <span>Conclusion + Récapitulatif</span>
+  </div>
+
+  <div class="scenario-title blue">🎬 Conclusion <span style="font-size:12px;font-weight:500;color:var(--gray);">(~30 secondes)</span></div>
+
+  <div class="scene">
+    <div class="scene-header blue">
+      <span class="scene-num">FIN</span>
+      <span>Logo Guimatrix + appel à l'action</span>
+      <span class="scene-dur">⏱ 30 sec</span>
+    </div>
+    <div class="scene-body">
+      <div class="scene-col">
+        <h4>📱 À l'écran</h4>
+        <div class="screen-action">
+          <div class="step"><div class="num">1</div><p>Logo Guimatrix centré sur fond blanc</p></div>
+          <div class="step"><div class="num">2</div><p>Afficher le lien : <strong>guimatrix.com</strong></p></div>
+          <div class="step"><div class="num">3</div><p>Afficher le contact WhatsApp : <strong>+224 622 411 238</strong></p></div>
+          <div class="step"><div class="num">4</div><p>Musique douce jusqu'au fondu au noir</p></div>
+        </div>
+      </div>
+      <div class="scene-col">
+        <h4>🎙️ Narration</h4>
+        <p class="narration">"Voilà comment fonctionne Guimatrix. Que vous soyez acheteur, vendeur ou livreur — l'application est faite pour vous. Inscrivez-vous gratuitement sur guimatrix.com ou contactez-nous sur WhatsApp. Guimatrix — achetez et vendez en toute confiance en Guinée."</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- RÉCAP DURÉES -->
+  <div class="scenario-title blue" style="margin-top:20px;">📊 Récapitulatif — Durées estimées</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:10%">#</th>
+        <th style="width:45%">Scénario</th>
+        <th style="width:20%">Durée</th>
+        <th style="width:25%">Rôle filmé</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>Intro</td><td>Introduction générale + logo</td><td>~30 sec</td><td>—</td></tr>
+      <tr><td>0</td><td>Inscription</td><td>~1 min</td><td>Nouvel utilisateur</td></tr>
+      <tr><td>1</td><td>Acheteur — trouver, commander, suivre</td><td>~2 min</td><td>Acheteur</td></tr>
+      <tr><td>2</td><td>Vendeur — publier, recevoir commande, être payé</td><td>~2 min</td><td>Vendeur</td></tr>
+      <tr><td>3</td><td>Livreur — accepter, collecter, livrer</td><td>~1 min 30</td><td>Livreur</td></tr>
+      <tr><td>4</td><td>Administrateur — tableau de bord, virements</td><td>~1 min</td><td>Admin</td></tr>
+      <tr><td>Fin</td><td>Conclusion + appel à l'action</td><td>~30 sec</td><td>—</td></tr>
+      <tr style="background:var(--light);font-weight:700;"><td colspan="2"><strong>DURÉE TOTALE ESTIMÉE</strong></td><td><strong>~8 min 30</strong></td><td>—</td></tr>
+    </tbody>
+  </table>
+
+  <div class="tip-box" style="margin-top:16px;">
+    <strong>🎬 Conseils de tournage :</strong><br>
+    • Filmer sur un vrai téléphone avec l'application ouverte — pas de simulation<br>
+    • Utiliser un fond propre et neutre (blanc ou bleu Guimatrix) pour les prises de tête<br>
+    • Alterner vue téléphone (screencast) et vue personne qui tient le téléphone<br>
+    • Enregistrer la voix séparément et ajouter en montage pour meilleure qualité audio<br>
+    • Ajouter des sous-titres en français et en langues locales (Pular, Soussou) pour plus d'impact
+  </div>
+
+  <div style="margin-top:24px; font-size:11px; color:var(--gray); text-align:center; font-style:italic; border-top:1px solid #eee; padding-top:12px;">
+    Guimatrix © 2026 · contact@guimatrix.com · Conakry, Guinée
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 6</span>
+  </div>
+</div>
+
+</body>
+</html>

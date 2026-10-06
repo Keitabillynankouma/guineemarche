@@ -1,0 +1,415 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Guimatrix — Plan de Recrutement</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+  :root {
+    --primary: #1B4F72; --accent: #E67E22; --green: #1E8449;
+    --red: #C0392B; --gray: #7F8C8D; --dark: #1C2833;
+    --light: #EBF5FB; --light-orange: #FEF9E7; --light-green: #EAFAF1;
+    --light-red: #FDECEA;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { font-family:'Inter',sans-serif; background:#f4f4f4; color:var(--dark); font-size:13px; }
+  .page { width:210mm; min-height:297mm; margin:0 auto 20px; background:white; padding:16mm 18mm; box-shadow:0 4px 24px rgba(0,0,0,.12); }
+  .doc-header { border-bottom:2px solid var(--accent); padding-bottom:6px; margin-bottom:18px; display:flex; justify-content:space-between; align-items:flex-end; font-size:10px; color:var(--gray); }
+  .doc-header .brand { font-weight:700; color:var(--primary); font-size:11px; }
+  .doc-footer { border-top:1px solid #eee; padding-top:8px; margin-top:20px; display:flex; justify-content:space-between; font-size:10px; color:var(--gray); }
+
+  /* COUVERTURE */
+  .cover { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:250mm; text-align:center; }
+  .cover .logo { font-size:56px; margin-bottom:16px; }
+  .cover h1 { font-size:46px; font-weight:900; color:var(--primary); margin-bottom:4px; }
+  .cover .sub { font-size:14px; color:var(--gray); font-style:italic; margin-bottom:24px; }
+  .cover h2 { font-size:22px; font-weight:800; color:var(--accent); margin-bottom:8px; }
+  .cover .desc { font-size:13px; color:var(--gray); margin-bottom:48px; }
+  .cover .date { font-size:11px; color:var(--gray); border-top:1px solid #eee; padding-top:14px; width:100%; font-style:italic; }
+
+  /* SECTIONS */
+  h1.section { font-size:17px; font-weight:800; color:var(--primary); margin:20px 0 10px; padding-bottom:6px; border-bottom:3px solid var(--accent); }
+  h2.sub { font-size:13px; font-weight:700; color:var(--primary); margin:14px 0 6px; }
+  p { margin-bottom:8px; line-height:1.65; font-size:12.5px; text-align:justify; }
+
+  /* TABLEAU PRIORITÉS */
+  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:11.5px; }
+  th { background:var(--primary); color:white; font-weight:700; padding:9px 10px; text-align:left; }
+  td { padding:8px 10px; border-bottom:1px solid #eee; vertical-align:top; }
+  tr.urgent td { background:var(--light-red); }
+  tr.important td { background:var(--light-orange); }
+  tr.later td { background:var(--light-green); }
+  tr.total td { background:var(--light); font-weight:700; }
+
+  /* FICHE POSTE */
+  .fiche { border-radius:12px; overflow:hidden; margin:20px 0; box-shadow:0 2px 10px rgba(0,0,0,.07); page-break-inside:avoid; }
+  .fiche-header { padding:14px 18px; display:flex; align-items:center; gap:12px; }
+  .fiche-header .emoji { font-size:28px; }
+  .fiche-header .info .title { font-size:16px; font-weight:800; color:white; }
+  .fiche-header .info .meta { font-size:10.5px; color:rgba(255,255,255,.85); margin-top:3px; }
+  .fiche-body { background:white; padding:14px 18px; border:1px solid #eee; border-top:none; border-radius:0 0 12px 12px; }
+
+  .fiche-red .fiche-header { background:linear-gradient(135deg, #C0392B, #E74C3C); }
+  .fiche-orange .fiche-header { background:linear-gradient(135deg, #D35400, var(--accent)); }
+  .fiche-green .fiche-header { background:linear-gradient(135deg, #1A5276, var(--primary)); }
+
+  .pills { display:flex; flex-wrap:wrap; gap:6px; margin:8px 0; }
+  .pill { background:var(--light); border:1px solid #BCD6E8; border-radius:20px; padding:3px 10px; font-size:10.5px; font-weight:600; color:var(--primary); }
+
+  ul.styled { list-style:none; padding:0; margin:6px 0; }
+  ul.styled li { padding:4px 0 4px 20px; position:relative; font-size:12px; border-bottom:1px solid #f5f5f5; line-height:1.5; }
+  ul.styled li::before { content:'▸'; position:absolute; left:0; color:var(--accent); font-weight:700; }
+  ul.styled li:last-child { border-bottom:none; }
+
+  .budget-box { background:var(--primary); border-radius:12px; padding:16px 20px; color:white; margin:16px 0; }
+  .budget-box h3 { font-size:13px; font-weight:800; color:#F39C12; margin-bottom:12px; }
+  .budget-row { display:flex; justify-content:space-between; padding:5px 0; border-bottom:1px solid rgba(255,255,255,.15); font-size:12px; }
+  .budget-row:last-child { border-bottom:none; font-weight:700; font-size:13px; color:#F1C40F; padding-top:8px; }
+  .budget-row .label { opacity:.9; }
+  .budget-row .val { font-weight:600; }
+
+  .info-box { border-radius:10px; padding:10px 14px; margin:10px 0; border-left:4px solid; }
+  .info-box.blue { background:var(--light); border-color:var(--primary); }
+  .info-box.orange { background:var(--light-orange); border-color:var(--accent); }
+  .info-box p { font-size:11.5px; margin:0; text-align:left; }
+  .info-box strong { display:block; margin-bottom:3px; font-size:11.5px; }
+  .info-box.blue strong { color:var(--primary); }
+  .info-box.orange strong { color:var(--accent); }
+
+  @media print {
+    body { background:white; }
+    .page { margin:0; box-shadow:none; page-break-after:always; }
+    .page:last-child { page-break-after:avoid; }
+    @page { size:A4; margin:0; }
+  }
+</style>
+</head>
+<body>
+
+<!-- PAGE 1: COUVERTURE -->
+<div class="page">
+  <div class="cover">
+    <div class="logo">🏢</div>
+    <h1>GUIMATRIX</h1>
+    <p class="sub">Marketplace de confiance — Guinée Conakry</p>
+    <h2>PLAN DE RECRUTEMENT</h2>
+    <p class="desc">Qui recruter, pourquoi et dans quel ordre de priorité</p>
+    <p class="date">Document interne — Septembre 2026</p>
+  </div>
+</div>
+
+<!-- PAGE 2: INTRODUCTION + TABLEAU -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Plan de Recrutement</span>
+    <span>Document interne</span>
+  </div>
+
+  <h1 class="section">Introduction</h1>
+  <p>Guimatrix est une marketplace en ligne basée à Conakry. Pour que l'application fonctionne et se développe, elle a besoin d'une petite équipe opérationnelle. Ce document explique les <strong>5 postes clés</strong> à pourvoir, pourquoi chacun est important, et dans quel ordre les recruter selon la priorité et le budget disponible.</p>
+  <p>La règle est simple : d'abord les postes qui <strong>génèrent des revenus ou maintiennent la confiance</strong> des utilisateurs, ensuite les postes de support.</p>
+
+  <h1 class="section">Tableau récapitulatif des postes</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:12%">Priorité</th>
+        <th style="width:28%">Poste</th>
+        <th style="width:40%">Pourquoi urgent ?</th>
+        <th style="width:20%">Salaire estimé / mois</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="urgent">
+        <td><strong>🔴 1 — URGENT</strong></td>
+        <td><strong>Chargé(e) de Marketing & Réseaux</strong></td>
+        <td>Sans marketing, personne ne connaît Guimatrix. C'est le moteur de croissance numéro 1.</td>
+        <td><strong>500 000 – 800 000 GNF</strong></td>
+      </tr>
+      <tr class="urgent">
+        <td><strong>🔴 2 — URGENT</strong></td>
+        <td><strong>Chef Livreur (Responsable Opérations)</strong></td>
+        <td>Sans supervision des livreurs, les livraisons échouent et les clients perdent confiance.</td>
+        <td><strong>600 000 – 1 000 000 GNF</strong></td>
+      </tr>
+      <tr class="important">
+        <td><strong>🟡 3 — IMPORTANT</strong></td>
+        <td><strong>Agent Support Client</strong></td>
+        <td>Les plaintes sans réponse détruisent la réputation. 1 seul agent suffit au départ.</td>
+        <td><strong>400 000 – 600 000 GNF</strong></td>
+      </tr>
+      <tr class="important">
+        <td><strong>🟡 4 — IMPORTANT</strong></td>
+        <td><strong>Commercial / Recruteur Vendeurs</strong></td>
+        <td>Aller chercher les boutiques et vendeurs professionnels à Conakry pour remplir la plateforme.</td>
+        <td><strong>400 000 + commissions</strong></td>
+      </tr>
+      <tr class="later">
+        <td><strong>🟢 5 — PLUS TARD</strong></td>
+        <td><strong>Comptable / Admin Financier</strong></td>
+        <td>Gérer les virements, la trésorerie et les rapports. Peut être à mi-temps au début.</td>
+        <td><strong>300 000 – 500 000 GNF</strong></td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="info-box orange">
+    <strong>⚡ Conseil de démarrage</strong>
+    <p>Commence par les 2 postes 🔴 urgents (Marketing + Chef Livreur). Une fois les premières commandes régulières, ajoute le support client. Le commercial et le comptable viennent ensuite quand le chiffre d'affaires le permet.</p>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- PAGE 3: FICHES POSTES 1 & 2 -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Plan de Recrutement</span>
+    <span>Document interne</span>
+  </div>
+
+  <div class="fiche fiche-red">
+    <div class="fiche-header">
+      <span class="emoji">📣</span>
+      <div class="info">
+        <div class="title">Chargé(e) de Marketing & Réseaux Sociaux</div>
+        <div class="meta">🔴 Priorité 1 — URGENT · 500 000 – 800 000 GNF/mois · Recruter immédiatement</div>
+      </div>
+    </div>
+    <div class="fiche-body">
+      <h2 class="sub">🎯 Pourquoi ce poste est le plus important</h2>
+      <p>Sans marketing, personne ne connaît Guimatrix. Ce poste est le <strong>moteur de toute la croissance</strong>. La personne gère les réseaux sociaux (TikTok, Facebook, Instagram, WhatsApp), crée du contenu, gère les influenceurs et fait connaître l'application auprès des vendeurs et acheteurs de Conakry. C'est le premier recrutement à faire — avant même d'avoir beaucoup de livreurs — car sans utilisateurs, les livreurs n'ont rien à livrer.</p>
+
+      <h2 class="sub">📋 Missions principales</h2>
+      <ul class="styled">
+        <li>Créer et publier du contenu quotidien sur TikTok, Facebook, Instagram (vidéos, photos, témoignages de vendeurs)</li>
+        <li>Gérer les groupes WhatsApp des vendeurs et acheteurs Guimatrix</li>
+        <li>Coordonner le programme d'affiliation : contacter et suivre les influenceurs guinéens</li>
+        <li>Lancer des campagnes publicitaires Facebook/Instagram avec le budget marketing</li>
+        <li>Mesurer les résultats : téléchargements, inscriptions, commandes générées chaque semaine</li>
+        <li>Créer des promotions et offres pour attirer les premiers utilisateurs</li>
+        <li>Représenter Guimatrix lors d'événements ou foires commerciales à Conakry</li>
+      </ul>
+
+      <h2 class="sub">✅ Profil recherché</h2>
+      <div class="pills">
+        <span class="pill">TikTok / Instagram</span>
+        <span class="pill">Facebook Ads</span>
+        <span class="pill">WhatsApp Business</span>
+        <span class="pill">Création vidéo</span>
+        <span class="pill">Créatif(ve)</span>
+        <span class="pill">20 – 32 ans</span>
+        <span class="pill">Français + langues locales</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fiche fiche-red">
+    <div class="fiche-header">
+      <span class="emoji">🚚</span>
+      <div class="info">
+        <div class="title">Chef Livreur — Responsable des Opérations</div>
+        <div class="meta">🔴 Priorité 2 — URGENT · 600 000 – 1 000 000 GNF/mois · Recruter dans le 1er mois</div>
+      </div>
+    </div>
+    <div class="fiche-body">
+      <h2 class="sub">🎯 Pourquoi ce poste est indispensable</h2>
+      <p>La livraison est ce que voit le client. Un mauvais livreur = un avis négatif et un client perdu à vie. Le Chef Livreur <strong>recrute, forme et supervise tous les livreurs</strong> de la plateforme. Il s'assure que les colis partent à l'heure, que les codes de vérification sont utilisés correctement, et que les livreurs respectent les règles. Sans ce poste, les opérations seront chaotiques dès que le volume augmentera.</p>
+
+      <h2 class="sub">📋 Missions principales</h2>
+      <ul class="styled">
+        <li>Recruter et vetter les livreurs (vérification identité, permis, véhicule)</li>
+        <li>Former les nouveaux livreurs à l'application : codes de livraison, GPS, processus de collecte</li>
+        <li>Créer et gérer les zones de livraison à Conakry (Ratoma, Kaloum, Matam, Dixinn, etc.)</li>
+        <li>Suivre les performances : délais, taux de succès, nombre de livraisons par livreur</li>
+        <li>Résoudre les incidents : colis perdu, livreur absent, adresse incorrecte</li>
+        <li>Gérer le planning des livreurs aux heures de pointe</li>
+        <li>Faire remonter les amendes et signalements à l'administrateur</li>
+      </ul>
+
+      <h2 class="sub">✅ Profil recherché</h2>
+      <div class="pills">
+        <span class="pill">Connaissance Conakry</span>
+        <span class="pill">Leadership terrain</span>
+        <span class="pill">Permis de conduire</span>
+        <span class="pill">Organisé(e)</span>
+        <span class="pill">Expérience logistique</span>
+        <span class="pill">Smartphone</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- PAGE 4: FICHES POSTES 3, 4, 5 -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Plan de Recrutement</span>
+    <span>Document interne</span>
+  </div>
+
+  <div class="fiche fiche-orange">
+    <div class="fiche-header">
+      <span class="emoji">🎧</span>
+      <div class="info">
+        <div class="title">Agent Support Client</div>
+        <div class="meta">🟡 Priorité 3 — Important · 400 000 – 600 000 GNF/mois · Recruter dans les 2 premiers mois</div>
+      </div>
+    </div>
+    <div class="fiche-body">
+      <h2 class="sub">🎯 Pourquoi ce poste est important</h2>
+      <p>Les premiers clients qui rencontrent un problème sans réponse <strong>ne reviendront jamais</strong>. L'agent répond aux acheteurs et vendeurs par WhatsApp et sur l'application, gère les litiges simples, et fait remonter les cas complexes à l'admin.</p>
+      <h2 class="sub">📋 Missions principales</h2>
+      <ul class="styled">
+        <li>Répondre aux messages des acheteurs et vendeurs en moins de 2 heures (WhatsApp, app)</li>
+        <li>Résoudre les litiges simples : commande non reçue, produit différent de la description</li>
+        <li>Escalader les cas complexes vers l'admin avec un résumé clair</li>
+        <li>Recueillir les retours utilisateurs et les transmettre à l'équipe</li>
+      </ul>
+      <div class="pills">
+        <span class="pill">Communication</span>
+        <span class="pill">Patient(e)</span>
+        <span class="pill">Pular / Soussou / Mandingue</span>
+        <span class="pill">WhatsApp Business</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fiche fiche-orange">
+    <div class="fiche-header">
+      <span class="emoji">🤝</span>
+      <div class="info">
+        <div class="title">Commercial / Recruteur de Vendeurs et Partenaires</div>
+        <div class="meta">🟡 Priorité 4 — Important · 400 000 GNF + commissions · Recruter dans les 3 premiers mois</div>
+      </div>
+    </div>
+    <div class="fiche-body">
+      <h2 class="sub">🎯 Pourquoi ce poste est important</h2>
+      <p>L'application ne vaut rien sans vendeurs actifs. Le commercial va <strong>sur le terrain à Conakry</strong> pour convaincre les boutiques, commerçants et artisans de s'inscrire sur Guimatrix. Il signe aussi des partenariats avec des entreprises et associations.</p>
+      <h2 class="sub">📋 Missions principales</h2>
+      <ul class="styled">
+        <li>Aller sur le terrain (marchés, boutiques, ateliers) pour recruter de nouveaux vendeurs</li>
+        <li>Accompagner les vendeurs pour la création de leur compte et leur première annonce</li>
+        <li>Négocier des partenariats avec des boutiques, enseignes et distributeurs locaux</li>
+        <li>Atteindre un objectif mensuel de nouveaux vendeurs actifs (ex : 30 vendeurs/mois)</li>
+      </ul>
+      <div class="pills">
+        <span class="pill">Terrain Conakry</span>
+        <span class="pill">Négociation</span>
+        <span class="pill">Langues locales</span>
+        <span class="pill">Permis de conduire</span>
+        <span class="pill">Orienté résultats</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="fiche fiche-green">
+    <div class="fiche-header">
+      <span class="emoji">💼</span>
+      <div class="info">
+        <div class="title">Comptable / Responsable Administratif et Financier</div>
+        <div class="meta">🟢 Priorité 5 — Plus tard · 300 000 – 500 000 GNF/mois · Quand &gt; 50 commandes/jour</div>
+      </div>
+    </div>
+    <div class="fiche-body">
+      <h2 class="sub">🎯 Pourquoi ce poste vient en dernier</h2>
+      <p>Au début, l'administrateur peut gérer lui-même les virements et la trésorerie. Quand les transactions quotidiennes deviennent nombreuses, il faut une personne dédiée. <strong>Peut commencer à mi-temps</strong> (3 jours/semaine).</p>
+      <h2 class="sub">📋 Missions principales</h2>
+      <ul class="styled">
+        <li>Suivre les commissions prélevées et établir des rapports mensuels</li>
+        <li>Vérifier et valider les virements vendeurs et livreurs</li>
+        <li>Tenir la comptabilité générale (recettes, dépenses, bénéfices)</li>
+        <li>Préparer les tableaux de bord financiers pour le directeur</li>
+      </ul>
+      <div class="pills">
+        <span class="pill">Comptabilité</span>
+        <span class="pill">Excel</span>
+        <span class="pill">Rigueur</span>
+        <span class="pill">Discrétion</span>
+        <span class="pill">Mi-temps possible</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 4</span>
+  </div>
+</div>
+
+<!-- PAGE 5: BUDGET + COMMENT RECRUTER -->
+<div class="page">
+  <div class="doc-header">
+    <span><span class="brand">GUIMATRIX</span> — Plan de Recrutement</span>
+    <span>Document interne</span>
+  </div>
+
+  <h1 class="section">Budget mensuel — Équipe complète</h1>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:40%">Poste</th>
+        <th style="width:20%" style="text-align:center">Salaire min.</th>
+        <th style="width:20%" style="text-align:center">Salaire max.</th>
+        <th style="width:20%" style="text-align:center">Priorité</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>Chargé(e) de Marketing</strong></td><td>500 000 GNF</td><td>800 000 GNF</td><td>🔴 Urgent</td></tr>
+      <tr><td><strong>Chef Livreur</strong></td><td>600 000 GNF</td><td>1 000 000 GNF</td><td>🔴 Urgent</td></tr>
+      <tr><td><strong>Agent Support Client</strong></td><td>400 000 GNF</td><td>600 000 GNF</td><td>🟡 Important</td></tr>
+      <tr><td><strong>Commercial / Vendeurs</strong></td><td>400 000 GNF</td><td>700 000 GNF</td><td>🟡 Important</td></tr>
+      <tr><td><strong>Comptable (mi-temps)</strong></td><td>300 000 GNF</td><td>500 000 GNF</td><td>🟢 Plus tard</td></tr>
+      <tr class="total">
+        <td><strong>TOTAL ÉQUIPE COMPLÈTE</strong></td>
+        <td><strong style="color:#1E8449">2 200 000 GNF</strong></td>
+        <td><strong style="color:#E67E22">3 600 000 GNF</strong></td>
+        <td>—</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="budget-box">
+    <h3>💡 Stratégie de démarrage progressive</h3>
+    <div class="budget-row"><span class="label">Mois 1 — Marketing + Chef Livreur uniquement</span><span class="val">1 100 000 – 1 800 000 GNF</span></div>
+    <div class="budget-row"><span class="label">Mois 2–3 — + Support Client</span><span class="val">1 500 000 – 2 400 000 GNF</span></div>
+    <div class="budget-row"><span class="label">Mois 4 — + Commercial</span><span class="val">1 900 000 – 3 100 000 GNF</span></div>
+    <div class="budget-row"><span class="label">Equipe complète (avec comptable mi-temps)</span><span class="val">2 200 000 – 3 600 000 GNF/mois</span></div>
+  </div>
+
+  <h1 class="section">Comment recruter</h1>
+  <ul class="styled">
+    <li><strong>Réseaux sociaux :</strong> publier les offres sur les groupes Facebook et WhatsApp "Emploi Guinée", "Jobs Conakry" et dans les groupes de votre secteur</li>
+    <li><strong>Bouche-à-oreille :</strong> demander à votre réseau personnel — le plus efficace en Guinée pour trouver des personnes de confiance</li>
+    <li><strong>Entretien :</strong> poser des questions sur la motivation, la connaissance du digital, et faire un test pratique simple (créer un post, appeler un numéro fictif, trouver une adresse à Conakry)</li>
+    <li><strong>Chef Livreur :</strong> faire une semaine d'essai sur le terrain avant confirmation définitive</li>
+    <li><strong>Commercial :</strong> fixer un objectif : 10 vendeurs recrutés en 30 jours avant confirmation du contrat</li>
+    <li><strong>Marketing :</strong> demander de montrer ses propres réseaux sociaux — la qualité de son propre contenu dit tout</li>
+  </ul>
+
+  <div class="info-box blue">
+    <strong>📌 Astuce pour le recrutement Marketing</strong>
+    <p>Cherche quelqu'un qui a déjà un compte TikTok ou Instagram actif en Guinée, même s'il n'a jamais travaillé en entreprise. Un jeune avec 2 000 followers locaux et de bonnes vidéos vaut mieux qu'un diplômé sans présence en ligne.</p>
+  </div>
+
+  <div style="margin-top:30px; font-size:11px; color:var(--gray); text-align:center; font-style:italic; border-top:1px solid #eee; padding-top:12px;">
+    Guimatrix © 2026 · contact@guimatrix.com · Conakry, Guinée · Septembre 2026
+  </div>
+
+  <div class="doc-footer">
+    <span>Guimatrix © 2026</span>
+    <span>Page 5</span>
+  </div>
+</div>
+
+</body>
+</html>

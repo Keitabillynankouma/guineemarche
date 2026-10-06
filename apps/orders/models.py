@@ -105,11 +105,12 @@ class MeetingZone(BaseModel):
 class Order(BaseModel):
 
     class Status(models.TextChoices):
-        PENDING   = 'pending',   'En attente'
-        CONFIRMED = 'confirmed', 'Confirmée'
-        COMPLETED = 'completed', 'Terminée'
-        CANCELLED = 'cancelled', 'Annulée'
-        DISPUTED  = 'disputed',  'Litige'
+        PENDING           = 'pending',           'En attente'
+        CONFIRMED         = 'confirmed',          'Confirmée'
+        PICKUP_CONFIRMED  = 'pickup_confirmed',   'Collecté par livreur'
+        COMPLETED         = 'completed',          'Terminée'
+        CANCELLED         = 'cancelled',          'Annulée'
+        DISPUTED          = 'disputed',           'Litige'
 
     class DeliveryMode(models.TextChoices):
         MEETING_POINT = 'meeting_point', 'Remise en main propre'
@@ -348,6 +349,94 @@ class Order(BaseModel):
     def refund_escrow(self):
         self.escrow_status = self.EscrowStatus.REFUNDED
         self.save(update_fields=['escrow_status', 'updated_at'])
+
+    def confirm_pickup(self):
+        """
+        Appelé quand le livreur confirme la collecte du produit chez le vendeur.
+        - Verse l'avance (advance_rate_pct %) au vendeur depuis le capital de roulement.
+        - Passe le statut à PICKUP_CONFIRMED.
+        - Déclenche uniquement pour home_delivery ET si le capital est suffisant.
+        """
+        if self.status != self.Status.CONFIRMED:
+            return
+        if self.delivery_mode != self.DeliveryMode.HOME_DELIVERY:
+            return
+
+        reserve = CapitalReserve.get()
+
+        # Vérifier si la commande est éligible à l'avance
+        item_amount = self.amount_gnf - (self.delivery_fee_gnf or 0)
+        if item_amount > reserve.max_order_gnf:
+            # Montant trop élevé — on passe quand même PICKUP_CONFIRMED sans avance
+            self.status = self.Status.PICKUP_CONFIRMED
+            self.save(update_fields=['status', 'updated_at'])
+            return
+
+        advance_gnf = int(item_amount * reserve.advance_rate_pct / 100)
+        held_gnf    = item_amount - advance_gnf
+
+        if not reserve.can_advance(advance_gnf):
+            # Capital insuffisant — pickup confirmé mais pas d'avance
+            self.status = self.Status.PICKUP_CONFIRMED
+            self.save(update_fields=['status', 'updated_at'])
+            return
+
+        with transaction.atomic():
+            # Créer l'enregistrement d'avance
+            advance, created = VendorAdvance.objects.get_or_create(
+                order=self,
+                defaults=dict(
+                    advance_gnf      = advance_gnf,
+                    held_gnf         = held_gnf,
+                    advance_rate_pct = reserve.advance_rate_pct,
+                    status           = VendorAdvance.Status.PENDING,
+                )
+            )
+            if not created:
+                return  # Idempotent
+
+            # Décaisser du capital
+            reserve.advance(advance_gnf)
+
+            # Marquer l'avance comme versée
+            from django.utils import timezone as tz
+            advance.status      = VendorAdvance.Status.ADVANCED
+            advance.advanced_at = tz.now()
+            advance.save(update_fields=['status', 'advanced_at', 'updated_at'])
+
+            # Créer un SellerPayout pour l'avance (70 %)
+            payout_phone    = self.seller.payout_phone or ''
+            payout_provider = self.seller.payout_provider or SellerPayout.Provider.ORANGE_MONEY
+            SellerPayout.objects.get_or_create(
+                order=self,
+                defaults=dict(
+                    seller       = self.seller,
+                    amount_gnf   = advance_gnf,
+                    payout_phone = payout_phone,
+                    provider     = payout_provider,
+                    status       = SellerPayout.Status.PENDING,
+                )
+            )
+
+            self.status = self.Status.PICKUP_CONFIRMED
+            self.save(update_fields=['status', 'updated_at'])
+
+        # Notifier le vendeur
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=self.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='💰 Avance reçue — colis collecté',
+                body=(
+                    f'Le livreur a récupéré « {self.listing.title} ». '
+                    f'Votre avance de {advance_gnf:,} GNF a été initiée. '
+                    f'Le solde de {held_gnf:,} GNF vous sera versé à la livraison.'
+                ),
+                data={'order_id': str(self.id)},
+            )
+        except Exception:
+            pass
 
 
 class SellerPayout(BaseModel):
@@ -738,3 +827,146 @@ class ReturnRequest(BaseModel):
 
     def __str__(self):
         return f"Retour #{str(self.order.id)[:8]} — {self.get_status_display()}"
+
+
+# ── Capital de roulement & avances vendeurs ───────────────────────────────────
+
+class CapitalReserve(BaseModel):
+    """
+    Fonds de roulement Guimatrix — singleton.
+    Utilisé pour payer les vendeurs à la collecte (avant que l'acheteur paie).
+    Accès via CapitalReserve.get().
+    """
+    SINGLETON_PK = 1
+
+    balance_gnf          = models.BigIntegerField(default=0,  help_text="Capital disponible actuellement")
+    total_advanced_gnf   = models.BigIntegerField(default=0,  help_text="Montant actuellement avancé (en cours)")
+    total_disbursed_gnf  = models.BigIntegerField(default=0,  help_text="Total versé depuis le début")
+    total_recovered_gnf  = models.BigIntegerField(default=0,  help_text="Total récupéré depuis le début")
+    total_defaulted_gnf  = models.BigIntegerField(default=0,  help_text="Total des pertes (défauts paiement acheteur)")
+
+    # Configuration
+    advance_rate_pct = models.PositiveSmallIntegerField(
+        default=70, help_text="Pourcentage versé au vendeur à la collecte (défaut 70 %)"
+    )
+    max_order_gnf    = models.BigIntegerField(
+        default=300_000, help_text="Montant max d'une commande éligible à l'avance"
+    )
+
+    class Meta:
+        verbose_name        = 'Capital de roulement'
+        verbose_name_plural = 'Capital de roulement'
+
+    def __str__(self):
+        return f"Capital Guimatrix — {self.balance_gnf:,} GNF disponible"
+
+    @classmethod
+    def get(cls):
+        obj, _ = cls.objects.get_or_create(pk=cls.SINGLETON_PK)
+        return obj
+
+    def can_advance(self, amount: int) -> bool:
+        return self.balance_gnf >= amount
+
+    def advance(self, amount: int):
+        """Atomic — décaisse une avance du capital."""
+        with transaction.atomic():
+            reserve = CapitalReserve.objects.select_for_update().get(pk=self.pk)
+            if reserve.balance_gnf < amount:
+                raise ValueError(f"Capital insuffisant : {reserve.balance_gnf:,} GNF < {amount:,} GNF")
+            reserve.balance_gnf         -= amount
+            reserve.total_advanced_gnf  += amount
+            reserve.total_disbursed_gnf += amount
+            reserve.save(update_fields=[
+                'balance_gnf', 'total_advanced_gnf', 'total_disbursed_gnf', 'updated_at'
+            ])
+            # Mettre à jour l'instance courante
+            self.balance_gnf         = reserve.balance_gnf
+            self.total_advanced_gnf  = reserve.total_advanced_gnf
+            self.total_disbursed_gnf = reserve.total_disbursed_gnf
+
+    def recover(self, amount: int):
+        """Atomic — récupère le capital avancé quand l'acheteur paie."""
+        with transaction.atomic():
+            reserve = CapitalReserve.objects.select_for_update().get(pk=self.pk)
+            reserve.balance_gnf         += amount
+            reserve.total_advanced_gnf  -= amount
+            reserve.total_recovered_gnf += amount
+            reserve.save(update_fields=[
+                'balance_gnf', 'total_advanced_gnf', 'total_recovered_gnf', 'updated_at'
+            ])
+            self.balance_gnf         = reserve.balance_gnf
+            self.total_advanced_gnf  = reserve.total_advanced_gnf
+            self.total_recovered_gnf = reserve.total_recovered_gnf
+
+    def record_default(self, amount: int):
+        """Atomic — enregistre une perte (acheteur n'a pas payé)."""
+        with transaction.atomic():
+            reserve = CapitalReserve.objects.select_for_update().get(pk=self.pk)
+            reserve.total_advanced_gnf -= amount
+            reserve.total_defaulted_gnf += amount
+            reserve.save(update_fields=[
+                'total_advanced_gnf', 'total_defaulted_gnf', 'updated_at'
+            ])
+
+    def add_funds(self, amount: int):
+        """Ajouter du capital manuellement (injection admin)."""
+        with transaction.atomic():
+            reserve = CapitalReserve.objects.select_for_update().get(pk=self.pk)
+            reserve.balance_gnf += amount
+            reserve.save(update_fields=['balance_gnf', 'updated_at'])
+            self.balance_gnf = reserve.balance_gnf
+
+
+class VendorAdvance(BaseModel):
+    """
+    Avance de paiement au vendeur lors de la collecte par le livreur.
+    Créée dans Order.confirm_pickup().
+    Soldée dans Order.release_escrow() ou signalée en défaut par l'admin.
+    """
+
+    class Status(models.TextChoices):
+        PENDING   = 'pending',   'En attente de versement'
+        ADVANCED  = 'advanced',  'Avance versée'
+        COMPLETED = 'completed', 'Soldé (acheteur payé)'
+        DEFAULTED = 'defaulted', 'Défaut de paiement'
+
+    order             = models.OneToOneField(
+        Order, on_delete=models.PROTECT, related_name='vendor_advance'
+    )
+    advance_gnf       = models.BigIntegerField(help_text="Montant avancé au vendeur (ex : 70 %)")
+    held_gnf          = models.BigIntegerField(help_text="Montant retenu jusqu'à livraison (ex : 30 %)")
+    advance_rate_pct  = models.PositiveSmallIntegerField(default=70)
+    status            = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
+    advanced_at       = models.DateTimeField(null=True, blank=True, help_text="Quand l'avance a été versée")
+    completed_at      = models.DateTimeField(null=True, blank=True, help_text="Quand l'acheteur a payé / solde versé")
+    payment_reference = models.CharField(max_length=100, blank=True, help_text="Réf. transaction mobile money")
+    admin_note        = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name        = 'Avance vendeur'
+        verbose_name_plural = 'Avances vendeurs'
+        ordering            = ['-created_at']
+
+    def __str__(self):
+        return (
+            f"Avance {self.order.seller.full_name} — "
+            f"{self.advance_gnf:,} GNF ({self.get_status_display()})"
+        )
+
+    def complete(self, payment_reference: str = ''):
+        """Solde l'avance : récupère le capital, verse le solde au vendeur."""
+        from django.utils import timezone as tz
+        self.status            = self.Status.COMPLETED
+        self.completed_at      = tz.now()
+        self.payment_reference = payment_reference
+        self.save(update_fields=['status', 'completed_at', 'payment_reference', 'updated_at'])
+        # Récupérer le capital avancé
+        CapitalReserve.get().recover(self.advance_gnf)
+
+    def mark_defaulted(self, note: str = ''):
+        """L'acheteur n'a pas payé — enregistre la perte."""
+        self.status     = self.Status.DEFAULTED
+        self.admin_note = note
+        self.save(update_fields=['status', 'admin_note', 'updated_at'])
+        CapitalReserve.get().record_default(self.advance_gnf)

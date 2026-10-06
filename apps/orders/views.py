@@ -2848,3 +2848,198 @@ class ChaChaPayoutWebhookView(APIView):
             )
         except Exception as exc:
             logger.warning("[PAYOUT WEBHOOK] Notification livreur impossible : %s", exc)
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Capital de roulement — API
+# ─────────────────────────────────────────────────────────────────────────────
+
+class ConfirmPickupView(APIView):
+    """
+    POST /api/v1/orders/<pk>/confirm-pickup/
+    Appelé par le livreur pour confirmer qu'il a collecté le produit chez le vendeur.
+    Déclenche le versement de l'avance (70 %) au vendeur depuis le capital de roulement.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        from .models import Order, DeliveryAssignment
+        order = get_object_or_404(Order, pk=pk)
+
+        # Seul le livreur assigné ou un admin peut confirmer
+        is_admin   = getattr(request.user, 'role', '') in ('admin', 'super_admin')
+        is_livreur = False
+        try:
+            assignment = order.delivery_assignment
+            is_livreur = assignment.livreur == request.user
+        except DeliveryAssignment.DoesNotExist:
+            pass
+
+        if not is_admin and not is_livreur:
+            return Response({'error': 'Non autorisé.'}, status=403)
+
+        if order.status != Order.Status.CONFIRMED:
+            return Response({
+                'error': f'La commande doit être confirmée pour collecter. Statut actuel : {order.status}'
+            }, status=400)
+
+        order.confirm_pickup()
+
+        has_advance = hasattr(order, 'vendor_advance') and order.vendor_advance is not None
+        return Response({
+            'status':       order.status,
+            'advance_paid': has_advance,
+            'advance_gnf':  order.vendor_advance.advance_gnf if has_advance else 0,
+            'held_gnf':     order.vendor_advance.held_gnf    if has_advance else 0,
+            'message':      'Collecte confirmée.' + (' Avance vendeur initiée.' if has_advance else ''),
+        })
+
+
+class AdminCapitalReserveView(APIView):
+    """
+    GET  /api/v1/orders/admin/capital/           — état du capital de roulement
+    POST /api/v1/orders/admin/capital/add-funds/ — injecter des fonds
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _check_admin(self, user):
+        return getattr(user, 'role', '') in ('admin', 'super_admin', 'admin_accounting')
+
+    def get(self, request):
+        if not self._check_admin(request.user):
+            return Response({'error': 'Accès réservé aux admins.'}, status=403)
+
+        from .models import CapitalReserve, VendorAdvance
+        reserve = CapitalReserve.get()
+
+        # Statistiques avances
+        pending_advances  = VendorAdvance.objects.filter(status=VendorAdvance.Status.ADVANCED)
+        pending_count     = pending_advances.count()
+        pending_total_gnf = sum(a.advance_gnf for a in pending_advances)
+
+        defaulted = VendorAdvance.objects.filter(status=VendorAdvance.Status.DEFAULTED)
+
+        return Response({
+            'balance_gnf':           reserve.balance_gnf,
+            'total_advanced_gnf':    reserve.total_advanced_gnf,
+            'total_disbursed_gnf':   reserve.total_disbursed_gnf,
+            'total_recovered_gnf':   reserve.total_recovered_gnf,
+            'total_defaulted_gnf':   reserve.total_defaulted_gnf,
+            'advance_rate_pct':      reserve.advance_rate_pct,
+            'max_order_gnf':         reserve.max_order_gnf,
+            'pending_advances_count': pending_count,
+            'pending_advances_gnf':   pending_total_gnf,
+            'defaulted_count':        defaulted.count(),
+            'recovery_rate_pct': (
+                round(reserve.total_recovered_gnf / reserve.total_disbursed_gnf * 100, 1)
+                if reserve.total_disbursed_gnf > 0 else 100.0
+            ),
+        })
+
+    def post(self, request):
+        """Injecter des fonds dans le capital."""
+        if not self._check_admin(request.user):
+            return Response({'error': 'Accès réservé aux admins.'}, status=403)
+
+        from .models import CapitalReserve
+        amount = request.data.get('amount_gnf')
+        if not amount or int(amount) <= 0:
+            return Response({'error': 'Montant invalide.'}, status=400)
+
+        reserve = CapitalReserve.get()
+        reserve.add_funds(int(amount))
+        reserve.refresh_from_db()
+        return Response({
+            'message':      f'{int(amount):,} GNF ajoutés au capital.',
+            'balance_gnf':  reserve.balance_gnf,
+        })
+
+
+class AdminCapitalConfigView(APIView):
+    """
+    PATCH /api/v1/orders/admin/capital/config/
+    Modifier le taux d'avance et le plafond par commande.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def patch(self, request):
+        if getattr(request.user, 'role', '') not in ('admin', 'super_admin'):
+            return Response({'error': 'Accès réservé aux super admins.'}, status=403)
+
+        from .models import CapitalReserve
+        reserve = CapitalReserve.objects.select_for_update().get(pk=CapitalReserve.SINGLETON_PK)
+
+        if 'advance_rate_pct' in request.data:
+            rate = int(request.data['advance_rate_pct'])
+            if not (10 <= rate <= 100):
+                return Response({'error': 'Le taux doit être entre 10 et 100 %.'}, status=400)
+            reserve.advance_rate_pct = rate
+
+        if 'max_order_gnf' in request.data:
+            reserve.max_order_gnf = int(request.data['max_order_gnf'])
+
+        reserve.save(update_fields=['advance_rate_pct', 'max_order_gnf', 'updated_at'])
+        return Response({
+            'advance_rate_pct': reserve.advance_rate_pct,
+            'max_order_gnf':    reserve.max_order_gnf,
+        })
+
+
+class AdminVendorAdvanceListView(generics.ListAPIView):
+    """
+    GET /api/v1/orders/admin/capital/advances/
+    Liste toutes les avances avec filtre par statut.
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        if getattr(request.user, 'role', '') not in ('admin', 'super_admin', 'admin_accounting'):
+            return Response({'error': 'Accès réservé aux admins.'}, status=403)
+
+        from .models import VendorAdvance
+        status_filter = request.query_params.get('status')
+        qs = VendorAdvance.objects.select_related(
+            'order', 'order__seller', 'order__listing'
+        ).order_by('-created_at')
+
+        if status_filter:
+            qs = qs.filter(status=status_filter)
+
+        data = []
+        for adv in qs[:100]:
+            data.append({
+                'id':              str(adv.id),
+                'order_id':        str(adv.order.id),
+                'seller_name':     adv.order.seller.full_name,
+                'listing_title':   adv.order.listing.title,
+                'advance_gnf':     adv.advance_gnf,
+                'held_gnf':        adv.held_gnf,
+                'advance_rate_pct':adv.advance_rate_pct,
+                'status':          adv.status,
+                'advanced_at':     adv.advanced_at,
+                'completed_at':    adv.completed_at,
+                'admin_note':      adv.admin_note,
+            })
+        return Response({'count': len(data), 'results': data})
+
+
+class AdminMarkAdvanceDefaultedView(APIView):
+    """
+    POST /api/v1/orders/admin/capital/advances/<pk>/default/
+    Marquer une avance comme défaut de paiement (acheteur n'a pas payé).
+    """
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        if getattr(request.user, 'role', '') not in ('admin', 'super_admin'):
+            return Response({'error': 'Accès réservé aux admins.'}, status=403)
+
+        from .models import VendorAdvance
+        advance = get_object_or_404(VendorAdvance, pk=pk)
+
+        if advance.status != VendorAdvance.Status.ADVANCED:
+            return Response({'error': 'Seule une avance versée peut être marquée en défaut.'}, status=400)
+
+        note = request.data.get('note', 'Défaut signalé par admin')
+        advance.mark_defaulted(note=note)
+        return Response({'message': 'Avance marquée en défaut. Capital mis à jour.'})

@@ -60,6 +60,9 @@ urlpatterns = [
     path('<uuid:pk>/confirm-receipt/',
         views.ConfirmReceiptView.as_view(),
         name='order-confirm-receipt'),
+    path('<uuid:pk>/confirm-pickup/',
+        views.ConfirmPickupView.as_view(),
+        name='order-confirm-pickup'),
     path('<uuid:pk>/dispute/',
         views.DisputeView.as_view(),
         name='order-dispute'),
@@ -217,4 +220,18 @@ urlpatterns = [
     path('admin/seller-payouts/<uuid:pk>/mark-paid/',
         views.AdminMarkSellerPayoutPaidView.as_view(),
         name='admin-seller-payout-mark-paid'),
+
+    # ── Capital de roulement ──────────────────────────────────────────────────
+    path('admin/capital/',
+        views.AdminCapitalReserveView.as_view(),
+        name='admin-capital'),
+    path('admin/capital/config/',
+        views.AdminCapitalConfigView.as_view(),
+        name='admin-capital-config'),
+    path('admin/capital/advances/',
+        views.AdminVendorAdvanceListView.as_view(),
+        name='admin-capital-advances'),
+    path('admin/capital/advances/<uuid:pk>/default/',
+        views.AdminMarkAdvanceDefaultedView.as_view(),
+        name='admin-capital-advance-default'),
 ]

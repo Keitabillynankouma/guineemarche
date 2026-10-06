@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Capital de Roulement — Guimatrix Admin</title>
+<style>
+  :root {
+    --primary: #1a1a2e;
+    --accent:  #e94560;
+    --green:   #10b981;
+    --yellow:  #f59e0b;
+    --red:     #ef4444;
+    --blue:    #3b82f6;
+    --bg:      #f1f5f9;
+    --card:    #ffffff;
+    --text:    #1e293b;
+    --muted:   #64748b;
+    --border:  #e2e8f0;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Segoe UI', Arial, sans-serif; background: var(--bg); color: var(--text); }
+
+  /* ── Header ── */
+  header {
+    background: var(--primary);
+    color: #fff;
+    padding: 18px 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 1.3rem; font-weight: 700; letter-spacing: .5px; }
+  header span { font-size: .85rem; opacity: .7; }
+  .live-dot {
+    display: inline-block; width: 8px; height: 8px;
+    background: var(--green); border-radius: 50%;
+    animation: blink 1.5s infinite;
+    margin-right: 6px;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+  /* ── Layout ── */
+  main { max-width: 1200px; margin: 0 auto; padding: 28px 24px; }
+  .section-title {
+    font-size: .75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 1px; color: var(--muted); margin-bottom: 14px;
+  }
+
+  /* ── KPI Cards ── */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+    margin-bottom: 32px;
+  }
+  .kpi {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 20px;
+    border-left: 4px solid var(--border);
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+  }
+  .kpi.green  { border-left-color: var(--green); }
+  .kpi.yellow { border-left-color: var(--yellow); }
+  .kpi.red    { border-left-color: var(--red); }
+  .kpi.blue   { border-left-color: var(--blue); }
+  .kpi.primary{ border-left-color: var(--primary); }
+  .kpi label  { font-size: .75rem; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .5px; }
+  .kpi .val   { font-size: 1.6rem; font-weight: 800; margin: 6px 0 2px; }
+  .kpi .sub   { font-size: .78rem; color: var(--muted); }
+
+  /* ── Config Panel ── */
+  .config-panel {
+    background: var(--card);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+  }
+  .config-field { flex: 1; min-width: 160px; }
+  .config-field label { font-size: .78rem; font-weight: 600; color: var(--muted); display: block; margin-bottom: 6px; }
+  .config-field input {
+    width: 100%; padding: 10px 14px;
+    border: 1.5px solid var(--border); border-radius: 8px;
+    font-size: .95rem; color: var(--text);
+    transition: border-color .2s;
+  }
+  .config-field input:focus { outline: none; border-color: var(--primary); }
+
+  /* ── Inject Capital ── */
+  .inject-panel {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 32px;
+    color: #fff;
+    display: flex;
+    gap: 16px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+  }
+  .inject-panel label { font-size: .78rem; font-weight: 600; opacity: .8; display: block; margin-bottom: 6px; }
+  .inject-panel input {
+    padding: 10px 16px; border-radius: 8px; border: none;
+    font-size: 1rem; min-width: 220px; color: var(--text);
+  }
+
+  /* ── Buttons ── */
+  .btn {
+    padding: 10px 22px; border-radius: 8px; border: none;
+    font-size: .9rem; font-weight: 600; cursor: pointer;
+    transition: opacity .2s, transform .1s;
+  }
+  .btn:hover { opacity: .88; }
+  .btn:active { transform: scale(.97); }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-green   { background: var(--green);  color: #fff; }
+  .btn-outline {
+    background: transparent; color: var(--primary);
+    border: 1.5px solid var(--border);
+  }
+
+  /* ── Progress Bar ── */
+  .progress-wrap { background: var(--border); border-radius: 99px; height: 10px; margin-top: 8px; overflow: hidden; }
+  .progress-bar  { height: 100%; border-radius: 99px; transition: width .6s; }
+
+  /* ── Table ── */
+  .table-card {
+    background: var(--card);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 1px 4px rgba(0,0,0,.06);
+    margin-bottom: 32px;
+  }
+  .table-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--border);
+  }
+  .table-header h3 { font-size: .95rem; font-weight: 700; }
+  .filter-tabs { display: flex; gap: 6px; }
+  .filter-tab {
+    padding: 5px 14px; border-radius: 99px;
+    font-size: .78rem; font-weight: 600; cursor: pointer; border: none;
+    background: var(--bg); color: var(--muted);
+    transition: background .2s, color .2s;
+  }
+  .filter-tab.active { background: var(--primary); color: #fff; }
+  table { width: 100%; border-collapse: collapse; }
+  th {
+    background: var(--bg); padding: 10px 16px;
+    text-align: left; font-size: .75rem;
+    text-transform: uppercase; letter-spacing: .5px; color: var(--muted);
+  }
+  td { padding: 12px 16px; border-top: 1px solid var(--border); font-size: .88rem; }
+  tr:hover td { background: #f8fafc; }
+  .badge {
+    padding: 3px 10px; border-radius: 99px;
+    font-size: .73rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: .3px;
+  }
+  .badge-green   { background: #d1fae5; color: #065f46; }
+  .badge-yellow  { background: #fef3c7; color: #92400e; }
+  .badge-red     { background: #fee2e2; color: #991b1b; }
+  .badge-blue    { background: #dbeafe; color: #1e40af; }
+  .badge-gray    { background: #f1f5f9; color: #64748b; }
+  .btn-sm { padding: 5px 12px; font-size: .78rem; border-radius: 6px; }
+  .text-right { text-align: right; }
+
+  /* ── Toast ── */
+  #toast {
+    position: fixed; bottom: 24px; right: 24px;
+    background: var(--primary); color: #fff;
+    padding: 12px 20px; border-radius: 10px;
+    font-size: .88rem; font-weight: 600;
+    box-shadow: 0 4px 16px rgba(0,0,0,.2);
+    opacity: 0; transform: translateY(10px);
+    transition: all .3s; pointer-events: none; z-index: 999;
+  }
+  #toast.show { opacity: 1; transform: translateY(0); }
+
+  /* ── Loading ── */
+  .loading { text-align: center; padding: 40px; color: var(--muted); }
+  .spinner {
+    width: 32px; height: 32px; border: 3px solid var(--border);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin .7s linear infinite; margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>💰 Capital de Roulement <span style="opacity:.5; font-weight:400">/ Guimatrix Admin</span></h1>
+  <span><span class="live-dot"></span>Données en temps réel</span>
+</header>
+
+<main>
+
+  <!-- ── KPI Cards ── -->
+  <div class="section-title">Vue d'ensemble</div>
+  <div class="kpi-grid" id="kpi-grid">
+    <div class="loading"><div class="spinner"></div>Chargement…</div>
+  </div>
+
+  <!-- ── Taux de récupération ── -->
+  <div class="section-title">Taux de récupération du capital</div>
+  <div class="table-card" style="padding:20px; margin-bottom:32px;">
+    <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+      <span style="font-size:.88rem; font-weight:600;">Capital récupéré</span>
+      <span id="recovery-pct" style="font-size:.88rem; font-weight:700; color: var(--green);">—</span>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="recovery-bar" style="width:0%; background: var(--green);"></div>
+    </div>
+    <div style="display:flex; justify-content:space-between; margin-top:10px;">
+      <div style="display:flex; justify-content:space-between; margin-bottom:6px; width:100%">
+        <span style="font-size:.88rem; font-weight:600;">Capital actuellement avancé</span>
+        <span id="advanced-pct" style="font-size:.88rem; font-weight:700; color: var(--yellow);">—</span>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div class="progress-bar" id="advanced-bar" style="width:0%; background: var(--yellow);"></div>
+    </div>
+  </div>
+
+  <!-- ── Config ── -->
+  <div class="section-title">Configuration</div>
+  <div class="config-panel">
+    <div class="config-field">
+      <label>Taux d'avance vendeur (%)</label>
+      <input type="number" id="cfg-rate" min="10" max="100" placeholder="70" />
+    </div>
+    <div class="config-field">
+      <label>Plafond par commande (GNF)</label>
+      <input type="number" id="cfg-max" placeholder="300000" />
+    </div>
+    <button class="btn btn-primary" onclick="saveConfig()">Enregistrer</button>
+  </div>
+
+  <!-- ── Injecter capital ── -->
+  <div class="section-title">Injecter du capital</div>
+  <div class="inject-panel">
+    <div>
+      <label>Montant à ajouter (GNF)</label>
+      <input type="number" id="inject-amount" placeholder="Ex : 5000000" min="1" />
+    </div>
+    <button class="btn btn-green" onclick="injectFunds()">➕ Ajouter au capital</button>
+  </div>
+
+  <!-- ── Table avances ── -->
+  <div class="section-title">Avances en cours</div>
+  <div class="table-card">
+    <div class="table-header">
+      <h3>Historique des avances</h3>
+      <div class="filter-tabs">
+        <button class="filter-tab active" onclick="filterAdvances('all',   this)">Toutes</button>
+        <button class="filter-tab"        onclick="filterAdvances('advanced',  this)">En cours</button>
+        <button class="filter-tab"        onclick="filterAdvances('completed', this)">Soldées</button>
+        <button class="filter-tab"        onclick="filterAdvances('defaulted', this)">Défauts</button>
+      </div>
+    </div>
+    <div id="advances-table">
+      <div class="loading"><div class="spinner"></div>Chargement…</div>
+    </div>
+  </div>
+
+</main>
+
+<div id="toast"></div>
+
+<script>
+const API = '/api/v1/orders';
+let allAdvances = [];
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+function fmt(n) {
+  if (n === null || n === undefined) return '—';
+  return Number(n).toLocaleString('fr-FR') + ' GNF';
+}
+function fmtDate(d) {
+  if (!d) return '—';
+  return new Date(d).toLocaleString('fr-FR', {
+    day:'2-digit', month:'short', year:'numeric',
+    hour:'2-digit', minute:'2-digit'
+  });
+}
+function toast(msg, ok=true) {
+  const el = document.getElementById('toast');
+  el.textContent = (ok ? '✅ ' : '❌ ') + msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+function badgeHtml(status) {
+  const map = {
+    advanced:  ['badge-yellow',  'En cours'],
+    completed: ['badge-green',   'Soldée'],
+    defaulted: ['badge-red',     'Défaut'],
+    pending:   ['badge-gray',    'En attente'],
+  };
+  const [cls, label] = map[status] || ['badge-gray', status];
+  return `<span class="badge ${cls}">${label}</span>`;
+}
+
+// ── Charger KPIs ─────────────────────────────────────────────────────────────
+async function loadCapital() {
+  try {
+    const r = await fetch(`${API}/admin/capital/`);
+    if (!r.ok) throw new Error(r.status);
+    const d = await r.json();
+
+    document.getElementById('kpi-grid').innerHTML = `
+      <div class="kpi green">
+        <label>Capital disponible</label>
+        <div class="val">${fmt(d.balance_gnf)}</div>
+        <div class="sub">Prêt à être avancé</div>
+      </div>
+      <div class="kpi yellow">
+        <label>En cours d'avance</label>
+        <div class="val">${fmt(d.total_advanced_gnf)}</div>
+        <div class="sub">${d.pending_advances_count} commande(s) active(s)</div>
+      </div>
+      <div class="kpi blue">
+        <label>Total versé</label>
+        <div class="val">${fmt(d.total_disbursed_gnf)}</div>
+        <div class="sub">Depuis le lancement</div>
+      </div>
+      <div class="kpi primary">
+        <label>Total récupéré</label>
+        <div class="val">${fmt(d.total_recovered_gnf)}</div>
+        <div class="sub">Acheteurs qui ont payé</div>
+      </div>
+      <div class="kpi red">
+        <label>Pertes (défauts)</label>
+        <div class="val">${fmt(d.total_defaulted_gnf)}</div>
+        <div class="sub">${d.defaulted_count} cas signalé(s)</div>
+      </div>
+      <div class="kpi ${d.recovery_rate_pct >= 95 ? 'green' : d.recovery_rate_pct >= 80 ? 'yellow' : 'red'}">
+        <label>Taux récupération</label>
+        <div class="val">${d.recovery_rate_pct}%</div>
+        <div class="sub">${d.recovery_rate_pct >= 95 ? '✅ Excellent' : d.recovery_rate_pct >= 80 ? '⚠️ Attention' : '🚨 Critique'}</div>
+      </div>
+    `;
+
+    // Barres de progression
+    const totalDisbursed = d.total_disbursed_gnf || 1;
+    const recovPct = Math.min(100, Math.round(d.total_recovered_gnf / totalDisbursed * 100));
+    const advPct   = Math.min(100, Math.round(d.total_advanced_gnf  / totalDisbursed * 100));
+    document.getElementById('recovery-pct').textContent = recovPct + '%';
+    document.getElementById('advanced-pct').textContent = advPct  + '%';
+    document.getElementById('recovery-bar').style.width = recovPct + '%';
+    document.getElementById('advanced-bar').style.width = advPct  + '%';
+
+    // Pré-remplir config
+    document.getElementById('cfg-rate').value = d.advance_rate_pct;
+    document.getElementById('cfg-max').value  = d.max_order_gnf;
+
+  } catch(e) {
+    document.getElementById('kpi-grid').innerHTML =
+      `<div class="loading" style="color:var(--red)">⚠️ Erreur de chargement. Connectez-vous d'abord à l'admin.</div>`;
+  }
+}
+
+// ── Charger avances ───────────────────────────────────────────────────────────
+async function loadAdvances() {
+  try {
+    const r = await fetch(`${API}/admin/capital/advances/`);
+    if (!r.ok) throw new Error(r.status);
+    const data = await r.json();
+    allAdvances = data.results || [];
+    renderAdvances(allAdvances);
+  } catch(e) {
+    document.getElementById('advances-table').innerHTML =
+      '<div class="loading" style="color:var(--red)">⚠️ Impossible de charger les avances.</div>';
+  }
+}
+function filterAdvances(status, btn) {
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  const filtered = status === 'all' ? allAdvances : allAdvances.filter(a => a.status === status);
+  renderAdvances(filtered);
+}
+function renderAdvances(list) {
+  if (!list.length) {
+    document.getElementById('advances-table').innerHTML =
+      '<div class="loading" style="padding:30px; color:var(--muted)">Aucune avance trouvée.</div>';
+    return;
+  }
+  const rows = list.map(a => `
+    <tr>
+      <td><span style="font-family:monospace; font-size:.8rem;">${a.order_id.slice(0,8)}…</span></td>
+      <td><b>${a.seller_name}</b></td>
+      <td style="max-width:200px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${a.listing_title}</td>
+      <td class="text-right"><b>${fmt(a.advance_gnf)}</b></td>
+      <td class="text-right" style="color:var(--muted);">${fmt(a.held_gnf)}</td>
+      <td>${a.advance_rate_pct}%</td>
+      <td>${badgeHtml(a.status)}</td>
+      <td style="color:var(--muted); font-size:.8rem;">${fmtDate(a.advanced_at)}</td>
+      <td>
+        ${a.status === 'advanced'
+          ? `<button class="btn btn-outline btn-sm" onclick="markDefault('${a.id}')">⚠️ Défaut</button>`
+          : '—'
+        }
+      </td>
+    </tr>
+  `).join('');
+
+  document.getElementById('advances-table').innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Commande</th>
+          <th>Vendeur</th>
+          <th>Article</th>
+          <th class="text-right">Avancé</th>
+          <th class="text-right">Retenu</th>
+          <th>Taux</th>
+          <th>Statut</th>
+          <th>Date avance</th>
+          <th>Action</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+// ── Actions ───────────────────────────────────────────────────────────────────
+async function saveConfig() {
+  const rate = parseInt(document.getElementById('cfg-rate').value);
+  const max  = parseInt(document.getElementById('cfg-max').value);
+  if (!rate || !max) return toast('Remplissez les deux champs.', false);
+
+  const r = await fetch(`${API}/admin/capital/config/`, {
+    method: 'PATCH',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ advance_rate_pct: rate, max_order_gnf: max })
+  });
+  if (r.ok) { toast('Configuration enregistrée.'); loadCapital(); }
+  else       toast('Erreur lors de la sauvegarde.', false);
+}
+
+async function injectFunds() {
+  const amount = parseInt(document.getElementById('inject-amount').value);
+  if (!amount || amount <= 0) return toast('Montant invalide.', false);
+
+  const r = await fetch(`${API}/admin/capital/`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ amount_gnf: amount })
+  });
+  if (r.ok) {
+    document.getElementById('inject-amount').value = '';
+    toast(`${amount.toLocaleString('fr-FR')} GNF ajoutés !`);
+    loadCapital();
+  } else {
+    toast('Erreur lors de l\'injection.', false);
+  }
+}
+
+async function markDefault(id) {
+  if (!confirm('Confirmer le défaut de paiement ? Le capital avancé sera perdu.')) return;
+  const note = prompt('Note (optionnel) :') || 'Défaut signalé par admin';
+  const r = await fetch(`${API}/admin/capital/advances/${id}/default/`, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ note })
+  });
+  if (r.ok) { toast('Défaut enregistré. Capital mis à jour.'); loadCapital(); loadAdvances(); }
+  else       toast('Erreur.', false);
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────────
+loadCapital();
+loadAdvances();
+setInterval(() => { loadCapital(); loadAdvances(); }, 30000); // refresh toutes les 30s
+</script>
+</body>
+</html>
