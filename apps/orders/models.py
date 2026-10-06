@@ -131,7 +131,7 @@ class Order(BaseModel):
     amount_gnf         = models.BigIntegerField()
     commission_gnf     = models.BigIntegerField(default=0)
     seller_payout_gnf  = models.BigIntegerField(default=0)
-    status             = models.CharField(max_length=12, choices=Status.choices,       default=Status.PENDING)
+    status             = models.CharField(max_length=16, choices=Status.choices,       default=Status.PENDING)
     delivery_mode      = models.CharField(max_length=15, choices=DeliveryMode.choices, default=DeliveryMode.MEETING_POINT)
     pickup_point       = models.ForeignKey(PickupPoint, on_delete=models.SET_NULL,     null=True, blank=True, related_name='orders')
     meet_location      = models.CharField(max_length=255, blank=True)
