@@ -95,6 +95,13 @@ const adminAPI = {
   getReturns:    (params)      => api.get('/orders/admin/returns/', { params }),
   updateReturn:  (id, data)    => api.patch(`/orders/admin/returns/${id}/`, data),
 
+  // Capital de roulement
+  getCapital:           ()          => api.get('/orders/admin/capital/'),
+  injectCapital:        (amount)    => api.post('/orders/admin/capital/', { amount_gnf: amount }),
+  saveCapitalConfig:    (data)      => api.patch('/orders/admin/capital/config/', data),
+  getCapitalAdvances:   (params)    => api.get('/orders/admin/capital/advances/', { params }),
+  markAdvanceDefaulted: (id, note)  => api.post(`/orders/admin/capital/advances/${id}/default/`, { note }),
+
   // Utilisateurs
   getUsers:   (params)      => api.get('/accounts/admin/users/', { params }),
   updateUser: (id, data)    => api.patch(`/accounts/admin/users/${id}/`, data),
@@ -3342,6 +3349,271 @@ function FinesSection() {
   )
 }
 
+// ── Onglet Capital de roulement ──────────────────────────────────────────────
+
+function TabCapital() {
+  const qc = useQueryClient()
+  const [injectAmount, setInjectAmount] = useState('')
+  const [cfgRate, setCfgRate]           = useState('')
+  const [cfgMax,  setCfgMax]            = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [toast, setToast]               = useState(null)
+
+  const showToast = (msg, ok = true) => {
+    setToast({ msg, ok })
+    setTimeout(() => setToast(null), 3500)
+  }
+
+  const { data: capital, isLoading: capLoading } = useQuery({
+    queryKey: ['admin-capital'],
+    queryFn:  () => adminAPI.getCapital().then(r => r.data),
+    refetchInterval: 30000,
+    onSuccess: d => {
+      if (!cfgRate) setCfgRate(d.advance_rate_pct)
+      if (!cfgMax)  setCfgMax(d.max_order_gnf)
+    },
+  })
+
+  const { data: advancesData, isLoading: advLoading } = useQuery({
+    queryKey: ['admin-capital-advances', statusFilter],
+    queryFn:  () => adminAPI.getCapitalAdvances(statusFilter !== 'all' ? { status: statusFilter } : {}).then(r => r.data),
+    refetchInterval: 30000,
+  })
+  const advances = advancesData?.results ?? (Array.isArray(advancesData) ? advancesData : [])
+
+  const injectMutation = useMutation({
+    mutationFn: (amount) => adminAPI.injectCapital(amount),
+    onSuccess: () => {
+      setInjectAmount('')
+      qc.invalidateQueries(['admin-capital'])
+      showToast('Capital ajouté avec succès.')
+    },
+    onError: () => showToast('Erreur lors de l\'injection.', false),
+  })
+
+  const configMutation = useMutation({
+    mutationFn: (data) => adminAPI.saveCapitalConfig(data),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-capital'])
+      showToast('Configuration enregistrée.')
+    },
+    onError: () => showToast('Erreur lors de la sauvegarde.', false),
+  })
+
+  const defaultMutation = useMutation({
+    mutationFn: ({ id, note }) => adminAPI.markAdvanceDefaulted(id, note),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-capital'])
+      qc.invalidateQueries(['admin-capital-advances'])
+      showToast('Défaut enregistré.')
+    },
+    onError: () => showToast('Erreur.', false),
+  })
+
+  const handleDefault = (id) => {
+    if (!window.confirm('Confirmer le défaut de paiement ? Le capital avancé sera perdu.')) return
+    const note = window.prompt('Note (optionnel) :') || 'Défaut signalé par admin'
+    defaultMutation.mutate({ id, note })
+  }
+
+  const totalDisbursed = capital?.total_disbursed_gnf || 1
+  const recovPct = capital ? Math.min(100, Math.round(capital.total_recovered_gnf / totalDisbursed * 100)) : 0
+  const advPct   = capital ? Math.min(100, Math.round(capital.total_advanced_gnf  / totalDisbursed * 100)) : 0
+  const recovRate = capital?.recovery_rate_pct ?? 0
+
+  const statusBadge = (s) => {
+    const map = {
+      advanced:  'bg-yellow-100 text-yellow-800',
+      completed: 'bg-green-100 text-green-800',
+      defaulted: 'bg-red-100 text-red-800',
+      pending:   'bg-gray-100 text-gray-600',
+    }
+    const labels = { advanced: 'En cours', completed: 'Soldée', defaulted: 'Défaut', pending: 'En attente' }
+    return <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${map[s] ?? 'bg-gray-100 text-gray-500'}`}>{labels[s] ?? s}</span>
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Toast */}
+      {toast && (
+        <div className={`fixed bottom-6 right-6 z-50 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold text-white transition-all ${toast.ok ? 'bg-green-600' : 'bg-red-600'}`}>
+          {toast.ok ? '✅' : '❌'} {toast.msg}
+        </div>
+      )}
+
+      {/* KPI Cards */}
+      {capLoading ? (
+        <p className="text-gray-400 text-center py-8">Chargement…</p>
+      ) : capital ? (
+        <>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            {[
+              { label: 'Capital disponible',  val: fmt(capital.balance_gnf),           color: 'green',  icon: '💵' },
+              { label: 'En cours d\'avance',  val: fmt(capital.total_advanced_gnf),    color: 'yellow', icon: '⏳' },
+              { label: 'Total versé',         val: fmt(capital.total_disbursed_gnf),   color: 'blue',   icon: '📤' },
+              { label: 'Total récupéré',      val: fmt(capital.total_recovered_gnf),   color: 'green',  icon: '✅' },
+              { label: 'Pertes (défauts)',    val: fmt(capital.total_defaulted_gnf),   color: 'red',    icon: '🚨' },
+              { label: 'Taux récupération',   val: `${recovRate}%`,                   color: recovRate >= 95 ? 'green' : recovRate >= 80 ? 'yellow' : 'red', icon: '📈' },
+            ].map(({ label, val, color, icon }) => (
+              <StatCard key={label} label={label} value={val} icon={icon} color={color} />
+            ))}
+          </div>
+
+          {/* Barres de progression */}
+          <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+            <div>
+              <div className="flex justify-between text-sm font-semibold mb-1">
+                <span>Capital récupéré</span><span className="text-green-600">{recovPct}%</span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-green-500 rounded-full transition-all" style={{ width: `${recovPct}%` }} />
+              </div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm font-semibold mb-1">
+                <span>Capital actuellement avancé</span><span className="text-yellow-600">{advPct}%</span>
+              </div>
+              <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-yellow-400 rounded-full transition-all" style={{ width: `${advPct}%` }} />
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        <p className="text-red-500 text-center py-8">Erreur de chargement du capital.</p>
+      )}
+
+      {/* Config + Injection */}
+      <div className="grid md:grid-cols-2 gap-4">
+        {/* Configuration */}
+        <div className="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+          <h3 className="font-bold text-gray-800">⚙️ Configuration</h3>
+          <div className="space-y-3">
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Taux d'avance vendeur (%)</label>
+              <input
+                type="number" min="10" max="100"
+                value={cfgRate}
+                onChange={e => setCfgRate(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                placeholder={capital?.advance_rate_pct ?? 70}
+              />
+            </div>
+            <div>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide block mb-1">Plafond par commande (GNF)</label>
+              <input
+                type="number" min="0"
+                value={cfgMax}
+                onChange={e => setCfgMax(e.target.value)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-indigo-400"
+                placeholder={capital?.max_order_gnf ?? 300000}
+              />
+            </div>
+            <button
+              onClick={() => configMutation.mutate({ advance_rate_pct: Number(cfgRate), max_order_gnf: Number(cfgMax) })}
+              disabled={configMutation.isLoading}
+              className="w-full bg-indigo-600 text-white rounded-xl py-2 text-sm font-semibold hover:bg-indigo-700 transition disabled:opacity-50"
+            >
+              {configMutation.isLoading ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+          </div>
+        </div>
+
+        {/* Injection */}
+        <div className="bg-gradient-to-br from-gray-900 to-gray-800 rounded-2xl p-5 text-white space-y-4">
+          <h3 className="font-bold">💰 Injecter du capital</h3>
+          <div>
+            <label className="text-xs font-semibold opacity-70 uppercase tracking-wide block mb-1">Montant à ajouter (GNF)</label>
+            <input
+              type="number" min="1"
+              value={injectAmount}
+              onChange={e => setInjectAmount(e.target.value)}
+              className="w-full bg-white/10 border border-white/20 rounded-xl px-3 py-2 text-white text-sm placeholder-white/40 focus:outline-none focus:border-white/60"
+              placeholder="Ex : 5 000 000"
+            />
+          </div>
+          <button
+            onClick={() => injectMutation.mutate(Number(injectAmount))}
+            disabled={!injectAmount || injectMutation.isLoading}
+            className="w-full bg-green-500 text-white rounded-xl py-2 text-sm font-semibold hover:bg-green-400 transition disabled:opacity-40"
+          >
+            {injectMutation.isLoading ? 'Ajout en cours…' : '➕ Ajouter au capital'}
+          </button>
+        </div>
+      </div>
+
+      {/* Table avances */}
+      <div className="bg-white rounded-2xl border border-gray-100 overflow-hidden">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+          <h3 className="font-bold text-gray-800">📋 Avances vendeurs</h3>
+          <div className="flex gap-2">
+            {['all', 'advanced', 'completed', 'defaulted'].map(s => (
+              <button
+                key={s}
+                onClick={() => setStatusFilter(s)}
+                className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                  statusFilter === s
+                    ? 'bg-gray-900 text-white'
+                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                }`}
+              >
+                {{ all: 'Toutes', advanced: 'En cours', completed: 'Soldées', defaulted: 'Défauts' }[s]}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {advLoading ? (
+          <p className="text-center text-gray-400 py-8">Chargement…</p>
+        ) : advances.length === 0 ? (
+          <p className="text-center text-gray-400 py-8">Aucune avance.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 text-gray-500 text-xs uppercase tracking-wide">
+                <tr>
+                  <th className="px-4 py-3 text-left">Commande</th>
+                  <th className="px-4 py-3 text-left">Vendeur</th>
+                  <th className="px-4 py-3 text-left">Article</th>
+                  <th className="px-4 py-3 text-right">Avancé</th>
+                  <th className="px-4 py-3 text-right">Retenu</th>
+                  <th className="px-4 py-3 text-center">Taux</th>
+                  <th className="px-4 py-3 text-center">Statut</th>
+                  <th className="px-4 py-3 text-center">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {advances.map(a => (
+                  <tr key={a.id} className="hover:bg-gray-50 transition">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-400">{a.order_id?.slice(0, 8)}…</td>
+                    <td className="px-4 py-3 font-semibold">{a.seller_name}</td>
+                    <td className="px-4 py-3 max-w-[180px] truncate text-gray-600">{a.listing_title}</td>
+                    <td className="px-4 py-3 text-right font-bold">{fmt(a.advance_gnf)}</td>
+                    <td className="px-4 py-3 text-right text-gray-500">{fmt(a.held_gnf)}</td>
+                    <td className="px-4 py-3 text-center">{a.advance_rate_pct}%</td>
+                    <td className="px-4 py-3 text-center">{statusBadge(a.status)}</td>
+                    <td className="px-4 py-3 text-center">
+                      {a.status === 'advanced' ? (
+                        <button
+                          onClick={() => handleDefault(a.id)}
+                          disabled={defaultMutation.isLoading}
+                          className="text-xs border border-red-200 text-red-600 rounded-lg px-2 py-1 hover:bg-red-50 transition"
+                        >
+                          ⚠️ Défaut
+                        </button>
+                      ) : '—'}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Rôles admin et leurs accès ───────────────────────────────────────────────
 const ADMIN_ROLES = ['admin', 'super_admin', 'admin_delivery', 'admin_marketing', 'admin_accounting']
 
@@ -3359,7 +3631,7 @@ const TABS_BY_ROLE = {
   super_admin:      null,
   admin_delivery:   ['deliveries', 'pickup-points', 'meeting-zones', 'delivery-config'],
   admin_marketing:  ['listings', 'shops', 'banners', 'categories', 'users'],
-  admin_accounting: ['accounting', 'overview', 'orders', 'returns', 'settings'],
+  admin_accounting: ['accounting', 'overview', 'orders', 'returns', 'settings', 'capital'],
 }
 
 const ALL_TABS = [
@@ -3377,6 +3649,7 @@ const ALL_TABS = [
   { id: 'meeting-zones',    label: '🤝 Zones rencontre' },
   { id: 'delivery-config',  label: '🌍 Config livraison' },
   { id: 'settings',         label: '⚙️ Paramètres' },
+  { id: 'capital',          label: '💰 Capital roulement' },
 ]
 
 function getVisibleTabs(role) {
@@ -3516,6 +3789,7 @@ export default function AdminPage() {
         {safeTab === 'delivery-config' && <TabDeliveryConfig />}
         {safeTab === 'returns'         && <TabReturns />}
         {safeTab === 'settings'        && <TabSettings />}
+        {safeTab === 'capital'         && <TabCapital />}
       </div>
     </div>
   )
