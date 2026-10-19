@@ -116,8 +116,8 @@ const ROLE_CONFIG = {
       { icon: '📊', title: 'Dashboard complet', desc: 'Suivez vos ventes, commandes et revenus en temps réel' },
     ],
     stats: [['3K+', 'Vendeurs'], ['98%', 'Payés à temps'], ['0 GNF', 'Commission départ']],
-    title: 'Créer votre compte vendeur',
-    subtitle: 'Vendez sans vous déplacer. On s\'occupe de tout.',
+    title: 'Devenir partenaire vendeur',
+    subtitle: 'Candidature examinée sous 48h. Vendez sans vous déplacer.',
   },
 }
 
@@ -183,6 +183,8 @@ export default function RegisterPage() {
   const [form, setForm] = useState({
     full_name: '', city: 'Conakry', quartier: '', phone_number: '',
     email: '', password: '', password2: '', referral_code: refCode,
+    // Champs vendeur
+    shop_name: '', business_type: 'boutique', nif: '',
   })
 
   useEffect(() => { if (refCode) setForm(f => ({ ...f, referral_code: refCode })) }, [refCode])
@@ -205,6 +207,11 @@ export default function RegisterPage() {
       const payload = {
         full_name: form.full_name, password: form.password, password2: form.password2,
         city: form.city, referral_code: form.referral_code || undefined, role,
+        ...(role === 'seller' && {
+          shop_name: form.shop_name,
+          business_type: form.business_type,
+          nif: form.nif || undefined,
+        }),
       }
       if (mode === 'guinea') {
         await authAPI.register({ ...payload, phone_number: form.phone_number, email: form.email || undefined, quartier: form.quartier || undefined })
@@ -241,7 +248,11 @@ export default function RegisterPage() {
       }
       localStorage.setItem('access_token', res.data.tokens.access)
       localStorage.setItem('refresh_token', res.data.tokens.refresh)
-      navigate(role === 'seller' ? '/seller/dashboard' : '/')
+      if (role === 'seller') {
+        setStep(3) // page d'attente validation
+      } else {
+        navigate('/')
+      }
     } catch (err) {
       const data = err.response?.data
       setError(data?.non_field_errors?.[0] || data?.error || data?.detail || 'Code invalide ou expiré.')
@@ -316,7 +327,7 @@ export default function RegisterPage() {
                     </div>
                   </button>
 
-                  {/* Carte Vendeur */}
+                  {/* Carte Vendeur Partenaire */}
                   <button
                     onClick={() => { setRole('seller'); setStep(1); setError('') }}
                     className="w-full group relative overflow-hidden rounded-2xl border-2 border-gray-200 hover:border-orange-500 bg-white hover:bg-orange-50 transition-all duration-200 text-left p-5"
@@ -326,10 +337,13 @@ export default function RegisterPage() {
                         🏪
                       </div>
                       <div className="flex-1">
-                        <p className="text-lg font-black text-gray-900 group-hover:text-orange-600 transition-colors">Vendre</p>
-                        <p className="text-sm text-gray-500 leading-relaxed mt-0.5">Je veux publier des annonces et vendre mes articles sur la plateforme</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-black text-gray-900 group-hover:text-orange-600 transition-colors">Devenir Partenaire</p>
+                          <span className="text-[10px] bg-orange-100 text-orange-700 font-bold px-2 py-0.5 rounded-full">Sur candidature</span>
+                        </div>
+                        <p className="text-sm text-gray-500 leading-relaxed mt-0.5">Je veux vendre mes produits sur Guimatrix en tant que vendeur partenaire agréé</p>
                         <div className="flex flex-wrap gap-1.5 mt-2">
-                          {['Collecte à domicile', 'Payé à la collecte', 'Dashboard vendeur'].map(t => (
+                          {['Collecte gratuite', 'Payé à la collecte', 'Espace vendeur dédié'].map(t => (
                             <span key={t} className="text-[10px] bg-orange-100 text-orange-700 font-semibold px-2 py-0.5 rounded-full">{t}</span>
                           ))}
                         </div>
@@ -340,10 +354,6 @@ export default function RegisterPage() {
                     </div>
                   </button>
                 </div>
-
-                <p className="text-center text-xs text-gray-400 mt-6">
-                  Vous pouvez acheter <span className="font-semibold">ET</span> vendre plus tard avec le même compte.
-                </p>
               </div>
             )}
 
@@ -410,14 +420,31 @@ export default function RegisterPage() {
                     value={form.full_name} onChange={f('full_name')} required
                     className={`focus:ring-2 ${ringClass}`} />
 
-                  {/* Champ spécifique vendeur */}
+                  {/* Champs candidature vendeur */}
                   {role === 'seller' && (
-                    <div className="bg-orange-50 border border-orange-100 rounded-xl p-3.5">
-                      <p className="text-orange-700 text-xs font-semibold mb-1">📦 Info vendeur</p>
-                      <p className="text-orange-600 text-xs leading-relaxed">
-                        Après inscription, vous pourrez créer votre boutique et publier vos premières annonces.
-                        Un collecteur Guimatrix viendra chercher vos articles directement chez vous.
-                      </p>
+                    <div className="space-y-3">
+                      <div className="bg-orange-50 border border-orange-100 rounded-xl p-3.5">
+                        <p className="text-orange-700 text-xs font-semibold">🏪 Candidature partenaire</p>
+                        <p className="text-orange-600 text-xs mt-0.5 leading-relaxed">
+                          Votre dossier sera examiné par notre équipe sous 48h. Vous serez notifié par SMS.
+                        </p>
+                      </div>
+                      <Input icon={<span className="text-sm">🏪</span>} label="Nom de votre boutique / activité"
+                        placeholder="Ex : Boutique Mamadou, Diallo Electronics..."
+                        value={form.shop_name} onChange={f('shop_name')} required
+                        className={`focus:ring-2 ${ringClass}`} />
+                      <SelectField icon={<span className="text-sm">📋</span>} label="Type d'activité"
+                        value={form.business_type}
+                        onChange={e => setForm(p => ({ ...p, business_type: e.target.value }))}>
+                        <option value="boutique">Boutique / Commerce</option>
+                        <option value="grossiste">Grossiste / Importateur</option>
+                        <option value="marque">Marque / Fabricant</option>
+                        <option value="particulier">Particulier</option>
+                      </SelectField>
+                      <Input icon={<span className="text-sm">🪪</span>} label="NIF fiscal (facultatif)"
+                        placeholder="Numéro d'identification fiscale"
+                        value={form.nif} onChange={f('nif')}
+                        className={`focus:ring-2 ${ringClass}`} />
                     </div>
                   )}
 
@@ -517,8 +544,8 @@ export default function RegisterPage() {
                       flex items-center justify-center gap-2 mt-2`}
                   >
                     {loading
-                      ? <><Spinner /> Création du compte...</>
-                      : `Créer mon compte ${role === 'seller' ? 'vendeur' : 'acheteur'} →`}
+                      ? <><Spinner /> {role === 'seller' ? 'Envoi de la candidature...' : 'Création du compte...'}</>
+                      : role === 'seller' ? 'Soumettre ma candidature →' : 'Créer mon compte acheteur →'}
                   </button>
 
                   <p className="text-center text-xs text-gray-500">
@@ -581,6 +608,48 @@ export default function RegisterPage() {
                     className={`font-semibold hover:underline ${role === 'seller' ? 'text-orange-600' : 'text-green-600'}`}>
                     Renvoyer
                   </button>
+                </p>
+              </div>
+            )}
+
+            {/* ══════════════════════════════════════════════════════════
+                STEP 3 — CANDIDATURE VENDEUR EN ATTENTE
+            ══════════════════════════════════════════════════════════ */}
+            {step === 3 && role === 'seller' && (
+              <div className="text-center py-4">
+                <div className="w-20 h-20 bg-orange-50 border-2 border-orange-100 rounded-3xl flex items-center justify-center text-4xl mx-auto mb-6">
+                  ⏳
+                </div>
+                <h2 className="text-2xl font-black text-gray-900 mb-2">Candidature soumise !</h2>
+                <p className="text-gray-500 text-sm leading-relaxed mb-6">
+                  Notre équipe examine votre dossier.<br />
+                  Vous recevrez une notification SMS dans les <strong className="text-gray-700">48 heures</strong>.
+                </p>
+
+                <div className="bg-orange-50 border border-orange-100 rounded-2xl p-4 text-left space-y-3 mb-6">
+                  <p className="text-xs font-bold text-orange-700 uppercase tracking-wide">Prochaines étapes</p>
+                  {[
+                    ['1', 'Examen de votre dossier (48h)'],
+                    ['2', 'Notification SMS de validation'],
+                    ['3', 'Accès à votre espace vendeur'],
+                    ['4', 'Première collecte organisée'],
+                  ].map(([n, t]) => (
+                    <div key={n} className="flex items-center gap-3">
+                      <div className="w-6 h-6 bg-orange-100 text-orange-700 rounded-full flex items-center justify-center text-xs font-black flex-shrink-0">{n}</div>
+                      <p className="text-sm text-gray-600">{t}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => navigate('/')}
+                  className="w-full bg-gradient-to-r from-orange-500 to-amber-400 hover:from-orange-600 hover:to-amber-500 text-white font-bold py-3.5 rounded-xl shadow-lg transition-all"
+                >
+                  Explorer la marketplace
+                </button>
+                <p className="text-xs text-gray-400 mt-3">
+                  Des questions ?{' '}
+                  <a href="https://wa.me/224" className="text-orange-600 font-semibold hover:underline">Contactez-nous sur WhatsApp</a>
                 </p>
               </div>
             )}

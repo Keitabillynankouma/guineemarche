@@ -85,7 +85,7 @@ export default function CreateListingPage() {
         weight_kg: '',
         pickup_address: '',
     })
-    const [deliveryModes, setDeliveryModes] = useState(['meeting_point', 'home_delivery'])
+    const [deliveryModes, setDeliveryModes] = useState(['collecte'])
     const [files, setFiles]               = useState([])
     const [previews, setPreviews]         = useState([])
     const [videoFile, setVideoFile]       = useState(null)
@@ -172,7 +172,7 @@ export default function CreateListingPage() {
                 setLoading(false)
                 return
             }
-            if (deliveryModes.includes('pickup') && !form.pickup_address.trim()) {
+            if (false && !form.pickup_address.trim()) { // adresse facultative désormais
                 setError('Veuillez indiquer votre adresse / lieu de retrait.')
                 setLoading(false)
                 return
@@ -446,72 +446,38 @@ export default function CreateListingPage() {
 
                     {/* ── Section 5 : Modes de livraison ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="5" icon="🚚" title="Modes de livraison" subtitle="Cochez comment l'acheteur peut récupérer l'article" />
+                        <SectionHeader number="5" icon="🚚" title="Livraison" subtitle="Comment votre article sera récupéré par l'acheteur" />
 
                         <div className="space-y-3">
 
-                            {/* ① Remise en main propre */}
-                            {[
-                                {
-                                    key:   'meeting_point',
-                                    icon:  '🤝',
-                                    label: 'Remise en main propre',
-                                    desc:  'Vous vous retrouvez dans un lieu public convenu (marché, carrefour, mosquée…).',
-                                    color: 'amber',
-                                },
-                                {
-                                    key:   'pickup',
-                                    icon:  '🏪',
-                                    label: 'Retrait chez moi',
-                                    desc:  'L\'acheteur vient chercher l\'article à votre boutique ou domicile. Précisez l\'adresse ci-dessous.',
-                                    color: 'blue',
-                                },
-                                {
-                                    key:   'home_delivery',
-                                    icon:  '🚚',
-                                    label: 'Livraison à domicile',
-                                    desc:  'Un livreur Guimatrix récupère l\'article et le livre chez l\'acheteur.',
-                                    color: 'green',
-                                },
-                            ].map(({ key, icon, label, desc, color }) => {
-                                const checked = deliveryModes.includes(key)
-                                const border  = checked ? `border-${color}-500 bg-${color}-50` : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                                const accent  = `accent-${color}-600`
-                                const textC   = checked ? `text-${color}-800` : 'text-gray-700'
-                                return (
-                                    <label key={key} className={`flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition ${border}`}>
-                                        <input
-                                            type="checkbox"
-                                            className={`mt-0.5 w-4 h-4 ${accent}`}
-                                            checked={checked}
-                                            onChange={e => setDeliveryModes(prev =>
-                                                e.target.checked ? [...prev, key] : prev.filter(m => m !== key)
-                                            )}
-                                        />
-                                        <div className="flex-1">
-                                            <p className={`text-sm font-bold ${textC}`}>{icon} {label}</p>
-                                            <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
-                                        </div>
-                                    </label>
-                                )
-                            })}
-
-                            {/* Adresse de retrait — s'affiche uniquement si "Retrait chez moi" coché */}
-                            {deliveryModes.includes('pickup') && (
-                                <div className="mt-1 pl-2 border-l-2 border-blue-200 space-y-1">
-                                    <label className={labelClass}>
-                                        📍 Votre adresse / lieu de retrait <span className="text-red-500">*</span>
-                                    </label>
-                                    <input
-                                        type="text"
-                                        placeholder="Ex : Kaloum, boutique N°12, en face de la mosquée centrale"
-                                        value={form.pickup_address}
-                                        onChange={e => setForm({ ...form, pickup_address: e.target.value })}
-                                        className={inputClass}
-                                    />
-                                    <p className="text-xs text-gray-400">Quartier + repère connu = moins d'appels de l'acheteur.</p>
+                            {/* Collecte Guimatrix — mode unique */}
+                            <label className="flex items-start gap-4 p-4 rounded-xl border-2 border-green-500 bg-green-50 cursor-pointer">
+                                <input type="checkbox" className="mt-0.5 w-4 h-4 accent-green-600"
+                                    checked={deliveryModes.includes('collecte')}
+                                    onChange={e => setDeliveryModes(prev =>
+                                        e.target.checked ? [...prev.filter(m => m !== 'collecte'), 'collecte'] : prev.filter(m => m !== 'collecte')
+                                    )}
+                                />
+                                <div className="flex-1">
+                                    <p className="text-sm font-bold text-green-800">🚚 Collecte Guimatrix</p>
+                                    <p className="text-xs text-gray-500 mt-0.5">Notre équipe vient chercher l'article chez vous. Vous n'avez rien à faire.</p>
                                 </div>
-                            )}
+                            </label>
+
+                            {/* Adresse de collecte — où le collecteur Guimatrix viendra chercher l'article */}
+                            <div className="mt-1 pl-2 border-l-2 border-green-200 space-y-1">
+                                <label className={labelClass}>
+                                    📍 Votre adresse de collecte <span className="text-xs text-gray-400 font-normal">(facultatif)</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    placeholder="Ex : Kaloum, quartier N°12, en face de la mosquée centrale"
+                                    value={form.pickup_address}
+                                    onChange={e => setForm({ ...form, pickup_address: e.target.value })}
+                                    className={inputClass}
+                                />
+                                <p className="text-xs text-gray-400">Le collecteur Guimatrix vous contactera pour confirmer le créneau de collecte.</p>
+                            </div>
 
                             {deliveryModes.length === 0 && (
                                 <p className="text-xs text-red-500 mt-1">⚠️ Cochez au moins un mode de livraison.</p>

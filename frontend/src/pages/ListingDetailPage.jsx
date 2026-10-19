@@ -326,81 +326,16 @@ function buildAvailableModes() {
 }
 
 function OrderModal({ listing, onClose, onSuccess }) {
-    const availableModes = buildAvailableModes(listing)
-    const [deliveryMode, setDeliveryMode]   = useState(availableModes[0]?.value || 'meeting_point')
-    const [meetLocation, setMeetLocation]   = useState('')
-    const [customLocation, setCustomLocation] = useState('')
-    const [pickupPoint, setPickupPoint]     = useState('')
-    const [deliveryAddress, setDeliveryAddress] = useState('')
-    const [distanceKm, setDistanceKm]       = useState('')
-    const [weightKg, setWeightKg]           = useState(listing.weight_kg ? String(listing.weight_kg) : '')
-    const [buyerCommune, setBuyerCommune]   = useState('')
-    const [geoLoading, setGeoLoading]       = useState(false)
-    const [geoError, setGeoError]           = useState('')
-    const [paymentMethod, setPaymentMethod] = useState('chachap') // 'chachap' | 'cash'
-    const [error, setError]                 = useState('')
+    const [pickupPoint, setPickupPoint]   = useState('')
+    const [paymentMethod, setPaymentMethod] = useState('chachap')
+    const [error, setError]               = useState('')
     const [negotiatedPrice, setNegotiatedPrice] = useState(listing.price_type === 'negotiable' ? String(listing.price_gnf) : '')
     const queryClient = useQueryClient()
 
     const { data: pickupPoints = [] } = useQuery({
         queryKey: ['pickup-points', listing.city],
         queryFn:  () => ordersAPI.getPickupPoints(listing.city).then(r => r.data?.results || r.data || []),
-        enabled:  deliveryMode === 'pickup_point',
     })
-
-    const { data: meetingZones = [] } = useQuery({
-        queryKey: ['meeting-zones', listing.city],
-        queryFn:  () => ordersAPI.getMeetingZones(listing.city).then(r => r.data?.results || r.data || []),
-        enabled:  deliveryMode === 'meeting_point',
-    })
-
-    const { data: deliveryZone = null } = useQuery({
-        queryKey: ['delivery-zone', listing.city],
-        queryFn:  () => ordersAPI.getDeliveryZones(listing.city).then(r => {
-            const list = r.data?.results || r.data || []
-            return Array.isArray(list) ? list[0] || null : null
-        }),
-        enabled:  deliveryMode === 'home_delivery',
-    })
-
-    const { data: zoneRates = [] } = useQuery({
-        queryKey: ['zone-rates', listing.city],
-        queryFn:  () => deliveryAPI.getZoneRates(listing.city).then(r => r.data?.results || r.data || []),
-        enabled:  deliveryMode === 'home_delivery',
-    })
-
-    // Communes disponibles : toutes les communes de la ville du vendeur (+ eventuels tarifs inter-communes)
-    const sellerCommune   = listing.quartier || ''
-    const sellerCity      = listing.city || 'Conakry'
-    // Afficher toutes les communes de la ville du vendeur + celles des tarifs inter-communes
-    const communesDeVille = COMMUNES_PAR_VILLE[sellerCity] || []
-    const communesTarifs  = zoneRates.filter(r => r.from_commune === sellerCommune).map(r => r.to_commune)
-    const availableComm   = [...new Set([...communesDeVille, ...communesTarifs])]
-    const communeRate     = buyerCommune
-        ? zoneRates.find(r => r.from_commune === sellerCommune && r.to_commune === buyerCommune)
-        : null
-
-    // Géolocalisation navigateur
-    const handleGeolocate = () => {
-        if (!navigator.geolocation) { setGeoError("Géolocalisation non supportée par ce navigateur."); return }
-        setGeoLoading(true); setGeoError('')
-        navigator.geolocation.getCurrentPosition(
-            (pos) => {
-                const { latitude: bLat, longitude: bLon } = pos.coords
-                if (listing.latitude && listing.longitude) {
-                    const km = haversineKm(listing.latitude, listing.longitude, bLat, bLon)
-                    // Coefficient routier ×1.3 pour approximer la distance réelle
-                    setDistanceKm(String(+(km * 1.3).toFixed(1)))
-                    setGeoError('')
-                } else {
-                    setGeoError("Ce vendeur n'a pas renseigné ses coordonnées — saisissez la distance manuellement.")
-                }
-                setGeoLoading(false)
-            },
-            () => { setGeoError("Position refusée. Saisissez la distance manuellement."); setGeoLoading(false) },
-            { timeout: 8000 }
-        )
-    }
 
     const createOrder = useMutation({
         mutationFn: (data) => ordersAPI.create(data),
@@ -409,38 +344,16 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
     const pay = useMutation({
         mutationFn: ({ id, data }) => ordersAPI.pay(id, data),
-        // Pas de onSuccess ici : handleOrder gère cash vs ChaChap différemment
         onError: (err) => setError(err.response?.data?.error || 'Erreur paiement.'),
     })
 
-    const finalMeetLocation = meetLocation || customLocation
-
-    // ── Calcul du tarif de livraison ──────────────────────────────────────────
-    // Priorité : tarif inter-commune > distance+poids > base
-    const calcDeliveryFee = () => {
-        if (deliveryMode !== 'home_delivery') return { fee: 0, distCharge: 0, weightCharge: 0, source: null }
-        if (communeRate) {
-            return { fee: communeRate.fee_gnf, distCharge: 0, weightCharge: 0, source: 'commune' }
-        }
-        if (!deliveryZone) return { fee: 0, distCharge: 0, weightCharge: 0, source: null }
-        const dist   = parseFloat(distanceKm) || 0
-        const weight = parseFloat(weightKg) || 0
-        const distCharge   = Math.max(0, dist - (deliveryZone.free_km_radius || 0)) * (deliveryZone.price_per_km_gnf || 0)
-        const weightCharge = Math.max(0, weight - parseFloat(deliveryZone.free_weight_kg || 0)) * (deliveryZone.price_per_kg_gnf || 0)
-        return { fee: Math.round(deliveryZone.fee_gnf + distCharge + weightCharge), distCharge: Math.round(distCharge), weightCharge: Math.round(weightCharge), source: 'distance' }
-    }
-    const { fee: deliveryFee, distCharge, weightCharge, source: feeSource } = calcDeliveryFee()
-    const hasDynamicPricing = deliveryZone && (deliveryZone.price_per_km_gnf > 0 || deliveryZone.price_per_kg_gnf > 0)
-    const articlePrice  = listing.price_type === 'negotiable' ? (parseInt(negotiatedPrice) || listing.price_gnf) : listing.price_gnf
-    const totalAmount   = articlePrice + deliveryFee
+    const articlePrice = listing.price_type === 'negotiable' ? (parseInt(negotiatedPrice) || listing.price_gnf) : listing.price_gnf
+    const totalAmount  = articlePrice
 
     const handleOrder = async (e) => {
         e.preventDefault(); setError('')
-        if (deliveryMode === 'meeting_point' && !finalMeetLocation) {
-            setError('Veuillez choisir ou saisir un lieu de rencontre.'); return
-        }
-        if (deliveryMode === 'home_delivery' && !deliveryAddress.trim()) {
-            setError('Veuillez saisir votre adresse de livraison.'); return
+        if (!pickupPoint) {
+            setError('Veuillez choisir un point de retrait.'); return
         }
         if (listing.price_type === 'negotiable') {
             const np = parseInt(negotiatedPrice)
@@ -448,20 +361,12 @@ function OrderModal({ listing, onClose, onSuccess }) {
         }
         try {
             const orderPayload = {
-                listing:          listing.id,
-                // seller_pickup → on envoie 'pickup' au backend avec l'adresse du vendeur
-                delivery_mode:    deliveryMode === 'seller_pickup' ? 'pickup' : deliveryMode,
-                meet_location:    deliveryMode === 'meeting_point'  ? finalMeetLocation : (deliveryMode === 'seller_pickup' ? listing.pickup_address : ''),
-                pickup_point:     deliveryMode === 'pickup_point'   ? pickupPoint       : null,
-                delivery_address: deliveryMode === 'home_delivery'  ? deliveryAddress   : '',
+                listing:      listing.id,
+                delivery_mode: 'pickup_point',
+                pickup_point:  pickupPoint,
             }
             if (listing.price_type === 'negotiable' && negotiatedPrice) {
                 orderPayload.negotiated_price = parseInt(negotiatedPrice)
-            }
-            if (deliveryMode === 'home_delivery') {
-                if (distanceKm)   orderPayload.delivery_distance_km    = parseFloat(distanceKm)
-                if (weightKg)     orderPayload.delivery_weight_kg      = parseFloat(weightKg)
-                if (buyerCommune) orderPayload.delivery_buyer_commune  = buyerCommune
             }
             const order = await createOrder.mutateAsync(orderPayload)
             let payResult
@@ -495,9 +400,6 @@ function OrderModal({ listing, onClose, onSuccess }) {
             setError(msg)
         }
     }
-
-    // Modes filtrés selon ce que le vendeur a autorisé
-    const DELIVERY_MODES = availableModes
 
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end md:items-center justify-center p-4">
@@ -543,112 +445,39 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Mode livraison */}
+                        {/* Point de retrait */}
                         <div>
-                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Mode de livraison</label>
-                            <div className="grid grid-cols-3 gap-2">
-                                {DELIVERY_MODES.map(m => (
-                                    <button key={m.value} type="button"
-                                        onClick={() => { setDeliveryMode(m.value); setMeetLocation(''); setCustomLocation(''); setDeliveryAddress('') }}
-                                        className={`p-3 rounded-xl border-2 text-left transition ${deliveryMode === m.value ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-gray-300'}`}>
-                                        <div className="text-xl mb-1">{m.icon}</div>
-                                        <div className={`text-xs font-bold ${deliveryMode === m.value ? 'text-green-700' : 'text-gray-700'}`}>{m.label}</div>
-                                        <div className="text-xs text-gray-400 mt-0.5">{m.sub}</div>
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Zone de rencontre */}
-                        {deliveryMode === 'meeting_point' && (
-                            <div className="space-y-3">
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">📍 Lieu de rencontre</label>
-                                <MeetingMap zones={meetingZones} selected={meetLocation} onSelect={setMeetLocation} city={listing.city} />
-                                {meetingZones.length > 0 && (
-                                    <select value={meetLocation} onChange={e => { setMeetLocation(e.target.value); setCustomLocation('') }}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50">
-                                        <option value="">— Choisir un lieu prédéfini —</option>
-                                        {meetingZones.map(z => <option key={z.id} value={z.name}>{z.name}{z.address ? ` (${z.address})` : ''}</option>)}
-                                    </select>
-                                )}
-                                <div className="flex items-center gap-2 text-xs text-gray-400">
-                                    <div className="flex-1 h-px bg-gray-200" />
-                                    {meetingZones.length > 0 ? 'ou saisir librement' : 'Saisissez le lieu de rencontre'}
-                                    <div className="flex-1 h-px bg-gray-200" />
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                                📦 Choisir votre point de retrait
+                            </label>
+                            {pickupPoints.length === 0 ? (
+                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                                    ⚠️ Aucun point de retrait disponible à {listing.city} pour le moment.
                                 </div>
-                                <input type="text" placeholder="Ex: Marché Madina, devant la pharmacie"
-                                    value={customLocation}
-                                    onChange={e => { setCustomLocation(e.target.value); if (e.target.value) setMeetLocation('') }}
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" />
-                            </div>
-                        )}
-
-                        {/* Retrait chez le vendeur */}
-                        {deliveryMode === 'seller_pickup' && (
-                            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 space-y-2">
-                                <p className="text-xs font-bold text-blue-700 uppercase tracking-wide">📍 Adresse du vendeur</p>
-                                {listing.pickup_address ? (
-                                    <p className="text-sm text-blue-800 font-medium">{listing.pickup_address}</p>
-                                ) : (
-                                    <p className="text-sm text-blue-600">Le vendeur n'a pas précisé son adresse. Contactez-le via la messagerie.</p>
-                                )}
-                                <p className="text-xs text-blue-500 mt-1">Convenez d'un horaire avec le vendeur avant de vous déplacer.</p>
-                            </div>
-                        )}
-
-                        {/* Point de retrait réseau */}
-                        {deliveryMode === 'pickup_point' && (
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Point de retrait</label>
-                                {pickupPoints.length === 0 ? (
-                                    <p className="text-sm text-gray-400 bg-gray-50 p-3 rounded-xl">Aucun point disponible à {listing.city}.</p>
-                                ) : (
-                                    <select value={pickupPoint} onChange={e => setPickupPoint(e.target.value)}
-                                        className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50" required>
-                                        <option value="">Choisir un point</option>
-                                        {pickupPoints.map(p => <option key={p.id} value={p.id}>{p.name} — {p.address}</option>)}
-                                    </select>
-                                )}
-                            </div>
-                        )}
-
-                        {/* Livraison à domicile */}
-                        {deliveryMode === 'home_delivery' && (
-                            <div className="space-y-3">
-                                <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide">🏠 Adresse de livraison</label>
-
-                                {/* Bannière tarif */}
-                                {(deliveryZone || communeRate) ? (
-                                    <div className="bg-green-50 border border-green-200 rounded-xl p-3">
-                                        <div className="flex items-center justify-between mb-1">
-                                            <p className="text-xs font-bold text-green-800">
-                                                Livraison disponible à {listing.city}
-                                                {feeSource === 'commune' && communeRate && (
-                                                    <span className="ml-1 text-green-600">· ~{communeRate.estimated_hours}h</span>
-                                                )}
-                                                {feeSource === 'distance' && deliveryZone && (
-                                                    <span className="ml-1 text-green-600">· ~{deliveryZone.estimated_days}j</span>
-                                                )}
-                                            </p>
-                                            <span className="bg-green-600 text-white text-xs font-black px-3 py-1 rounded-full">
-                                                {new Intl.NumberFormat('fr-GN').format(deliveryFee)} GNF
-                                            </span>
-                                        </div>
-                                        {feeSource === 'commune' && (
-                                            <p className="text-xs text-green-600 opacity-80">Tarif fixe {sellerCommune} → {buyerCommune}</p>
-                                        )}
-                                        {feeSource === 'distance' && hasDynamicPricing && (
-                                            <p className="text-xs text-green-600 opacity-80">
-                                                Base {new Intl.NumberFormat('fr-GN').format(deliveryZone.fee_gnf)} GNF
-                                                {deliveryZone.price_per_km_gnf > 0 && ` · +${new Intl.NumberFormat('fr-GN').format(deliveryZone.price_per_km_gnf)} GNF/km`}
-                                                {deliveryZone.price_per_kg_gnf > 0 && ` · +${new Intl.NumberFormat('fr-GN').format(deliveryZone.price_per_kg_gnf)} GNF/kg`}
-                                            </p>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-xs text-amber-700">
-                                        ⚠️ Aucun tarif configuré pour {listing.city}. Contactez le vendeur.
-                                    </div>
+                            ) : (
+                                <div className="space-y-2">
+                                    {pickupPoints.map(p => (
+                                        <button key={p.id} type="button"
+                                            onClick={() => setPickupPoint(String(p.id))}
+                                            className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+                                                pickupPoint === String(p.id)
+                                                    ? 'border-green-500 bg-green-50'
+                                                    : 'border-gray-200 hover:border-gray-300'
+                                            }`}>
+                                            <span className={`text-lg mt-0.5 ${pickupPoint === String(p.id) ? '' : 'grayscale opacity-60'}`}>📍</span>
+                                            <div className="flex-1">
+                                                <p className={`text-sm font-bold ${pickupPoint === String(p.id) ? 'text-green-700' : 'text-gray-800'}`}>{p.name}</p>
+                                                {p.address && <p className="text-xs text-gray-500 mt-0.5">{p.address}</p>}
+                                                {p.hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {p.hours}</p>}
+                                            </div>
+                                            {pickupPoint === String(p.id) && (
+                                                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                                                </svg>
+                                            )}
+                                        </button>
+                                    ))}
+                                </div>
                                 )}
 
                                 {/* Option 3 : sélecteur commune (si des tarifs inter-communes existent) */}
@@ -717,35 +546,14 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Récapitulatif total si livraison */}
-                        {deliveryMode === 'home_delivery' && deliveryFee > 0 && (
-                            <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Prix article{listing.price_type === 'negotiable' ? ' (négocié)' : ''}</span>
-                                    <span>{new Intl.NumberFormat('fr-GN').format(articlePrice)} GNF</span>
-                                </div>
-                                <div className="flex justify-between text-gray-600">
-                                    <span>Frais de base livraison</span>
-                                    <span>{new Intl.NumberFormat('fr-GN').format(deliveryZone?.fee_gnf || 0)} GNF</span>
-                                </div>
-                                {distCharge > 0 && (
-                                    <div className="flex justify-between text-gray-500 text-xs">
-                                        <span>Surcharge distance ({distanceKm} km)</span>
-                                        <span>+{new Intl.NumberFormat('fr-GN').format(distCharge)} GNF</span>
-                                    </div>
-                                )}
-                                {weightCharge > 0 && (
-                                    <div className="flex justify-between text-gray-500 text-xs">
-                                        <span>Surcharge poids ({weightKg} kg)</span>
-                                        <span>+{new Intl.NumberFormat('fr-GN').format(weightCharge)} GNF</span>
-                                    </div>
-                                )}
-                                <div className="flex justify-between font-black text-gray-900 border-t pt-2 mt-1">
-                                    <span>Total</span>
-                                    <span className="text-green-700">{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
-                                </div>
+                        {/* Récapitulatif total */}
+                        <div className="bg-gray-50 rounded-xl p-4 text-sm">
+                            <div className="flex justify-between font-black text-gray-900">
+                                <span>Total à payer</span>
+                                <span className="text-green-700">{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
                             </div>
-                        )}
+                            <p className="text-xs text-gray-400 mt-1">Frais de collecte inclus · Paiement sécurisé</p>
+                        </div>
 
                         {/* Mode de paiement */}
                         <div className="space-y-2">
@@ -1193,36 +1001,6 @@ export default function ListingDetailPage() {
                         </div>
                     )}
 
-                    {/* Modes de livraison */}
-                    {listing.allowed_delivery_modes && listing.allowed_delivery_modes.length > 0 && (
-                        <div className="bg-white rounded-2xl shadow-card p-5">
-                            <h2 className="font-semibold text-gray-700 text-sm mb-3">🚚 Modes de livraison disponibles</h2>
-                            <div className="space-y-2">
-                                {listing.allowed_delivery_modes.includes('home_delivery') && (
-                                    <div className="flex items-start gap-3 bg-green-50 border border-green-100 rounded-xl px-3 py-2.5">
-                                        <span className="text-base">🏠</span>
-                                        <div>
-                                            <p className="text-sm font-semibold text-green-800">Livraison à domicile</p>
-                                            <p className="text-xs text-green-600 mt-0.5">Un livreur GuinéeMarché vous livre à votre adresse.</p>
-                                        </div>
-                                    </div>
-                                )}
-                                {listing.allowed_delivery_modes.includes('pickup') && (
-                                    <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2.5">
-                                        <span className="text-base">📦</span>
-                                        <div>
-                                            <p className="text-sm font-semibold text-blue-800">Point de retrait</p>
-                                            {listing.pickup_address ? (
-                                                <p className="text-xs text-blue-600 mt-0.5">📍 {listing.pickup_address}</p>
-                                            ) : (
-                                                <p className="text-xs text-blue-500 mt-0.5">Contactez le vendeur pour l'adresse.</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    )}
 
                     {/* Bouton acheter */}
                     {!isSeller && listing.status === 'active' && (
