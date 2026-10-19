@@ -54,7 +54,7 @@ export default function SellerDashboard() {
 
   const { data: ordersData } = useQuery({
     queryKey: ['seller-orders'],
-    queryFn: () => ordersAPI.listSeller().then(r => r.data),
+    queryFn: () => ordersAPI.getSeller().then(r => r.data),
   })
   const { data: listingsData } = useQuery({
     queryKey: ['my-listings'],
@@ -66,7 +66,7 @@ export default function SellerDashboard() {
   })
   const { data: earningsData } = useQuery({
     queryKey: ['seller-earnings-summary'],
-    queryFn: () => ordersAPI.sellerEarnings({ page: 1, page_size: 5 }).then(r => r.data),
+    queryFn: () => ordersAPI.getSellerEarnings().then(r => r.data),
   })
 
   const orders   = Array.isArray(ordersData)   ? ordersData   : (ordersData?.results   ?? [])

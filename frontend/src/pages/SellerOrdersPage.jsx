@@ -36,7 +36,7 @@ export default function SellerOrdersPage() {
 
   const { data, isLoading } = useQuery({
     queryKey: ['seller-orders'],
-    queryFn: () => ordersAPI.listSeller().then(r => r.data),
+    queryFn: () => ordersAPI.getSeller().then(r => r.data),
   })
 
   const all = Array.isArray(data) ? data : (data?.results ?? [])
