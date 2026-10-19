@@ -479,72 +479,7 @@ function OrderModal({ listing, onClose, onSuccess }) {
                                     ))}
                                 </div>
                                 )}
-
-                                {/* Option 3 : sélecteur commune (si des tarifs inter-communes existent) */}
-                                {availableComm.length > 0 && (
-                                    <div>
-                                        <label className="block text-xs text-gray-500 mb-1">🗺️ Votre commune</label>
-                                        <select
-                                            value={buyerCommune}
-                                            onChange={e => { setBuyerCommune(e.target.value); setDistanceKm('') }}
-                                            className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
-                                        >
-                                            <option value="">— Choisir votre commune —</option>
-                                            {availableComm.map(c => <option key={c} value={c}>{c}</option>)}
-                                        </select>
-                                    </div>
-                                )}
-
-                                {/* Option 1 : GPS + distance manuelle (si pas de tarif commune ou commune non sélectionnée) */}
-                                {!communeRate && deliveryZone && hasDynamicPricing && (
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex-1">
-                                                <label className="block text-xs text-gray-500 mb-1">📍 Distance (km)</label>
-                                                <input
-                                                    type="number" min="0" step="0.1"
-                                                    placeholder="Ex : 8"
-                                                    value={distanceKm}
-                                                    onChange={e => setDistanceKm(e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
-                                                />
-                                            </div>
-                                            <div className="flex-1">
-                                                <label className="block text-xs text-gray-500 mb-1">⚖️ Poids (kg)</label>
-                                                <input
-                                                    type="number" min="0" step="0.1"
-                                                    placeholder="Ex : 2.5"
-                                                    value={weightKg}
-                                                    onChange={e => setWeightKg(e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50"
-                                                />
-                                            </div>
-                                        </div>
-                                        <button
-                                            type="button"
-                                            onClick={handleGeolocate}
-                                            disabled={geoLoading}
-                                            className="w-full flex items-center justify-center gap-2 border border-green-300 text-green-700 text-xs font-semibold py-2 rounded-xl hover:bg-green-50 transition disabled:opacity-50"
-                                        >
-                                            {geoLoading ? '⏳ Localisation…' : '📍 Détecter ma position (auto)'}
-                                        </button>
-                                        {geoError && <p className="text-xs text-amber-600">{geoError}</p>}
-                                        {distanceKm && !geoError && (
-                                            <p className="text-xs text-green-600">✅ Distance : {distanceKm} km (approximation routière)</p>
-                                        )}
-                                    </div>
-                                )}
-
-                                <textarea
-                                    rows={3}
-                                    placeholder={`Quartier, rue, repère… (ex: Ratoma, face à l'hôpital)`}
-                                    value={deliveryAddress}
-                                    onChange={e => setDeliveryAddress(e.target.value)}
-                                    className="w-full border border-gray-200 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-green-500 bg-gray-50 resize-none"
-                                    required
-                                />
-                            </div>
-                        )}
+                        </div>
 
                         {/* Récapitulatif total */}
                         <div className="bg-gray-50 rounded-xl p-4 text-sm">
