@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ordersAPI, listingsAPI, shopsAPI } from '../services/api'
 import useAuthStore from '../store/authStore'
-import Navbar from '../components/Navbar'
 
 function fmt(n) {
   if (!n && n !== 0) return '0 GNF'
@@ -111,7 +110,25 @@ export default function SellerDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Navbar />
+      {/* Barre de navigation vendeur */}
+      <nav className="bg-white border-b border-gray-100 px-4 py-3 sticky top-0 z-40">
+        <div className="max-w-4xl mx-auto flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-orange-500 to-amber-400 rounded-xl flex items-center justify-center shadow-sm">
+              <span className="text-white font-black text-sm">G</span>
+            </div>
+            <span className="font-black text-gray-900 text-lg">Guimatrix</span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link to="/" className="text-xs text-gray-500 hover:text-gray-700 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+              Marketplace
+            </Link>
+            <Link to="/profile" className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center text-orange-600 font-bold text-sm">
+              {user?.full_name?.[0]?.toUpperCase() ?? 'V'}
+            </Link>
+          </div>
+        </div>
+      </nav>
 
       <div className="max-w-4xl mx-auto px-4 py-6 space-y-6">
 
