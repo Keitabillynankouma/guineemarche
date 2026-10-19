@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Guimatrix — Rôles &amp; Flux fonctionnels</title>
+<style>
+/* ── Variables ── */
+:root {
+  --primary: #1a1a2e;
+  --accent:  #e94560;
+  --green:   #10b981;
+  --yellow:  #f59e0b;
+  --blue:    #3b82f6;
+  --red:     #ef4444;
+  --gray:    #64748b;
+  --lightbg: #f1f5f9;
+  --text:    #1e293b;
+  --white:   #ffffff;
+  --border:  #e2e8f0;
+}
+
+/* ── Reset & base ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Segoe UI', Arial, sans-serif;
+  font-size: 11pt;
+  color: var(--text);
+  background: var(--white);
+  line-height: 1.6;
+}
+
+/* ── Page wrapper (écran) ── */
+.page {
+  max-width: 210mm;
+  margin: 0 auto;
+  padding: 20mm 20mm 16mm;
+}
+
+/* ── Cover ── */
+.cover {
+  text-align: center;
+  padding: 30mm 0 20mm;
+  border-bottom: 3px solid var(--accent);
+  margin-bottom: 20mm;
+}
+.cover .brand {
+  font-size: 36pt;
+  font-weight: 900;
+  color: var(--primary);
+  letter-spacing: 4px;
+}
+.cover .subtitle {
+  font-size: 16pt;
+  color: var(--gray);
+  margin-top: 6px;
+}
+.cover .meta {
+  font-size: 9pt;
+  color: var(--gray);
+  font-style: italic;
+  margin-top: 10px;
+}
+.cover .line {
+  width: 120px;
+  height: 4px;
+  background: var(--accent);
+  margin: 14px auto;
+  border-radius: 2px;
+}
+
+/* ── Sections ── */
+.section-title {
+  background: var(--primary);
+  color: var(--white);
+  font-size: 14pt;
+  font-weight: 700;
+  padding: 8px 14px;
+  margin: 28px 0 14px;
+  border-radius: 4px;
+}
+h2 {
+  font-size: 13pt;
+  color: var(--accent);
+  margin: 20px 0 8px;
+  padding-bottom: 3px;
+}
+h3 {
+  font-size: 11pt;
+  color: var(--primary);
+  font-weight: 700;
+  margin: 14px 0 6px;
+}
+
+/* ── Paragraphes & listes ── */
+p { margin-bottom: 7px; }
+ul { list-style: none; padding-left: 0; margin-bottom: 8px; }
+ul li {
+  padding: 2px 0 2px 20px;
+  position: relative;
+  font-size: 10.5pt;
+}
+ul li::before {
+  content: '•';
+  position: absolute;
+  left: 6px;
+  color: var(--accent);
+  font-weight: bold;
+}
+
+/* ── Labels ── */
+.kv { margin: 4px 0 4px 12px; font-size: 10.5pt; }
+.kv b { color: var(--primary); }
+.kv .val-green  { color: var(--green); }
+.kv .val-accent { color: var(--accent); }
+
+/* ── Badges rôles ── */
+.role-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 9pt;
+  font-weight: 700;
+  margin-left: 6px;
+}
+.badge-admin    { background: #fee2e2; color: #991b1b; }
+.badge-delivery { background: #dbeafe; color: #1e40af; }
+.badge-market   { background: #d1fae5; color: #065f46; }
+.badge-account  { background: #ede9fe; color: #5b21b6; }
+.badge-super    { background: #fef3c7; color: #92400e; }
+
+/* ── Tables ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 9.5pt;
+  margin-bottom: 14px;
+}
+thead tr { background: var(--primary); color: var(--white); }
+th {
+  padding: 7px 10px;
+  text-align: left;
+  font-weight: 700;
+  font-size: 9pt;
+}
+th.center, td.center { text-align: center; }
+tbody tr:nth-child(even) { background: var(--lightbg); }
+tbody tr:nth-child(odd)  { background: var(--white); }
+td { padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+.td-status {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 9pt;
+}
+.ok  { color: #065f46; font-weight: 700; font-size: 13pt; }
+.no  { color: #991b1b; font-weight: 700; font-size: 13pt; }
+.sa  { color: #92400e; font-size: 8pt; font-style: italic; }
+
+/* Statuts commande */
+.s-pending  { background: #fef3c7; }
+.s-confirm  { background: #dbeafe; }
+.s-pickup   { background: #ede9fe; }
+.s-complete { background: #d1fae5; }
+.s-cancel   { background: #fee2e2; }
+.s-dispute  { background: #ffedd5; }
+
+/* Cron */
+code {
+  font-family: 'Courier New', monospace;
+  font-size: 9pt;
+  color: var(--primary);
+  background: var(--lightbg);
+  padding: 1px 5px;
+  border-radius: 3px;
+}
+
+/* ── Schéma flux ── */
+.schema {
+  background: var(--lightbg);
+  border-left: 4px solid var(--accent);
+  padding: 12px 16px;
+  margin: 10px 0 16px;
+  font-family: 'Courier New', monospace;
+  font-size: 9pt;
+  color: var(--primary);
+  line-height: 1.9;
+  border-radius: 0 6px 6px 0;
+}
+
+/* ── Escrow pills ── */
+.pill {
+  display: inline-block;
+  padding: 1px 8px;
+  border-radius: 99px;
+  font-size: 8.5pt;
+  font-weight: 700;
+  margin: 0 2px;
+}
+.pill-held     { background: #fef3c7; color: #92400e; }
+.pill-released { background: #d1fae5; color: #065f46; }
+.pill-refunded { background: #fee2e2; color: #991b1b; }
+
+/* ── Footer ── */
+.footer {
+  text-align: center;
+  font-size: 8.5pt;
+  color: var(--gray);
+  font-style: italic;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+  margin-top: 24px;
+}
+
+/* ══════════════════════════════════════
+   STYLES D'IMPRESSION
+   ══════════════════════════════════════ */
+@media print {
+  body { font-size: 10pt; }
+  .page { padding: 14mm 16mm 12mm; max-width: 100%; }
+  .cover { padding: 20mm 0 14mm; }
+  .cover .brand { font-size: 30pt; }
+  .cover .subtitle { font-size: 14pt; }
+  .section-title { margin: 20px 0 10px; }
+  .page-break { page-break-before: always; }
+  h2 { page-break-after: avoid; }
+  h3 { page-break-after: avoid; }
+  table { page-break-inside: avoid; }
+  thead { display: table-header-group; }
+}
+</style>
+</head>
+<body>
+<div class="page">
+
+<!-- ══════════ COVER ══════════ -->
+<div class="cover">
+  <div class="brand">GUIMATRIX</div>
+  <div class="line"></div>
+  <div class="subtitle">Rôles utilisateurs &amp; Flux fonctionnels</div>
+  <div class="meta">Document interne — Mise à jour : octobre 2026</div>
+</div>
+
+<!-- ══════════ SECTION 1 : RÔLES ══════════ -->
+<div class="section-title">1. Les rôles utilisateurs</div>
+
+<p>L'application Guimatrix distingue deux catégories de rôles : les rôles utilisateurs ordinaires (acheteur, vendeur, livreur) et les rôles d'administration avec des accès restreints selon les responsabilités.</p>
+
+<!-- 1.1 Acheteur -->
+<h2>1.1 &nbsp;Acheteur <span class="role-badge badge-admin" style="background:#f0fdf4;color:#166534;">buyer</span></h2>
+<div class="kv"><b>Valeur par défaut :</b> Oui — tout compte créé est <code>buyer</code> par défaut</div>
+<div class="kv"><b>Accès admin :</b> Aucun</div>
+<p>Le compte doit être vérifié (<code>is_verified = true</code>) avant de pouvoir passer une commande. Le buyer peut :</p>
+<ul>
+  <li>Parcourir les annonces sans être connecté</li>
+  <li>Passer une commande et payer (Orange Money, MTN MoMo, PayCard…)</li>
+  <li>Suivre sa commande en temps réel</li>
+  <li>Confirmer la réception de l'article</li>
+  <li>Ouvrir un litige en cas de problème</li>
+  <li>Parrainer d'autres utilisateurs avec son code de parrainage unique (8 caractères) et gagner des commissions affilié</li>
+</ul>
+
+<!-- 1.2 Vendeur -->
+<h2>1.2 &nbsp;Vendeur <span class="role-badge badge-admin" style="background:#eff6ff;color:#1e40af;">seller</span></h2>
+<div class="kv"><b>Accès admin :</b> Aucun</div>
+<p>Le seller peut :</p>
+<ul>
+  <li>Créer des annonces (soumises à approbation avant d'être visibles publiquement)</li>
+  <li>Consulter et gérer ses commandes reçues</li>
+  <li>Confirmer qu'il a l'article prêt pour la livraison ou remise</li>
+  <li>Configurer son compte Mobile Money (Orange Money, MTN MoMo, PayCard, Kulu, Soutra Money, Akiba)</li>
+  <li>Recevoir une avance de <b>70%</b> du montant dès la collecte par le livreur (capital de roulement)</li>
+  <li>Recevoir le <b>solde de 30%</b> à la confirmation de réception par l'acheteur</li>
+</ul>
+
+<!-- 1.3 Livreur -->
+<h2>1.3 &nbsp;Livreur <span class="role-badge badge-delivery">livreur</span></h2>
+<div class="kv"><b>Accès admin :</b> Aucun — interface livreur dédiée</div>
+<p>Le livreur peut :</p>
+<ul>
+  <li>Voir ses missions de livraison assignées par un admin</li>
+  <li>Activer ou désactiver sa disponibilité lui-même (<code>is_available</code>)</li>
+  <li>Démarrer une livraison et mettre à jour sa position GPS</li>
+  <li>Confirmer la collecte chez le vendeur (déclenche le paiement de l'avance vendeur à 70%)</li>
+  <li>Confirmer la livraison chez l'acheteur</li>
+  <li>Configurer son compte Mobile Money pour recevoir ses virements hebdomadaires automatiques</li>
+</ul>
+
+<!-- 1.4 Admin -->
+<h2>1.4 &nbsp;Administrateur <span class="role-badge badge-admin">admin</span></h2>
+<div class="kv"><b>is_staff :</b> <span class="val-green">Oui</span></div>
+<div class="kv"><b>is_super_admin :</b> <span class="val-green">Oui (équivalent super_admin)</span></div>
+<p>Accès complet à tous les modules du dashboard d'administration : commandes, litiges, annonces, boutiques, livraisons, comptabilité, capital de roulement, paramètres, utilisateurs.</p>
+
+<!-- 1.5 Super Admin -->
+<h2>1.5 &nbsp;Super Administrateur <span class="role-badge badge-super">super_admin</span></h2>
+<div class="kv"><b>is_staff :</b> <span class="val-green">Oui</span></div>
+<div class="kv"><b>Privilège exclusif :</b> <span class="val-accent">Peut modifier le champ is_staff d'autres comptes (promotion / rétrogradation)</span></div>
+<p>Même périmètre que l'admin. C'est le rôle le plus élevé de l'application.</p>
+
+<!-- 1.6 Admin Livraison -->
+<h2>1.6 &nbsp;Admin Livraison <span class="role-badge badge-delivery">admin_delivery</span></h2>
+<div class="kv"><b>is_staff :</b> <span class="val-green">Oui</span></div>
+<div class="kv"><b>Onglets :</b> Livraisons · Points de retrait · Zones de rencontre · Config livraison</div>
+<ul>
+  <li>Assigner un livreur à une commande confirmée</li>
+  <li>Réassigner une livraison à un autre livreur</li>
+  <li>Créer, modifier, supprimer les points de retrait et zones de rencontre</li>
+  <li>Configurer les zones de livraison et les tarifs inter-quartiers de Conakry</li>
+</ul>
+
+<!-- 1.7 Admin Marketing -->
+<h2>1.7 &nbsp;Admin Marketing <span class="role-badge badge-market">admin_marketing</span></h2>
+<div class="kv"><b>is_staff :</b> <span class="val-green">Oui</span></div>
+<div class="kv"><b>Onglets :</b> Annonces · Boutiques · Publicités · Catégories · Utilisateurs</div>
+<ul>
+  <li>Approuver ou rejeter les annonces (avec motif de rejet)</li>
+  <li>Suspendre une annonce active</li>
+  <li>Approuver et modifier les boutiques vendeurs</li>
+  <li>Créer, modifier, supprimer les publicités (banners)</li>
+  <li>Gérer les catégories d'annonces</li>
+  <li>Activer ou suspendre des comptes utilisateurs</li>
+</ul>
+
+<!-- 1.8 Admin Comptabilité -->
+<h2>1.8 &nbsp;Admin Comptabilité <span class="role-badge badge-account">admin_accounting</span></h2>
+<div class="kv"><b>is_staff :</b> <span class="val-green">Oui</span></div>
+<div class="kv"><b>Onglets :</b> Comptabilité · Dashboard · Commandes · Retours · Paramètres · Capital roulement</div>
+<ul>
+  <li>Suivre et déclencher les virements vendeurs (libération escrow → Mobile Money)</li>
+  <li>Consulter les gains des livreurs et générer les virements hebdomadaires</li>
+  <li>Appliquer des amendes aux livreurs</li>
+  <li>Résoudre les litiges (en faveur de l'acheteur ou du vendeur)</li>
+  <li>Gérer le capital de roulement : injecter des fonds, modifier le taux d'avance (%), définir le plafond par commande</li>
+  <li>Signaler les défauts de paiement sur les avances vendeurs</li>
+  <li>Exporter les données comptables en CSV</li>
+</ul>
+
+<!-- Tableau permissions -->
+<h2>Tableau des permissions par rôle</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Permission</th>
+      <th class="center">admin /<br>super_admin</th>
+      <th class="center">admin_<br>delivery</th>
+      <th class="center">admin_<br>marketing</th>
+      <th class="center">admin_<br>accounting</th>
+      <th class="center">buyer /<br>seller</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr><td>is_admin (accès admin)</td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>is_super_admin (accès total)</td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>Gérer livraisons</td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>Gérer annonces &amp; marketing</td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>Gérer comptabilité</td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>Modifier is_staff</td><td class="center"><span class="sa">super_admin<br>seulement</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>Capital de roulement</td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="ok">✓</span></td><td class="center"><span class="no">✗</span></td></tr>
+    <tr><td>Ouvrir un litige</td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="sa">acheteur</span></td></tr>
+    <tr><td>Passer une commande</td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="sa">acheteur</span></td></tr>
+    <tr><td>Créer une annonce</td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="no">✗</span></td><td class="center"><span class="sa">vendeur</span></td></tr>
+  </tbody>
+</table>
+
+<!-- ══════════ SECTION 2 : FLUX ══════════ -->
+<div class="page-break"></div>
+<div class="section-title">2. Flux fonctionnels</div>
+
+<!-- 2.1 Inscription -->
+<h2>2.1 &nbsp;Inscription &amp; Authentification</h2>
+<p>Tout utilisateur s'inscrit avec son <b>numéro de téléphone guinéen</b>. Le compte est créé avec le rôle <code>buyer</code> par défaut. Un <b>code de parrainage unique</b> (8 caractères alphanumériques) est généré automatiquement. Le compte doit être vérifié (<code>is_verified = true</code>) par un admin avant de pouvoir passer une commande ou créer une annonce.</p>
+
+<!-- 2.2 Cycle commande -->
+<h2>2.2 &nbsp;Cycle de vie d'une commande</h2>
+<p>L'escrow (fonds retenus) protège l'acheteur jusqu'à confirmation de réception.</p>
+
+<table>
+  <thead>
+    <tr><th>Statut</th><th>Qui agit</th><th>Ce qui se passe</th></tr>
+  </thead>
+  <tbody>
+    <tr class="s-pending">
+      <td class="td-status">PENDING</td>
+      <td>Acheteur</td>
+      <td>Commande passée, paiement effectué. Escrow = <span class="pill pill-held">HELD</span> (fonds retenus).</td>
+    </tr>
+    <tr class="s-confirm">
+      <td class="td-status">CONFIRMED</td>
+      <td>Vendeur</td>
+      <td>Vendeur confirme qu'il a l'article prêt. Livreur en attente d'assignation.</td>
+    </tr>
+    <tr class="s-pickup">
+      <td class="td-status">PICKUP_CONFIRMED</td>
+      <td>Livreur + Admin</td>
+      <td>Livreur collecte chez le vendeur → vendeur reçoit <b>70%</b> immédiatement (si capital disponible). 30% en attente.</td>
+    </tr>
+    <tr class="s-complete">
+      <td class="td-status">COMPLETED</td>
+      <td>Acheteur / Livreur</td>
+      <td>Acheteur confirme la réception → escrow <span class="pill pill-released">RELEASED</span> → vendeur reçoit le <b>30%</b> restant. Livreur crédité.</td>
+    </tr>
+    <tr class="s-cancel">
+      <td class="td-status">CANCELLED</td>
+      <td>Acheteur / Admin</td>
+      <td>Annulation avant collecte. Remboursement acheteur. Escrow = <span class="pill pill-refunded">REFUNDED</span>.</td>
+    </tr>
+    <tr class="s-dispute">
+      <td class="td-status">DISPUTED</td>
+      <td>Acheteur</td>
+      <td>Litige ouvert. Admin tranche → COMPLETED (vendeur gagne) ou CANCELLED (acheteur remboursé).</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3>Schéma simplifié</h3>
+<div class="schema">
+PENDING  →  (vendeur confirme)  →  CONFIRMED<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(livreur collecte)  →  PICKUP_CONFIRMED  ←  <b>vendeur reçoit 70%</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(livraison faite)  →  COMPLETED &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;←  <b>vendeur reçoit 30%</b><br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;↓<br>
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(litige ouvert)  →  DISPUTED  →  (admin résout)  →  COMPLETED ou CANCELLED
+</div>
+
+<!-- 2.3 Capital -->
+<h2>2.3 &nbsp;Flux Capital de roulement (livraison à domicile)</h2>
+<p>Le capital de roulement (<b>10 000 000 GNF de départ</b>) permet de payer le vendeur partiellement dès la collecte par le livreur, sans attendre que l'acheteur confirme. Cela réduit la méfiance du vendeur envers la plateforme.</p>
+<ul>
+  <li>Livreur collecte chez le vendeur → appelle <code>confirm-pickup</code></li>
+  <li>Système vérifie le capital disponible et le plafond par commande (300 000 GNF par défaut)</li>
+  <li>Si éligible : vendeur reçoit <b>70%</b> du montant article immédiatement (Mobile Money)</li>
+  <li>30% restant retenu jusqu'à confirmation de l'acheteur</li>
+  <li>Quand l'acheteur confirme → escrow libéré → 30% virés au vendeur → capital reconstitué</li>
+  <li>En cas de défaut → admin signale le défaut → capital enregistre la perte (<code>total_defaulted_gnf</code>)</li>
+</ul>
+
+<!-- 2.4 Modes de livraison -->
+<h2>2.4 &nbsp;Modes de livraison</h2>
+<h3>Remise en main propre <code>meeting_point</code></h3>
+<p>Acheteur et vendeur se retrouvent dans un lieu public convenu (marché, carrefour, mosquée…). Aucun livreur impliqué. Le paiement via escrow est libéré quand l'acheteur confirme la réception.</p>
+<h3>Point de retrait <code>pickup_point</code></h3>
+<p>L'acheteur récupère l'article dans un point de retrait Guimatrix agréé. Le livreur dépose l'article au point de retrait.</p>
+<h3>Livraison à domicile <code>home_delivery</code></h3>
+<p>Un livreur Guimatrix collecte l'article chez le vendeur et le livre directement chez l'acheteur. <b>Seul mode éligible au capital de roulement</b> (avance 70% au vendeur à la collecte).</p>
+
+<!-- 2.5 Cron jobs -->
+<h2>2.5 &nbsp;Automatismes — Cron jobs (Render)</h2>
+<p>Quatre tâches automatiques tournent en arrière-plan et maintiennent la cohérence de la plateforme :</p>
+<table>
+  <thead>
+    <tr><th>Cron job</th><th>Fréquence</th><th>Action</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>expire-listings</code></td><td>Quotidien</td><td>Expire automatiquement les annonces dont la date est dépassée.</td></tr>
+    <tr><td><code>notify-escrow</code></td><td>Quotidien</td><td>Notifie les vendeurs que leur paiement escrow est prêt à être libéré.</td></tr>
+    <tr><td><code>release-escrow</code></td><td>Quotidien</td><td>Libère automatiquement l'escrow après le délai légal sans litige ouvert.</td></tr>
+    <tr><td><code>weekly-payout</code></td><td>Lundi matin</td><td>Génère et déclenche les virements hebdomadaires de tous les livreurs (Mobile Money).</td></tr>
+  </tbody>
+</table>
+
+<!-- 2.6 Escrow -->
+<h2>2.6 &nbsp;Système de paiement &amp; Escrow</h2>
+<p>Guimatrix utilise un mécanisme d'<b>escrow</b> : l'argent de l'acheteur est capturé dès la commande et retenu jusqu'à confirmation de réception. Aucun versement n'est fait au vendeur avant cette étape.</p>
+<div class="kv"><b>Opérateurs acceptés :</b> Orange Money · MTN MoMo · PayCard Guinée · ChaChaP</div>
+<div class="kv"><b>Escrow <span class="pill pill-held">HELD</span> :</b> Fonds retenus dès le paiement de l'acheteur</div>
+<div class="kv"><b>Escrow <span class="pill pill-released">RELEASED</span> :</b> Vendeur payé après confirmation de réception</div>
+<div class="kv"><b>Escrow <span class="pill pill-refunded">REFUNDED</span> :</b> Remboursement acheteur en cas d'annulation ou litige gagné</div>
+
+<!-- 2.7 Affiliés -->
+<h2>2.7 &nbsp;Programme de parrainage (Affiliés)</h2>
+<p>Chaque utilisateur possède un <b>code de parrainage unique</b> généré automatiquement à l'inscription (8 caractères alphanumériques). Lorsqu'un nouvel utilisateur s'inscrit avec ce code, le parrain reçoit une commission sur les commandes du filleul. Les commissions sont suivies dans le module affiliés.</p>
+
+<!-- Footer -->
+<div class="footer">Guimatrix — Document interne confidentiel</div>
+
+</div><!-- .page -->
+</body>
+</html>
