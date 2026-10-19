@@ -373,9 +373,10 @@ export default function HomePage() {
     const user = useAuthStore(s => s.user)
     const navigate = useNavigate()
 
-    // Livreur → redirection immédiate vers son tableau de bord
+    // Livreur / Vendeur → redirection immédiate vers leur tableau de bord
     useEffect(() => {
         if (user?.role === 'livreur') navigate('/livreur', { replace: true })
+        if (user?.role === 'seller')  navigate('/seller/dashboard', { replace: true })
     }, [user])
     const loadMoreRef = useRef(null)
 
@@ -463,10 +464,10 @@ export default function HomePage() {
                         🇬🇳 Marketplace N°1 en Guinée
                     </div>
                     <h1 className="text-4xl md:text-5xl font-extrabold mb-3 leading-tight tracking-tight">
-                        Achetez et vendez<br />
-                        <span className="text-emerald-300">partout en Guinée</span>
+                        Commandez, on s'occupe<br />
+                        <span className="text-emerald-300">du reste en Guinée</span>
                     </h1>
-                    <p className="text-green-200/80 mb-7 text-sm">Des milliers d'annonces vérifiées, près de chez vous</p>
+                    <p className="text-green-200/80 mb-7 text-sm">Des milliers d'annonces vérifiées · Retrait en point de collecte près de chez vous</p>
 
                     {/* Barre de recherche unifiée IA + classique */}
                     <SmartSearchBar
@@ -580,7 +581,7 @@ export default function HomePage() {
 
                     {/* Chiffres clés */}
                     <div className="grid grid-cols-3 gap-3 mt-7">
-                        {[['10K+', 'Annonces'], ['5K+', 'Vendeurs actifs'], ['4.8★', 'Note moyenne']].map(([val, lbl]) => (
+                        {[['10K+', 'Annonces'], ['5K+', 'Partenaires vendeurs'], ['4.8★', 'Note moyenne']].map(([val, lbl]) => (
                             <div key={lbl} className="bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl py-3 px-2">
                                 <p className="text-lg font-black text-white">{val}</p>
                                 <p className="text-emerald-200/80 text-xs mt-0.5 leading-tight">{lbl}</p>
