@@ -4118,27 +4118,25 @@ function TabProject() {
 const TABS_BY_ROLE = {
   admin:            null,
   super_admin:      null,
-  admin_delivery:   ['deliveries', 'pickup-points', 'meeting-zones', 'delivery-config'],
+  admin_delivery:   ['deliveries', 'pickup-points', 'delivery-config'],
   admin_marketing:  ['listings', 'shops', 'banners', 'categories', 'users'],
-  admin_accounting: ['accounting', 'overview', 'orders', 'returns', 'settings', 'capital'],
+  admin_accounting: ['accounting', 'overview', 'orders', 'returns', 'settings'],
 }
 
 const ALL_TABS = [
   { id: 'overview',         label: '📊 Dashboard' },
-  { id: 'accounting',       label: '💰 Comptabilité' },
-  { id: 'deliveries',       label: '🚚 Livraisons' },
   { id: 'orders',           label: '📋 Commandes' },
-  { id: 'returns',          label: '↩️ Retours' },
+  { id: 'deliveries',       label: '🚚 Livraisons' },
   { id: 'users',            label: '👥 Utilisateurs' },
   { id: 'listings',         label: '📦 Annonces' },
   { id: 'shops',            label: '🏪 Boutiques' },
+  { id: 'accounting',       label: '💰 Comptabilité' },
+  { id: 'returns',          label: '↩️ Retours' },
+  { id: 'pickup-points',    label: '📍 Points retrait' },
+  { id: 'delivery-config',  label: '🌍 Config livraison' },
   { id: 'banners',          label: '📢 Publicités' },
   { id: 'categories',       label: '🏷️ Catégories' },
-  { id: 'pickup-points',    label: '📍 Points retrait' },
-  { id: 'meeting-zones',    label: '🤝 Zones rencontre' },
-  { id: 'delivery-config',  label: '🌍 Config livraison' },
   { id: 'settings',         label: '⚙️ Paramètres' },
-  { id: 'capital',          label: '💰 Capital roulement' },
   { id: 'project',          label: '🗂️ Projet' },
 ]
 
@@ -4275,11 +4273,9 @@ export default function AdminPage() {
         {safeTab === 'categories'    && <TabCategories />}
         {safeTab === 'shops'         && <TabShops />}
         {safeTab === 'pickup-points'   && <TabPickupPoints />}
-        {safeTab === 'meeting-zones'   && <TabMeetingZones />}
         {safeTab === 'delivery-config' && <TabDeliveryConfig />}
         {safeTab === 'returns'         && <TabReturns />}
         {safeTab === 'settings'        && <TabSettings />}
-        {safeTab === 'capital'         && <TabCapital />}
         {safeTab === 'project'         && <TabProject />}
       </div>
     </div>
