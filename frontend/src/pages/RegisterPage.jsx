@@ -41,7 +41,9 @@ function SelectField({ icon, label, children, ...props }) {
 
 // ── OTP ───────────────────────────────────────────────────────────────────────
 function OTPInput({ value, onChange }) {
-  const refs = Array.from({ length: 6 }, () => useRef(null))
+  const r0 = useRef(null), r1 = useRef(null), r2 = useRef(null)
+  const r3 = useRef(null), r4 = useRef(null), r5 = useRef(null)
+  const refs = [r0, r1, r2, r3, r4, r5]
   const digits = Array.from({ length: 6 }, (_, i) => value[i] || '')
   const handleChange = (i, e) => {
     const v = e.target.value.replace(/\D/g, '').slice(-1)
