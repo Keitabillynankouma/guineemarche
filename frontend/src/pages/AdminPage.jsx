@@ -3626,6 +3626,495 @@ const ROLE_META = {
 }
 
 // Onglets accessibles par rôle (null = tous)
+// ── Onglet Suivi Projet ───────────────────────────────────────────────────────
+
+const projectAPI = {
+  getTasks:       () => api.get('/core/project/tasks/'),
+  createTask:     (d) => api.post('/core/project/tasks/', d),
+  updateTask:     (id, d) => api.patch(`/core/project/tasks/${id}/`, d),
+  deleteTask:     (id) => api.delete(`/core/project/tasks/${id}/`),
+  getNotes:       () => api.get('/core/project/notes/'),
+  createNote:     (d) => api.post('/core/project/notes/', d),
+  updateNote:     (id, d) => api.patch(`/core/project/notes/${id}/`, d),
+  deleteNote:     (id) => api.delete(`/core/project/notes/${id}/`),
+  getMilestones:  () => api.get('/core/project/milestones/'),
+  createMilestone:(d) => api.post('/core/project/milestones/', d),
+  updateMilestone:(id, d) => api.patch(`/core/project/milestones/${id}/`, d),
+  deleteMilestone:(id) => api.delete(`/core/project/milestones/${id}/`),
+  getTeam:        () => api.get('/core/project/team/'),
+  createMember:   (d) => api.post('/core/project/team/', d),
+  updateMember:   (id, d) => api.patch(`/core/project/team/${id}/`, d),
+  deleteMember:   (id) => api.delete(`/core/project/team/${id}/`),
+}
+
+const TASK_COLS = [
+  { id: 'todo',        label: 'À faire',   color: 'bg-gray-100 text-gray-700',   dot: 'bg-gray-400'   },
+  { id: 'in_progress', label: 'En cours',  color: 'bg-blue-100 text-blue-700',   dot: 'bg-blue-500'   },
+  { id: 'done',        label: 'Terminé',   color: 'bg-green-100 text-green-700', dot: 'bg-green-500'  },
+]
+const PRIORITY_BADGE = {
+  low:    'bg-gray-100 text-gray-600',
+  medium: 'bg-amber-100 text-amber-700',
+  high:   'bg-red-100 text-red-700',
+}
+const MILESTONE_STATUS = {
+  planned:     { label: 'Prévu',     color: 'bg-gray-100 text-gray-600'   },
+  in_progress: { label: 'En cours',  color: 'bg-blue-100 text-blue-700'   },
+  done:        { label: 'Terminé',   color: 'bg-green-100 text-green-700' },
+  cancelled:   { label: 'Annulé',    color: 'bg-red-100 text-red-600'     },
+}
+
+function TabProject() {
+  const qc = useQueryClient()
+  const [sub, setSub] = useState('kanban')
+  const [taskForm, setTaskForm]   = useState({ title:'', description:'', status:'todo', assignee:'', priority:'medium' })
+  const [showTaskForm, setShowTaskForm] = useState(false)
+  const [editTask, setEditTask]   = useState(null)
+  const [noteForm, setNoteForm]   = useState({ title:'', content:'', author_name:'', pinned:false })
+  const [showNoteForm, setShowNoteForm] = useState(false)
+  const [editNote, setEditNote]   = useState(null)
+  const [msForm, setMsForm]       = useState({ title:'', description:'', phase:'', status:'planned', target_date:'' })
+  const [showMsForm, setShowMsForm] = useState(false)
+  const [editMs, setEditMs]       = useState(null)
+  const [tmForm, setTmForm]       = useState({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true })
+  const [showTmForm, setShowTmForm] = useState(false)
+  const [editTm, setEditTm]       = useState(null)
+
+  const { data: tasks = [] }      = useQuery({ queryKey: ['proj-tasks'],      queryFn: () => projectAPI.getTasks().then(r => r.data) })
+  const { data: notes = [] }      = useQuery({ queryKey: ['proj-notes'],      queryFn: () => projectAPI.getNotes().then(r => r.data) })
+  const { data: milestones = [] } = useQuery({ queryKey: ['proj-milestones'], queryFn: () => projectAPI.getMilestones().then(r => r.data) })
+  const { data: team = [] }       = useQuery({ queryKey: ['proj-team'],       queryFn: () => projectAPI.getTeam().then(r => r.data) })
+
+  // ── mutations génériques ──────────────────────────────────────────────
+  function mk(fn, keys) {
+    return useMutation({ mutationFn: fn, onSuccess: () => keys.forEach(k => qc.invalidateQueries([k])) })
+  }
+  const createTask = mk(d => projectAPI.createTask(d), ['proj-tasks'])
+  const updateTask = mk(({ id, ...d }) => projectAPI.updateTask(id, d), ['proj-tasks'])
+  const deleteTask = mk(id => projectAPI.deleteTask(id), ['proj-tasks'])
+  const createNote = mk(d => projectAPI.createNote(d), ['proj-notes'])
+  const updateNote = mk(({ id, ...d }) => projectAPI.updateNote(id, d), ['proj-notes'])
+  const deleteNote = mk(id => projectAPI.deleteNote(id), ['proj-notes'])
+  const createMs   = mk(d => projectAPI.createMilestone(d), ['proj-milestones'])
+  const updateMs   = mk(({ id, ...d }) => projectAPI.updateMilestone(id, d), ['proj-milestones'])
+  const deleteMs   = mk(id => projectAPI.deleteMilestone(id), ['proj-milestones'])
+  const createTm   = mk(d => projectAPI.createMember(d), ['proj-team'])
+  const updateTm   = mk(({ id, ...d }) => projectAPI.updateMember(id, d), ['proj-team'])
+  const deleteTm   = mk(id => projectAPI.deleteMember(id), ['proj-team'])
+
+  const SUB_TABS = [
+    { id: 'kanban',   label: '📋 Kanban'  },
+    { id: 'notes',    label: '📝 Notes'   },
+    { id: 'roadmap',  label: '🗺️ Roadmap' },
+    { id: 'team',     label: '👥 Équipe'  },
+  ]
+
+  // ── Kanban ────────────────────────────────────────────────────────────
+  function renderKanban() {
+    const tasksByStatus = col => tasks.filter(t => t.status === col)
+
+    function openEditTask(t) {
+      setEditTask(t)
+      setTaskForm({ title: t.title, description: t.description, status: t.status, assignee: t.assignee, priority: t.priority })
+      setShowTaskForm(true)
+    }
+    function submitTask(e) {
+      e.preventDefault()
+      if (editTask) { updateTask.mutate({ id: editTask.id, ...taskForm }); }
+      else          { createTask.mutate(taskForm) }
+      setShowTaskForm(false); setEditTask(null)
+      setTaskForm({ title:'', description:'', status:'todo', assignee:'', priority:'medium' })
+    }
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800">Tableau Kanban</h3>
+          <button onClick={() => { setEditTask(null); setTaskForm({ title:'', description:'', status:'todo', assignee:'', priority:'medium' }); setShowTaskForm(true) }}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition">
+            + Nouvelle tâche
+          </button>
+        </div>
+
+        {showTaskForm && (
+          <form onSubmit={submitTask} className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 space-y-3">
+            <p className="font-semibold text-gray-800 text-sm">{editTask ? 'Modifier la tâche' : 'Nouvelle tâche'}</p>
+            <input required placeholder="Titre *" value={taskForm.title} onChange={e => setTaskForm(p => ({...p, title: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+            <textarea placeholder="Description (optionnel)" value={taskForm.description} rows={2}
+              onChange={e => setTaskForm(p => ({...p, description: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none" />
+            <div className="grid grid-cols-3 gap-2">
+              <select value={taskForm.status} onChange={e => setTaskForm(p => ({...p, status: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                {TASK_COLS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+              </select>
+              <select value={taskForm.priority} onChange={e => setTaskForm(p => ({...p, priority: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+                <option value="low">⬇ Faible</option>
+                <option value="medium">➡ Moyen</option>
+                <option value="high">⬆ Élevé</option>
+              </select>
+              <input placeholder="Assigné à" value={taskForm.assignee} onChange={e => setTaskForm(p => ({...p, assignee: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => { setShowTaskForm(false); setEditTask(null) }}
+                className="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Annuler</button>
+              <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700">
+                {editTask ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </form>
+        )}
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {TASK_COLS.map(col => (
+            <div key={col.id} className="bg-gray-50 rounded-2xl p-3">
+              <div className={`flex items-center gap-2 mb-3 px-2 py-1 rounded-xl ${col.color}`}>
+                <div className={`w-2 h-2 rounded-full ${col.dot}`} />
+                <span className="text-sm font-bold">{col.label}</span>
+                <span className="ml-auto text-xs opacity-60">{tasksByStatus(col.id).length}</span>
+              </div>
+              <div className="space-y-2">
+                {tasksByStatus(col.id).map(t => (
+                  <div key={t.id} className="bg-white rounded-xl p-3 shadow-sm border border-gray-100">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="text-sm font-semibold text-gray-800 leading-tight flex-1">{t.title}</p>
+                      <div className="flex gap-1 flex-shrink-0">
+                        <button onClick={() => openEditTask(t)} className="text-gray-400 hover:text-blue-500 text-xs p-1">✏️</button>
+                        <button onClick={() => deleteTask.mutate(t.id)} className="text-gray-400 hover:text-red-500 text-xs p-1">🗑</button>
+                      </div>
+                    </div>
+                    {t.description && <p className="text-xs text-gray-500 mt-1 leading-relaxed">{t.description}</p>}
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${PRIORITY_BADGE[t.priority] || ''}`}>
+                        {t.priority === 'high' ? '⬆' : t.priority === 'low' ? '⬇' : '➡'} {t.priority}
+                      </span>
+                      {t.assignee && <span className="text-[10px] text-gray-500">👤 {t.assignee}</span>}
+                    </div>
+                    <div className="flex gap-1 mt-2">
+                      {TASK_COLS.filter(c => c.id !== t.status).map(c => (
+                        <button key={c.id} onClick={() => updateTask.mutate({ id: t.id, status: c.id })}
+                          className={`text-[10px] px-2 py-0.5 rounded-full border font-medium transition hover:opacity-80 ${c.color} border-current/20`}>
+                          → {c.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {tasksByStatus(col.id).length === 0 && (
+                  <p className="text-xs text-gray-400 text-center py-4">Aucune tâche</p>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Notes ──────────────────────────────────────────────────────────────
+  function renderNotes() {
+    function openEditNote(n) {
+      setEditNote(n)
+      setNoteForm({ title: n.title, content: n.content, author_name: n.author_name, pinned: n.pinned })
+      setShowNoteForm(true)
+    }
+    function submitNote(e) {
+      e.preventDefault()
+      if (editNote) updateNote.mutate({ id: editNote.id, ...noteForm })
+      else          createNote.mutate(noteForm)
+      setShowNoteForm(false); setEditNote(null)
+      setNoteForm({ title:'', content:'', author_name:'', pinned:false })
+    }
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800">Notes d'équipe</h3>
+          <button onClick={() => { setEditNote(null); setNoteForm({ title:'', content:'', author_name:'', pinned:false }); setShowNoteForm(true) }}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition">
+            + Nouvelle note
+          </button>
+        </div>
+        {showNoteForm && (
+          <form onSubmit={submitNote} className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 space-y-3">
+            <p className="font-semibold text-gray-800 text-sm">{editNote ? 'Modifier la note' : 'Nouvelle note'}</p>
+            <input required placeholder="Titre *" value={noteForm.title} onChange={e => setNoteForm(p => ({...p, title: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+            <textarea required placeholder="Contenu *" value={noteForm.content} rows={4}
+              onChange={e => setNoteForm(p => ({...p, content: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none" />
+            <div className="flex items-center gap-4">
+              <input placeholder="Auteur" value={noteForm.author_name} onChange={e => setNoteForm(p => ({...p, author_name: e.target.value}))}
+                className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input type="checkbox" checked={noteForm.pinned} onChange={e => setNoteForm(p => ({...p, pinned: e.target.checked}))} className="w-4 h-4" />
+                📌 Épingler
+              </label>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => { setShowNoteForm(false); setEditNote(null) }}
+                className="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Annuler</button>
+              <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700">
+                {editNote ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </form>
+        )}
+        <div className="space-y-3">
+          {notes.length === 0 && <p className="text-center text-gray-400 text-sm py-8">Aucune note pour l'instant.</p>}
+          {notes.map(n => (
+            <div key={n.id} className={`bg-white rounded-2xl p-4 border ${n.pinned ? 'border-amber-200 bg-amber-50' : 'border-gray-100'} shadow-sm`}>
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-2">
+                  {n.pinned && <span className="text-sm">📌</span>}
+                  <p className="font-bold text-gray-800">{n.title}</p>
+                </div>
+                <div className="flex gap-1">
+                  <button onClick={() => updateNote.mutate({ id: n.id, pinned: !n.pinned })}
+                    className="text-xs text-gray-400 hover:text-amber-500 p-1">{n.pinned ? '📌' : '📍'}</button>
+                  <button onClick={() => openEditNote(n)} className="text-xs text-gray-400 hover:text-blue-500 p-1">✏️</button>
+                  <button onClick={() => deleteNote.mutate(n.id)} className="text-xs text-gray-400 hover:text-red-500 p-1">🗑</button>
+                </div>
+              </div>
+              <p className="text-sm text-gray-600 mt-2 leading-relaxed whitespace-pre-wrap">{n.content}</p>
+              <div className="flex items-center gap-3 mt-3 text-xs text-gray-400">
+                {n.author_name && <span>✍️ {n.author_name}</span>}
+                <span>{new Date(n.updated_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })}</span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  // ── Roadmap ─────────────────────────────────────────────────────────────
+  function renderRoadmap() {
+    function openEditMs(m) {
+      setEditMs(m)
+      setMsForm({ title: m.title, description: m.description, phase: m.phase, status: m.status, target_date: m.target_date || '' })
+      setShowMsForm(true)
+    }
+    function submitMs(e) {
+      e.preventDefault()
+      const d = { ...msForm, target_date: msForm.target_date || null }
+      if (editMs) updateMs.mutate({ id: editMs.id, ...d })
+      else        createMs.mutate(d)
+      setShowMsForm(false); setEditMs(null)
+      setMsForm({ title:'', description:'', phase:'', status:'planned', target_date:'' })
+    }
+    const phases = [...new Set(milestones.map(m => m.phase).filter(Boolean))]
+    const noPhase = milestones.filter(m => !m.phase)
+    const byPhase = phases.map(ph => ({ phase: ph, items: milestones.filter(m => m.phase === ph) }))
+    if (noPhase.length) byPhase.push({ phase: '', items: noPhase })
+
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800">Roadmap du projet</h3>
+          <button onClick={() => { setEditMs(null); setMsForm({ title:'', description:'', phase:'', status:'planned', target_date:'' }); setShowMsForm(true) }}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition">
+            + Nouveau jalon
+          </button>
+        </div>
+        {showMsForm && (
+          <form onSubmit={submitMs} className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 space-y-3">
+            <p className="font-semibold text-gray-800 text-sm">{editMs ? 'Modifier le jalon' : 'Nouveau jalon'}</p>
+            <input required placeholder="Titre *" value={msForm.title} onChange={e => setMsForm(p => ({...p, title: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+            <div className="grid grid-cols-2 gap-2">
+              <input placeholder="Phase (ex: Phase 1, MVP...)" value={msForm.phase} onChange={e => setMsForm(p => ({...p, phase: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <input type="date" value={msForm.target_date} onChange={e => setMsForm(p => ({...p, target_date: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+            </div>
+            <select value={msForm.status} onChange={e => setMsForm(p => ({...p, status: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500">
+              {Object.entries(MILESTONE_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+            </select>
+            <textarea placeholder="Description (optionnel)" value={msForm.description} rows={2}
+              onChange={e => setMsForm(p => ({...p, description: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none" />
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => { setShowMsForm(false); setEditMs(null) }}
+                className="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Annuler</button>
+              <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700">
+                {editMs ? 'Enregistrer' : 'Créer'}
+              </button>
+            </div>
+          </form>
+        )}
+        {milestones.length === 0 && <p className="text-center text-gray-400 text-sm py-8">Aucun jalon. Commencez par définir les phases du projet.</p>}
+        {byPhase.map(({ phase, items }) => (
+          <div key={phase || '_'} className="mb-6">
+            {phase && (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="h-px flex-1 bg-gray-200" />
+                <span className="text-xs font-bold text-gray-500 uppercase tracking-wider px-2">{phase}</span>
+                <div className="h-px flex-1 bg-gray-200" />
+              </div>
+            )}
+            <div className="space-y-2">
+              {items.map(m => {
+                const st = MILESTONE_STATUS[m.status] || MILESTONE_STATUS.planned
+                return (
+                  <div key={m.id} className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-start gap-4">
+                    <div className={`w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 ${st.color}`}>
+                      {m.status === 'done' ? '✅' : m.status === 'in_progress' ? '🔵' : m.status === 'cancelled' ? '❌' : '⭕'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-semibold text-gray-800 text-sm">{m.title}</p>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${st.color}`}>{st.label}</span>
+                        {m.target_date && <span className="text-xs text-gray-400">📅 {new Date(m.target_date).toLocaleDateString('fr-FR')}</span>}
+                      </div>
+                      {m.description && <p className="text-xs text-gray-500 mt-1">{m.description}</p>}
+                    </div>
+                    <div className="flex gap-1 flex-shrink-0">
+                      <button onClick={() => openEditMs(m)} className="text-gray-400 hover:text-blue-500 text-xs p-1">✏️</button>
+                      <button onClick={() => deleteMs.mutate(m.id)} className="text-gray-400 hover:text-red-500 text-xs p-1">🗑</button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // ── Équipe ──────────────────────────────────────────────────────────────
+  function renderTeam() {
+    function openEditTm(t) {
+      setEditTm(t)
+      setTmForm({ name: t.name, role: t.role, email: t.email, phone: t.phone, responsibilities: t.responsibilities, avatar_emoji: t.avatar_emoji, active: t.active })
+      setShowTmForm(true)
+    }
+    function submitTm(e) {
+      e.preventDefault()
+      if (editTm) updateTm.mutate({ id: editTm.id, ...tmForm })
+      else        createTm.mutate(tmForm)
+      setShowTmForm(false); setEditTm(null)
+      setTmForm({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true })
+    }
+    return (
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-bold text-gray-800">Tableau de bord équipe</h3>
+          <button onClick={() => { setEditTm(null); setTmForm({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true }); setShowTmForm(true) }}
+            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition">
+            + Ajouter un membre
+          </button>
+        </div>
+        {showTmForm && (
+          <form onSubmit={submitTm} className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 space-y-3">
+            <p className="font-semibold text-gray-800 text-sm">{editTm ? 'Modifier le membre' : 'Nouveau membre'}</p>
+            <div className="grid grid-cols-2 gap-2">
+              <input required placeholder="Nom *" value={tmForm.name} onChange={e => setTmForm(p => ({...p, name: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <input required placeholder="Rôle *" value={tmForm.role} onChange={e => setTmForm(p => ({...p, role: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <input placeholder="Email" value={tmForm.email} onChange={e => setTmForm(p => ({...p, email: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <input placeholder="Téléphone" value={tmForm.phone} onChange={e => setTmForm(p => ({...p, phone: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <input placeholder="Emoji avatar (ex: 👨‍💻)" value={tmForm.avatar_emoji} onChange={e => setTmForm(p => ({...p, avatar_emoji: e.target.value}))}
+                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer px-3">
+                <input type="checkbox" checked={tmForm.active} onChange={e => setTmForm(p => ({...p, active: e.target.checked}))} className="w-4 h-4" />
+                Membre actif
+              </label>
+            </div>
+            <textarea placeholder="Responsabilités" value={tmForm.responsibilities} rows={2}
+              onChange={e => setTmForm(p => ({...p, responsibilities: e.target.value}))}
+              className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500 resize-none" />
+            <div className="flex gap-2 justify-end">
+              <button type="button" onClick={() => { setShowTmForm(false); setEditTm(null) }}
+                className="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Annuler</button>
+              <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700">
+                {editTm ? 'Enregistrer' : 'Ajouter'}
+              </button>
+            </div>
+          </form>
+        )}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {team.length === 0 && <p className="col-span-2 text-center text-gray-400 text-sm py-8">Aucun membre d'équipe pour l'instant.</p>}
+          {team.map(t => (
+            <div key={t.id} className={`bg-white rounded-2xl p-4 border shadow-sm ${t.active ? 'border-gray-100' : 'border-gray-200 opacity-60'}`}>
+              <div className="flex items-start gap-3">
+                <div className="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center text-2xl flex-shrink-0">{t.avatar_emoji || '👤'}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="font-bold text-gray-800">{t.name}</p>
+                      <p className="text-xs text-green-600 font-semibold">{t.role}</p>
+                    </div>
+                    <div className="flex gap-1">
+                      <button onClick={() => openEditTm(t)} className="text-gray-400 hover:text-blue-500 text-xs p-1">✏️</button>
+                      <button onClick={() => deleteTm.mutate(t.id)} className="text-gray-400 hover:text-red-500 text-xs p-1">🗑</button>
+                    </div>
+                  </div>
+                  {t.responsibilities && <p className="text-xs text-gray-500 mt-1.5 leading-relaxed">{t.responsibilities}</p>}
+                  <div className="flex flex-wrap gap-3 mt-2">
+                    {t.phone && <a href={`tel:${t.phone}`} className="text-xs text-gray-500 hover:text-green-600">📞 {t.phone}</a>}
+                    {t.email && <a href={`mailto:${t.email}`} className="text-xs text-gray-500 hover:text-green-600 truncate">✉️ {t.email}</a>}
+                  </div>
+                  {!t.active && <span className="text-xs text-gray-400 italic mt-1 block">Inactif</span>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Résumé rapide */}
+      <div className="grid grid-cols-4 gap-3">
+        {[
+          { label: 'Tâches à faire',  value: tasks.filter(t => t.status === 'todo').length,        color: 'bg-gray-50 text-gray-700',   icon: '📋' },
+          { label: 'En cours',        value: tasks.filter(t => t.status === 'in_progress').length, color: 'bg-blue-50 text-blue-700',   icon: '🔵' },
+          { label: 'Jalons actifs',   value: milestones.filter(m => m.status === 'in_progress').length, color: 'bg-amber-50 text-amber-700', icon: '🗺️' },
+          { label: 'Membres équipe',  value: team.filter(m => m.active).length,                    color: 'bg-green-50 text-green-700', icon: '👥' },
+        ].map(c => (
+          <div key={c.label} className={`rounded-2xl p-3 text-center ${c.color}`}>
+            <p className="text-lg mb-0.5">{c.icon}</p>
+            <p className="text-xl font-black">{c.value}</p>
+            <p className="text-xs font-medium opacity-80">{c.label}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Sous-onglets */}
+      <div className="bg-white rounded-2xl shadow p-1 flex gap-1">
+        {SUB_TABS.map(s => (
+          <button key={s.id} onClick={() => setSub(s.id)}
+            className={`flex-1 text-sm font-medium px-3 py-2 rounded-xl transition whitespace-nowrap ${
+              sub === s.id ? 'bg-green-600 text-white shadow-sm' : 'text-gray-600 hover:bg-gray-100'
+            }`}>
+            {s.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Contenu selon le sous-onglet */}
+      <div>
+        {sub === 'kanban'  && renderKanban()}
+        {sub === 'notes'   && renderNotes()}
+        {sub === 'roadmap' && renderRoadmap()}
+        {sub === 'team'    && renderTeam()}
+      </div>
+    </div>
+  )
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+
 const TABS_BY_ROLE = {
   admin:            null,
   super_admin:      null,
@@ -3650,6 +4139,7 @@ const ALL_TABS = [
   { id: 'delivery-config',  label: '🌍 Config livraison' },
   { id: 'settings',         label: '⚙️ Paramètres' },
   { id: 'capital',          label: '💰 Capital roulement' },
+  { id: 'project',          label: '🗂️ Projet' },
 ]
 
 function getVisibleTabs(role) {
@@ -3790,6 +4280,7 @@ export default function AdminPage() {
         {safeTab === 'returns'         && <TabReturns />}
         {safeTab === 'settings'        && <TabSettings />}
         {safeTab === 'capital'         && <TabCapital />}
+        {safeTab === 'project'         && <TabProject />}
       </div>
     </div>
   )

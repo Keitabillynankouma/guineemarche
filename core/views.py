@@ -1,5 +1,5 @@
 import logging
-from rest_framework import serializers
+from rest_framework import serializers, viewsets, status as drf_status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
@@ -7,6 +7,7 @@ from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 from django.conf import settings
 from core.permissions import IsAdmin
 from core.site_settings import SiteSettings
+from core.models import ProjectTask, ProjectNote, ProjectMilestone, TeamMember
 
 logger = logging.getLogger(__name__)
 
@@ -129,3 +130,47 @@ class SupportChatView(APIView):
         except Exception as exc:
             logger.error("Support chat error: %s", exc)
             return Response({'reply': "Une erreur est survenue. Contactez-nous sur WhatsApp au +224622411238."}, status=200)
+
+
+# ── Suivi projet interne ──────────────────────────────────────────────────────
+
+class ProjectTaskSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ProjectTask
+        fields = '__all__'
+
+class ProjectNoteSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ProjectNote
+        fields = '__all__'
+
+class ProjectMilestoneSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = ProjectMilestone
+        fields = '__all__'
+
+class TeamMemberSerializer(serializers.ModelSerializer):
+    class Meta:
+        model  = TeamMember
+        fields = '__all__'
+
+
+class ProjectTaskViewSet(viewsets.ModelViewSet):
+    queryset           = ProjectTask.objects.all()
+    serializer_class   = ProjectTaskSerializer
+    permission_classes = [IsAdmin]
+
+class ProjectNoteViewSet(viewsets.ModelViewSet):
+    queryset           = ProjectNote.objects.all()
+    serializer_class   = ProjectNoteSerializer
+    permission_classes = [IsAdmin]
+
+class ProjectMilestoneViewSet(viewsets.ModelViewSet):
+    queryset           = ProjectMilestone.objects.all()
+    serializer_class   = ProjectMilestoneSerializer
+    permission_classes = [IsAdmin]
+
+class TeamMemberViewSet(viewsets.ModelViewSet):
+    queryset           = TeamMember.objects.all()
+    serializer_class   = TeamMemberSerializer
+    permission_classes = [IsAdmin]
