@@ -27,6 +27,9 @@ import LivreurDashboard from './pages/LivreurDashboard'
 import NotificationsPage from './pages/NotificationsPage'
 import SellerEarningsPage from './pages/SellerEarningsPage'
 import SellerDashboard from './pages/SellerDashboard'
+import SellerListingsPage from './pages/SellerListingsPage'
+import SellerOrdersPage from './pages/SellerOrdersPage'
+import SellerShopPage from './pages/SellerShopPage'
 
 const queryClient = new QueryClient()
 
@@ -176,7 +179,13 @@ function AppRoutes() {
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/livreur" element={<PrivateRoute><LivreurDashboard /></PrivateRoute>} />
         <Route path="/earnings" element={<PrivateRoute><SellerEarningsPage /></PrivateRoute>} />
+        {/* ── Portail vendeur ────────────────────────────── */}
         <Route path="/seller/dashboard" element={<PrivateRoute><SellerDashboard /></PrivateRoute>} />
+        <Route path="/seller/listings"  element={<PrivateRoute><SellerListingsPage /></PrivateRoute>} />
+        <Route path="/seller/orders"    element={<PrivateRoute><SellerOrdersPage /></PrivateRoute>} />
+        <Route path="/seller/shop"      element={<PrivateRoute><SellerShopPage /></PrivateRoute>} />
+        <Route path="/seller/earnings"  element={<PrivateRoute><SellerEarningsPage /></PrivateRoute>} />
+        <Route path="/seller/profile"   element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
       </Routes>
       {/* Footer discret */}
       <footer className="bg-white border-t mt-8 py-4 px-4 text-center text-xs text-gray-400 space-x-4">

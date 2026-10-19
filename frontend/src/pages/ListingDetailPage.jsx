@@ -317,30 +317,12 @@ function MeetingMap({ zones, selected, onSelect, city }) {
 }
 
 // ── Order Modal ────────────────────────────────────────────────────────────────
-// Modes vendeur → mode commande
-const SELLER_MODE_MAP = {
-    meeting_point: 'meeting_point',
-    pickup:        'seller_pickup',
-    home_delivery: 'home_delivery',
-}
-// Construit la liste des modes disponibles selon ce que le vendeur a autorisé
-function buildAvailableModes(listing) {
-    const allowed = Array.isArray(listing.allowed_delivery_modes) ? listing.allowed_delivery_modes : []
-    const modes = []
-    if (allowed.includes('meeting_point')) modes.push({ value: 'meeting_point', label: 'Main propre',       icon: '🤝', sub: 'Rencontre physique' })
-    if (allowed.includes('pickup'))        modes.push({ value: 'seller_pickup', label: 'Retrait vendeur',   icon: '🏪', sub: listing.pickup_address || 'Chez le vendeur' })
-    if (allowed.includes('home_delivery')) modes.push({ value: 'home_delivery', label: 'Domicile',          icon: '🚚', sub: 'Livraison chez vous' })
-    // Point retrait réseau GuinéeMarché — toujours disponible
-    modes.push({ value: 'pickup_point', label: 'Point retrait',  icon: '📦', sub: 'Réseau GuinéeMarché' })
-    // Si aucun mode vendeur → fallback tout afficher
-    if (allowed.length === 0) {
-        return [
-            { value: 'meeting_point', label: 'Main propre',     icon: '🤝', sub: 'Rencontre physique' },
-            { value: 'pickup_point',  label: 'Point retrait',   icon: '📦', sub: 'Réseau GuinéeMarché' },
-            { value: 'home_delivery', label: 'Domicile',        icon: '🚚', sub: 'Livraison chez vous' },
-        ]
-    }
-    return modes
+// Modèle Guimatrix : collecte chez le vendeur → point de retrait → acheteur récupère
+// Un seul mode disponible pour l'acheteur : point de retrait
+function buildAvailableModes() {
+    return [
+        { value: 'pickup_point', label: 'Point de retrait', icon: '📦', sub: 'Réseau Guimatrix' },
+    ]
 }
 
 function OrderModal({ listing, onClose, onSuccess }) {
