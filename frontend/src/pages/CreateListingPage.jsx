@@ -80,7 +80,7 @@ const labelClass = "block text-xs font-semibold text-gray-500 uppercase tracking
 export default function CreateListingPage() {
     const [form, setForm] = useState({
         title: '', description: '', price_gnf: '',
-        price_type: 'fixed', condition: 'good',
+        price_type: 'fixed', condition: 'new',
         city: 'Conakry', quartier: '', category: '',
         weight_kg: '',
         pickup_address: '',
@@ -342,59 +342,31 @@ export default function CreateListingPage() {
                         </div>
                     </div>
 
-                    {/* ── Section 2 : Prix & État ── */}
+                    {/* ── Section 2 : Prix ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="2" icon="💰" title="Prix & État" subtitle="Fixez votre prix et l'état de l'article" />
+                        <SectionHeader number="2" icon="💰" title="Prix" subtitle="Fixez votre prix de vente" />
 
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-2 gap-3">
-                                <div>
-                                    <label className={labelClass}>Prix (GNF)</label>
-                                    <input
-                                        type="number" placeholder="0"
-                                        value={form.price_gnf}
-                                        onChange={e => setForm({ ...form, price_gnf: e.target.value })}
-                                        className={inputClass}
-                                    />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Type de prix</label>
-                                    <select
-                                        value={form.price_type}
-                                        onChange={e => setForm({ ...form, price_type: e.target.value })}
-                                        className={inputClass}
-                                    >
-                                        <option value="fixed">Prix fixe</option>
-                                        <option value="negotiable">À débattre</option>
-                                        <option value="free">Gratuit</option>
-                                    </select>
-                                </div>
-                            </div>
-
+                        <div className="grid grid-cols-2 gap-3">
                             <div>
-                                <label className={labelClass}>État de l'article</label>
-                                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                                    {[
-                                        { value: 'new',      label: '✨ Neuf',        sub: 'Jamais utilisé' },
-                                        { value: 'like_new', label: '⭐ Comme neuf',  sub: 'Très peu utilisé' },
-                                        { value: 'good',     label: '👍 Bon état',    sub: 'Quelques traces' },
-                                        { value: 'fair',     label: '👌 Correct',     sub: 'Usure visible' },
-                                        { value: 'poor',     label: '⚠️ Très usé',    sub: 'Beaucoup d\'usure' },
-                                    ].map(opt => (
-                                        <button
-                                            key={opt.value} type="button"
-                                            onClick={() => setForm({ ...form, condition: opt.value })}
-                                            className={`p-3 rounded-xl border-2 text-left transition ${
-                                                form.condition === opt.value
-                                                    ? 'border-green-500 bg-green-50'
-                                                    : 'border-gray-200 bg-gray-50 hover:border-gray-300'
-                                            }`}
-                                        >
-                                            <p className={`text-xs font-bold ${form.condition === opt.value ? 'text-green-700' : 'text-gray-700'}`}>{opt.label}</p>
-                                            <p className="text-xs text-gray-400 mt-0.5">{opt.sub}</p>
-                                        </button>
-                                    ))}
-                                </div>
+                                <label className={labelClass}>Prix (GNF)</label>
+                                <input
+                                    type="number" placeholder="0"
+                                    value={form.price_gnf}
+                                    onChange={e => setForm({ ...form, price_gnf: e.target.value })}
+                                    className={inputClass}
+                                />
+                            </div>
+                            <div>
+                                <label className={labelClass}>Type de prix</label>
+                                <select
+                                    value={form.price_type}
+                                    onChange={e => setForm({ ...form, price_type: e.target.value })}
+                                    className={inputClass}
+                                >
+                                    <option value="fixed">Prix fixe</option>
+                                    <option value="negotiable">À débattre</option>
+                                    <option value="free">Gratuit</option>
+                                </select>
                             </div>
                         </div>
                     </div>

@@ -181,7 +181,8 @@ function AppRoutes() {
         <Route path="/earnings" element={<PrivateRoute><SellerEarningsPage /></PrivateRoute>} />
         {/* ── Portail vendeur ────────────────────────────── */}
         <Route path="/seller/dashboard" element={<PrivateRoute><SellerDashboard /></PrivateRoute>} />
-        <Route path="/seller/listings"  element={<PrivateRoute><SellerListingsPage /></PrivateRoute>} />
+        <Route path="/seller/listings"     element={<PrivateRoute><SellerListingsPage /></PrivateRoute>} />
+        <Route path="/seller/listings/new" element={<Navigate to="/create" replace />} />
         <Route path="/seller/orders"    element={<PrivateRoute><SellerOrdersPage /></PrivateRoute>} />
         <Route path="/seller/shop"      element={<PrivateRoute><SellerShopPage /></PrivateRoute>} />
         <Route path="/seller/earnings"  element={<PrivateRoute><SellerEarningsPage /></PrivateRoute>} />
