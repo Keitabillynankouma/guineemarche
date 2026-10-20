@@ -83,10 +83,10 @@ export default function SellerLayout({ children }) {
 
         {/* Bas sidebar */}
         <div className="px-3 py-4 border-t border-white/10 space-y-1">
-          <a href="/" target="_blank" rel="noopener noreferrer"
+          <Link to="/"
             className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:bg-white/8 hover:text-white transition-all">
             <span>🛒</span> Voir la marketplace
-          </a>
+          </Link>
           <button onClick={handleLogout}
             className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-gray-400 hover:bg-red-500/15 hover:text-red-400 transition-all">
             <span>🚪</span> Déconnexion

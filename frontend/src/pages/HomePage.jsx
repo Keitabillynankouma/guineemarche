@@ -187,7 +187,7 @@ function FeaturedShops({ shops }) {
 }
 
 // ── Navbar ─────────────────────────────────────────────────────────────────────
-function Navbar({ isAuthenticated }) {
+function Navbar({ isAuthenticated, userRole }) {
     const [dark, toggleDark] = useDarkMode()
     return (
         <nav className="bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-b border-gray-100 dark:border-gray-800 sticky top-0 z-20" style={{boxShadow:'0 1px 0 rgba(0,0,0,0.05)'}}>
@@ -196,6 +196,12 @@ function Navbar({ isAuthenticated }) {
                 <div className="flex items-center gap-1.5">
                     {isAuthenticated ? (
                         <>
+                            {userRole === 'seller' && (
+                                <Link to="/seller/dashboard"
+                                    className="flex items-center gap-1.5 bg-orange-500 hover:bg-orange-600 text-white text-xs font-bold px-3 py-2 rounded-xl transition-colors">
+                                    📊 Mon espace
+                                </Link>
+                            )}
                             <Link to="/create" className="btn-primary text-sm px-4 py-2 rounded-xl">+ Publier</Link>
                             <Link to="/messages" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Messages">💬</Link>
                             <Link to="/favorites" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Favoris">❤️</Link>
@@ -373,10 +379,9 @@ export default function HomePage() {
     const user = useAuthStore(s => s.user)
     const navigate = useNavigate()
 
-    // Livreur / Vendeur → redirection immédiate vers leur tableau de bord
+    // Livreur → redirection immédiate vers leur tableau de bord
     useEffect(() => {
         if (user?.role === 'livreur') navigate('/livreur', { replace: true })
-        if (user?.role === 'seller')  navigate('/seller/dashboard', { replace: true })
     }, [user])
     const loadMoreRef = useRef(null)
 
@@ -449,7 +454,7 @@ export default function HomePage() {
 
     return (
         <div className="min-h-screen" style={{background:'#f8fafc'}}>
-            <Navbar isAuthenticated={isAuthenticated} />
+            <Navbar isAuthenticated={isAuthenticated} userRole={user?.role} />
 
             {/* Hero + Recherche */}
             <div className="hero-section text-white py-14 px-4 relative overflow-hidden">
