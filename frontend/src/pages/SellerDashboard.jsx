@@ -97,7 +97,7 @@ export default function SellerDashboard() {
               Bonjour, {user?.full_name?.split(' ')[0] ?? 'Vendeur'} 👋
             </h1>
           </div>
-          <Link to="/seller/listings/new"
+          <Link to="/create"
             className="flex items-center gap-2 bg-gradient-to-r from-orange-500 to-amber-400 text-white text-sm font-bold px-5 py-2.5 rounded-xl shadow-md shadow-orange-500/20 hover:shadow-lg transition-all active:scale-95">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4"/>
@@ -194,7 +194,7 @@ export default function SellerDashboard() {
               <p className="text-4xl mb-3">📭</p>
               <p className="text-sm font-semibold text-gray-700">Aucune commande pour l'instant</p>
               <p className="text-xs text-gray-400 mt-1">Publiez des annonces pour commencer à vendre</p>
-              <Link to="/seller/listings/new"
+              <Link to="/create"
                 className="inline-block mt-4 bg-orange-500 text-white text-sm font-bold px-5 py-2.5 rounded-xl hover:bg-orange-600 transition-colors">
                 Publier une annonce
               </Link>
