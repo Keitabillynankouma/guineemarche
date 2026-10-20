@@ -45,9 +45,7 @@ createRoot(document.getElementById('root')).render(
           <div className="bg-white rounded-2xl shadow-lg p-8 max-w-md text-center">
             <div className="text-5xl mb-4">😔</div>
             <h1 className="text-xl font-bold text-gray-800 mb-2">Une erreur est survenue</h1>
-            <p className="text-gray-500 text-sm mb-6">
-              L'équipe Guimatrix a été notifiée automatiquement. Essayez de recharger la page.
-            </p>
+            <p className="text-sm text-gray-500 mb-6">Une erreur inattendue s'est produite. Veuillez réessayer.</p>
             <div className="flex gap-3 justify-center">
               <button
                 onClick={resetError}

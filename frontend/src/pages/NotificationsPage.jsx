@@ -37,8 +37,9 @@ export default function NotificationsPage() {
     onSuccess:  () => qc.invalidateQueries(['notifications']),
   })
 
-  const notifications = data?.results ?? data ?? []
-  const unread = notifications.filter(n => !n.is_read).length
+  const rawNotifs     = data?.results ?? data
+  const notifications = Array.isArray(rawNotifs) ? rawNotifs : []
+  const unread        = notifications.filter(n => !n.is_read).length
 
   function handleMarkRead(notif) {
     if (!notif.is_read) markRead.mutate(notif.id)

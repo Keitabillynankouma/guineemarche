@@ -18,8 +18,9 @@ export default function NotificationBell() {
     enabled:       isAuthenticated,
   })
 
-  const items  = data?.results ?? data ?? []
-  const unread = items.filter(n => !n.is_read).length
+  const rawItems = data?.results ?? data
+  const items    = Array.isArray(rawItems) ? rawItems : []
+  const unread   = items.filter(n => !n.is_read).length
 
   if (!isAuthenticated) return null
 
