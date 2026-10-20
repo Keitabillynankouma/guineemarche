@@ -3681,6 +3681,8 @@ function TabProject() {
   const [tmForm, setTmForm]       = useState({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true })
   const [showTmForm, setShowTmForm] = useState(false)
   const [editTm, setEditTm]       = useState(null)
+  const [tmNameSearch, setTmNameSearch] = useState('')
+  const [showTmSuggestions, setShowTmSuggestions] = useState(false)
 
   const { data: rawTasks }      = useQuery({ queryKey: ['proj-tasks'],      queryFn: () => projectAPI.getTasks().then(r => r.data) })
   const { data: rawNotes }      = useQuery({ queryKey: ['proj-notes'],      queryFn: () => projectAPI.getNotes().then(r => r.data) })
@@ -3690,6 +3692,13 @@ function TabProject() {
   const notes      = Array.isArray(rawNotes)      ? rawNotes      : (rawNotes?.results      ?? [])
   const milestones = Array.isArray(rawMilestones) ? rawMilestones : (rawMilestones?.results ?? [])
   const team       = Array.isArray(rawTeam)       ? rawTeam       : (rawTeam?.results       ?? [])
+
+  const { data: tmUserResults } = useQuery({
+    queryKey: ['tm-user-search', tmNameSearch],
+    queryFn:  () => adminAPI.getUsers({ search: tmNameSearch, page_size: 8 }).then(r => r.data),
+    enabled:  tmNameSearch.length >= 2,
+  })
+  const tmUserSuggestions = Array.isArray(tmUserResults) ? tmUserResults : (tmUserResults?.results ?? [])
 
   // ── mutations génériques ──────────────────────────────────────────────
   function mk(fn, keys) {
@@ -4005,12 +4014,13 @@ function TabProject() {
       else        createTm.mutate(tmForm)
       setShowTmForm(false); setEditTm(null)
       setTmForm({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true })
+      setTmNameSearch('')
     }
     return (
       <div>
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-bold text-gray-800">Tableau de bord équipe</h3>
-          <button onClick={() => { setEditTm(null); setTmForm({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true }); setShowTmForm(true) }}
+          <button onClick={() => { setEditTm(null); setTmForm({ name:'', role:'', email:'', phone:'', responsibilities:'', avatar_emoji:'👤', active:true }); setTmNameSearch(''); setShowTmForm(true) }}
             className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-lg transition">
             + Ajouter un membre
           </button>
@@ -4018,11 +4028,59 @@ function TabProject() {
         {showTmForm && (
           <form onSubmit={submitTm} className="bg-white border border-gray-200 rounded-2xl p-4 mb-4 space-y-3">
             <p className="font-semibold text-gray-800 text-sm">{editTm ? 'Modifier le membre' : 'Nouveau membre'}</p>
+
+            {/* Nom avec autocomplete */}
+            <div className="relative">
+              <input required placeholder="Nom *" value={tmForm.name}
+                onChange={e => {
+                  setTmForm(p => ({...p, name: e.target.value}))
+                  setTmNameSearch(e.target.value)
+                  setShowTmSuggestions(true)
+                }}
+                onBlur={() => setTimeout(() => setShowTmSuggestions(false), 150)}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
+              {showTmSuggestions && tmUserSuggestions.length > 0 && (
+                <div className="absolute z-20 top-full left-0 right-0 bg-white border border-gray-200 rounded-xl shadow-lg mt-1 max-h-48 overflow-y-auto">
+                  {tmUserSuggestions.map(u => (
+                    <button key={u.id} type="button"
+                      onMouseDown={() => {
+                        setTmForm(p => ({ ...p, name: u.full_name, email: u.email || '', phone: u.phone_number || '' }))
+                        setTmNameSearch(u.full_name)
+                        setShowTmSuggestions(false)
+                      }}
+                      className="w-full text-left px-3 py-2 text-sm hover:bg-green-50 flex items-center gap-2">
+                      <span className="font-medium text-gray-800">{u.full_name}</span>
+                      {u.phone_number && <span className="text-xs text-gray-400">{u.phone_number}</span>}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Rôles — checkboxes */}
+            <div>
+              <p className="text-xs text-gray-500 mb-1.5 font-medium">Rôle(s) *</p>
+              <div className="flex flex-wrap gap-2">
+                {['Développeur', 'Chef de projet', 'Marketing', 'Comptabilité', 'Support', 'Autre'].map(r => {
+                  const selected = tmForm.role.split(',').map(s => s.trim()).includes(r)
+                  return (
+                    <label key={r} className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-xs font-medium cursor-pointer transition ${
+                      selected ? 'bg-green-100 border-green-400 text-green-800' : 'bg-gray-50 border-gray-200 text-gray-600 hover:border-green-300'
+                    }`}>
+                      <input type="checkbox" className="hidden" checked={selected}
+                        onChange={() => {
+                          const current = tmForm.role.split(',').map(s => s.trim()).filter(Boolean)
+                          const next = selected ? current.filter(x => x !== r) : [...current, r]
+                          setTmForm(p => ({...p, role: next.join(', ')}))
+                        }} />
+                      {r}
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
-              <input required placeholder="Nom *" value={tmForm.name} onChange={e => setTmForm(p => ({...p, name: e.target.value}))}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
-              <input required placeholder="Rôle *" value={tmForm.role} onChange={e => setTmForm(p => ({...p, role: e.target.value}))}
-                className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
               <input placeholder="Email" value={tmForm.email} onChange={e => setTmForm(p => ({...p, email: e.target.value}))}
                 className="border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-500" />
               <input placeholder="Téléphone" value={tmForm.phone} onChange={e => setTmForm(p => ({...p, phone: e.target.value}))}
@@ -4040,7 +4098,8 @@ function TabProject() {
             <div className="flex gap-2 justify-end">
               <button type="button" onClick={() => { setShowTmForm(false); setEditTm(null) }}
                 className="px-3 py-1.5 border border-gray-200 text-gray-600 text-sm rounded-lg hover:bg-gray-50">Annuler</button>
-              <button type="submit" className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700">
+              <button type="submit" disabled={!tmForm.role}
+                className="px-3 py-1.5 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 disabled:opacity-40">
                 {editTm ? 'Enregistrer' : 'Ajouter'}
               </button>
             </div>
