@@ -2362,10 +2362,11 @@ function TabAccounting() {
     queryFn: () => adminAPI.getAccountingSummary().then(r => r.data),
   })
 
-  const { data: livreurs = [], isLoading: livLoading } = useQuery({
+  const { data: rawLivreurs, isLoading: livLoading } = useQuery({
     queryKey: ['accounting-livreurs'],
     queryFn: () => adminAPI.getLivreurEarnings().then(r => r.data),
   })
+  const livreurs = Array.isArray(rawLivreurs) ? rawLivreurs : (rawLivreurs?.results ?? [])
 
   const handleMarkPaid = async (livreurId) => {
     if (!payRef.trim()) { setPayMsg('Entrez une référence de paiement (ex: OM-12345)'); return }
@@ -3064,10 +3065,11 @@ function WeeklyPayoutsSection() {
   const [msg, setMsg]   = useState('')
   const [busy, setBusy] = useState(false)
 
-  const { data: payouts = [], isLoading } = useQuery({
+  const { data: rawPayouts, isLoading } = useQuery({
     queryKey: ['weekly-payouts', statusFilter],
     queryFn: () => adminAPI.getWeeklyPayouts({ status: statusFilter || undefined }).then(r => r.data),
   })
+  const payouts = Array.isArray(rawPayouts) ? rawPayouts : (rawPayouts?.results ?? [])
 
   const toggleSelect = (id) => setSelectedIds(prev =>
     prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
@@ -3680,10 +3682,14 @@ function TabProject() {
   const [showTmForm, setShowTmForm] = useState(false)
   const [editTm, setEditTm]       = useState(null)
 
-  const { data: tasks = [] }      = useQuery({ queryKey: ['proj-tasks'],      queryFn: () => projectAPI.getTasks().then(r => r.data) })
-  const { data: notes = [] }      = useQuery({ queryKey: ['proj-notes'],      queryFn: () => projectAPI.getNotes().then(r => r.data) })
-  const { data: milestones = [] } = useQuery({ queryKey: ['proj-milestones'], queryFn: () => projectAPI.getMilestones().then(r => r.data) })
-  const { data: team = [] }       = useQuery({ queryKey: ['proj-team'],       queryFn: () => projectAPI.getTeam().then(r => r.data) })
+  const { data: rawTasks }      = useQuery({ queryKey: ['proj-tasks'],      queryFn: () => projectAPI.getTasks().then(r => r.data) })
+  const { data: rawNotes }      = useQuery({ queryKey: ['proj-notes'],      queryFn: () => projectAPI.getNotes().then(r => r.data) })
+  const { data: rawMilestones } = useQuery({ queryKey: ['proj-milestones'], queryFn: () => projectAPI.getMilestones().then(r => r.data) })
+  const { data: rawTeam }       = useQuery({ queryKey: ['proj-team'],       queryFn: () => projectAPI.getTeam().then(r => r.data) })
+  const tasks      = Array.isArray(rawTasks)      ? rawTasks      : (rawTasks?.results      ?? [])
+  const notes      = Array.isArray(rawNotes)      ? rawNotes      : (rawNotes?.results      ?? [])
+  const milestones = Array.isArray(rawMilestones) ? rawMilestones : (rawMilestones?.results ?? [])
+  const team       = Array.isArray(rawTeam)       ? rawTeam       : (rawTeam?.results       ?? [])
 
   // ── mutations génériques ──────────────────────────────────────────────
   function mk(fn, keys) {
