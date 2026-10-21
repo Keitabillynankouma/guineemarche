@@ -1131,11 +1131,16 @@ function TabSettings() {
 // ── Onglet Points de retrait ──────────────────────────────────────────────────
 const VILLES_GN = ['Conakry','Kindia','Mamou','Labé','Kankan','Faranah','Kissidougou','Guéckédou','Macenta','Nzérékoré','Boké','Fria','Coyah','Dubréka','Siguiri','Koundara','Gaoual','Dinguiraye','Kérouané','Pita','Télimélé']
 
+const EMPTY_PDR = { name: '', address: '', city: 'Conakry', commune: '', phone: '', opening_hours: '', manager: '' }
+
 function TabPickupPoints() {
   const qc = useQueryClient()
-  const [form, setForm] = useState({ name: '', address: '', city: 'Conakry', commune: '', phone: '' })
+  const [form, setForm]     = useState(EMPTY_PDR)
   const [editId, setEditId] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  // Assigner un gestionnaire en ligne (sans ouvrir le formulaire complet)
+  const [assigningId, setAssigningId]   = useState(null)
+  const [assignManager, setAssignManager] = useState('')
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['admin-pickup-points'],
@@ -1143,13 +1148,20 @@ function TabPickupPoints() {
   })
   const points = Array.isArray(data) ? data : (data?.results ?? [])
 
+  // Gestionnaires PDR disponibles
+  const { data: managersData } = useQuery({
+    queryKey: ['users-pdr-managers'],
+    queryFn:  () => adminAPI.getUsers({ role: 'point_retrait_manager' }).then(r => r.data),
+  })
+  const managers = Array.isArray(managersData) ? managersData : (managersData?.results ?? [])
+
   const saveMutation = useMutation({
     mutationFn: (d) => editId
       ? adminAPI.updatePickupPoint(editId, d)
       : adminAPI.createPickupPoint(d),
     onSuccess: () => {
       qc.invalidateQueries(['admin-pickup-points'])
-      setForm({ name: '', address: '', city: 'Conakry', commune: '', phone: '' })
+      setForm(EMPTY_PDR)
       setEditId(null)
       setShowForm(false)
     },
@@ -1165,13 +1177,36 @@ function TabPickupPoints() {
     onSuccess:  () => qc.invalidateQueries(['admin-pickup-points']),
   })
 
+  const assignMutation = useMutation({
+    mutationFn: ({ id, manager }) => adminAPI.updatePickupPoint(id, { manager: manager || null }),
+    onSuccess: () => {
+      qc.invalidateQueries(['admin-pickup-points'])
+      setAssigningId(null)
+      setAssignManager('')
+    },
+  })
+
   const startEdit = (p) => {
-    setForm({ name: p.name, address: p.address, city: p.city, commune: p.commune || '', phone: p.phone || '' })
+    setForm({
+      name: p.name, address: p.address, city: p.city,
+      commune: p.commune || '', phone: p.phone || '',
+      opening_hours: p.opening_hours || '',
+      manager: p.manager || '',
+    })
     setEditId(p.id)
     setShowForm(true)
   }
 
-  const handleSubmit = (e) => { e.preventDefault(); saveMutation.mutate(form) }
+  const startAssign = (p) => {
+    setAssigningId(p.id)
+    setAssignManager(p.manager || '')
+  }
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    const payload = { ...form, manager: form.manager || null }
+    saveMutation.mutate(payload)
+  }
 
   const byCity = points.reduce((acc, p) => {
     if (!acc[p.city]) acc[p.city] = []
@@ -1222,11 +1257,36 @@ function TabPickupPoints() {
                 placeholder="Ex: Matam"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
             </div>
-            <div className="md:col-span-2">
+            <div>
               <label className="block text-xs text-gray-500 mb-1">Téléphone du point</label>
               <input value={form.phone} onChange={e => setForm(f => ({...f, phone: e.target.value}))}
                 placeholder="Ex: +224 6XX XXX XXX"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Horaires d'ouverture</label>
+              <input value={form.opening_hours} onChange={e => setForm(f => ({...f, opening_hours: e.target.value}))}
+                placeholder="Ex: Lun-Sam 8h-18h"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
+            </div>
+            {/* ── Gestionnaire ── */}
+            <div className="md:col-span-2">
+              <label className="block text-xs text-gray-500 mb-1">👤 Gestionnaire du point <span className="text-gray-400">(rôle Gestionnaire PDR requis)</span></label>
+              <select
+                value={form.manager}
+                onChange={e => setForm(f => ({...f, manager: e.target.value}))}
+                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-teal-400"
+              >
+                <option value="">— Aucun gestionnaire assigné —</option>
+                {managers.map(m => (
+                  <option key={m.id} value={m.id}>
+                    {m.full_name}{m.phone_number ? ` · ${m.phone_number}` : ''}{m.email ? ` · ${m.email}` : ''}
+                  </option>
+                ))}
+              </select>
+              {managers.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">⚠️ Aucun utilisateur avec le rôle "Gestionnaire PDR". Attribue d'abord ce rôle dans l'onglet Utilisateurs.</p>
+              )}
             </div>
             <div className="md:col-span-2 flex gap-2 justify-end">
               <button type="button" onClick={() => setShowForm(false)}
@@ -1257,22 +1317,66 @@ function TabPickupPoints() {
             </div>
             <div className="divide-y">
               {pts.map(p => (
-                <div key={p.id} className="flex items-center gap-3 px-5 py-3">
-                  <div className="flex-1 min-w-0">
-                    <p className={`font-medium text-sm ${p.is_active ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{p.name}</p>
-                    <p className="text-xs text-gray-400 truncate">{p.address}{p.commune && ` · ${p.commune}`}</p>
-                    {p.phone && <p className="text-xs text-green-600">{p.phone}</p>}
+                <div key={p.id} className="px-5 py-3 space-y-2">
+                  <div className="flex items-center gap-3">
+                    <div className="flex-1 min-w-0">
+                      <p className={`font-medium text-sm ${p.is_active ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{p.name}</p>
+                      <p className="text-xs text-gray-400 truncate">{p.address}{p.commune && ` · ${p.commune}`}</p>
+                      {p.phone && <p className="text-xs text-green-600">{p.phone}</p>}
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <button onClick={() => toggleMutation.mutate({ id: p.id, is_active: !p.is_active })}
+                        className={`text-xs px-2 py-1 rounded-lg font-medium transition ${p.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
+                        {p.is_active ? 'Actif' : 'Inactif'}
+                      </button>
+                      <button onClick={() => startEdit(p)}
+                        className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">✏️</button>
+                      <button onClick={() => deleteMutation.mutate(p.id)}
+                        className="text-xs px-2 py-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition">🗑️</button>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <button onClick={() => toggleMutation.mutate({ id: p.id, is_active: !p.is_active })}
-                      className={`text-xs px-2 py-1 rounded-lg font-medium transition ${p.is_active ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'bg-gray-100 text-gray-500 hover:bg-gray-200'}`}>
-                      {p.is_active ? 'Actif' : 'Inactif'}
-                    </button>
-                    <button onClick={() => startEdit(p)}
-                      className="text-xs px-2 py-1 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition">✏️</button>
-                    <button onClick={() => { if (window.confirm(`Supprimer "${p.name}" ?`)) deleteMutation.mutate(p.id) }}
-                      className="text-xs px-2 py-1 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition">🗑️</button>
-                  </div>
+
+                  {/* Gestionnaire — ligne dédiée */}
+                  {assigningId === p.id ? (
+                    <div className="flex items-center gap-2 bg-teal-50 rounded-xl px-3 py-2">
+                      <span className="text-xs text-teal-700 font-medium whitespace-nowrap">👤 Gestionnaire :</span>
+                      <select
+                        value={assignManager}
+                        onChange={e => setAssignManager(e.target.value)}
+                        className="flex-1 text-xs border border-teal-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-teal-400 bg-white"
+                      >
+                        <option value="">— Retirer le gestionnaire —</option>
+                        {managers.map(m => (
+                          <option key={m.id} value={m.id}>
+                            {m.full_name}{m.phone_number ? ` · ${m.phone_number}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => assignMutation.mutate({ id: p.id, manager: assignManager })}
+                        disabled={assignMutation.isPending}
+                        className="text-xs bg-teal-600 hover:bg-teal-700 text-white px-3 py-1 rounded-lg font-medium transition disabled:opacity-50">
+                        ✓
+                      </button>
+                      <button onClick={() => setAssigningId(null)}
+                        className="text-xs text-gray-500 hover:text-gray-700 px-2 py-1">✕</button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      {p.manager_name ? (
+                        <span className="text-xs bg-teal-100 text-teal-700 px-2 py-0.5 rounded-full font-medium">
+                          👤 {p.manager_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-400 italic">Aucun gestionnaire</span>
+                      )}
+                      <button
+                        onClick={() => startAssign(p)}
+                        className="text-xs text-teal-600 hover:underline">
+                        {p.manager_name ? '🔄 Changer' : '+ Assigner un gestionnaire'}
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
             </div>
