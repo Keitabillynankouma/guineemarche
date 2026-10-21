@@ -95,6 +95,14 @@ urlpatterns = [
         views.LivreurUpdatePayoutInfoView.as_view(),
         name='livreur-payout-info'),
 
+    # Gestionnaire point de retrait
+    path('my-pickup-point/',
+        views.PickupManagerDashboardView.as_view(),
+        name='pickup-manager-dashboard'),
+    path('my-pickup-point/orders/<uuid:pk>/action/',
+        views.PickupManagerOrderActionView.as_view(),
+        name='pickup-manager-order-action'),
+
     # Admin
     path('admin/pickup-points/',
         views.AdminPickupPointView.as_view(),

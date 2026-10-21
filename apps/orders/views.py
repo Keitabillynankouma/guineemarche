@@ -84,6 +84,72 @@ class AdminPickupPointDetailView(APIView):
         return Response(status=204)
 
 
+class PickupManagerDashboardView(APIView):
+    """Gestionnaire : voir son point de retrait et les commandes associées."""
+    permission_classes = [IsAuthenticated]
+
+    def _get_point(self, user):
+        try:
+            return user.managed_pickup_point
+        except PickupPoint.DoesNotExist:
+            return None
+
+    def get(self, request):
+        point = self._get_point(request.user)
+        if not point:
+            return Response({'detail': 'Aucun point de retrait assigné.'}, status=404)
+
+        orders = Order.objects.filter(
+            pickup_point=point,
+            delivery_mode='point_retrait',
+        ).select_related('buyer', 'listing', 'seller').order_by('-created_at')
+
+        status_filter = request.query_params.get('status')
+        if status_filter:
+            orders = orders.filter(status=status_filter)
+
+        from .serializers import OrderSerializer
+        return Response({
+            'pickup_point': PickupPointSerializer(point).data,
+            'orders': OrderSerializer(orders[:50], many=True, context={'request': request}).data,
+            'stats': {
+                'total':      orders.count(),
+                'en_attente': orders.filter(status='au_point_retrait').count(),
+                'confirmes':  orders.filter(status='pickup_confirmed').count(),
+                'termines':   orders.filter(status='completed').count(),
+            },
+        })
+
+
+class PickupManagerOrderActionView(APIView):
+    """Gestionnaire : marquer une commande comme prête / remise."""
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, pk):
+        try:
+            point = request.user.managed_pickup_point
+        except PickupPoint.DoesNotExist:
+            return Response({'detail': 'Non autorisé.'}, status=403)
+
+        order  = get_object_or_404(Order, pk=pk, pickup_point=point)
+        action = request.data.get('action')
+
+        if action == 'ready':
+            # Commande arrivée au point, prête pour le client
+            order.status = 'au_point_retrait'
+            order.save(update_fields=['status'])
+            return Response({'status': order.status})
+
+        if action == 'delivered':
+            # Client venu récupérer
+            order.status = 'pickup_confirmed'
+            order.save(update_fields=['status'])
+            return Response({'status': order.status})
+
+        return Response({'detail': 'Action invalide. Utilisez "ready" ou "delivered".'}, status=400)
+
+
+
 class AdminMeetingZoneView(APIView):
     """Admin : CRUD complet sur les zones de rencontre."""
     permission_classes = [IsAdmin]

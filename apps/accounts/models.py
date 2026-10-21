@@ -32,7 +32,8 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
         SUPER_ADMIN       = 'super_admin',       'Super Administrateur'
         ADMIN_DELIVERY    = 'admin_delivery',    'Admin Livraison'
         ADMIN_MARKETING   = 'admin_marketing',   'Admin Marketing'
-        ADMIN_ACCOUNTING  = 'admin_accounting',  'Admin Comptabilité'
+        ADMIN_ACCOUNTING        = 'admin_accounting',        'Admin Comptabilité'
+        POINT_RETRAIT_MANAGER   = 'point_retrait_manager',   'Gestionnaire Point de Retrait'
 
     phone_number = PhoneNumberField(unique=True, null=True, blank=True, region='GN')
     email        = models.EmailField(unique=True, null=True, blank=True)

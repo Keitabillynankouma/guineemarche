@@ -68,11 +68,21 @@ class IntraCityZoneRate(BaseModel):
 
 
 class PickupPoint(BaseModel):
-    name      = models.CharField(max_length=200)
-    address   = models.CharField(max_length=300)
-    city      = models.CharField(max_length=100, default='Conakry')
-    commune   = models.CharField(max_length=100, blank=True)
-    phone     = models.CharField(max_length=20, blank=True)
+    name           = models.CharField(max_length=200)
+    address        = models.CharField(max_length=300)
+    city           = models.CharField(max_length=100, default='Conakry')
+    commune        = models.CharField(max_length=100, blank=True)
+    phone          = models.CharField(max_length=20, blank=True)
+    latitude       = models.FloatField(null=True, blank=True)
+    longitude      = models.FloatField(null=True, blank=True)
+    opening_hours  = models.CharField(max_length=200, blank=True, help_text="Ex: Lun-Sam 8h-18h")
+    manager        = models.OneToOneField(
+        'accounts.User',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='managed_pickup_point',
+        limit_choices_to={'role': 'point_retrait_manager'},
+    )
     is_active = models.BooleanField(default=True)
 
     class Meta:

@@ -3,9 +3,13 @@ from .models import Order, Payment, PickupPoint, MeetingZone, DeliveryZone, Deli
 
 
 class PickupPointSerializer(serializers.ModelSerializer):
+    manager_name = serializers.CharField(source='manager.full_name', read_only=True, default=None)
+
     class Meta:
         model  = PickupPoint
-        fields = ('id', 'name', 'address', 'city', 'commune', 'phone', 'is_active')
+        fields = ('id', 'name', 'address', 'city', 'commune', 'phone',
+                  'latitude', 'longitude', 'opening_hours',
+                  'manager', 'manager_name', 'is_active')
 
 
 class MeetingZoneSerializer(serializers.ModelSerializer):

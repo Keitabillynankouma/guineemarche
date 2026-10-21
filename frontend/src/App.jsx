@@ -30,6 +30,8 @@ import SellerDashboard from './pages/SellerDashboard'
 import SellerListingsPage from './pages/SellerListingsPage'
 import SellerOrdersPage from './pages/SellerOrdersPage'
 import SellerShopPage from './pages/SellerShopPage'
+import PickupPointsPage from './pages/PickupPointsPage'
+import PickupManagerDashboard from './pages/PickupManagerDashboard'
 
 const queryClient = new QueryClient()
 
@@ -187,6 +189,9 @@ function AppRoutes() {
         <Route path="/seller/shop"      element={<PrivateRoute><SellerShopPage /></PrivateRoute>} />
         <Route path="/seller/earnings"  element={<PrivateRoute><SellerEarningsPage /></PrivateRoute>} />
         <Route path="/seller/profile"   element={<PrivateRoute><ProfilePage /></PrivateRoute>} />
+        {/* ── Points de retrait ─────────────────────────── */}
+        <Route path="/pickup-points"   element={<PickupPointsPage />} />
+        <Route path="/pickup-manager"  element={<PrivateRoute><PickupManagerDashboard /></PrivateRoute>} />
       </Routes>
       {/* Footer discret */}
       <footer className="bg-white border-t mt-8 py-4 px-4 text-center text-xs text-gray-400 space-x-4">

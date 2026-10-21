@@ -202,6 +202,11 @@ function Navbar({ isAuthenticated, userRole }) {
                                     📊 Mon espace
                                 </Link>
                             )}
+                            <Link to="/pickup-points"
+                                className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base"
+                                title="Points de retrait">
+                                📦
+                            </Link>
                             <Link to="/create" className="btn-primary text-sm px-4 py-2 rounded-xl">+ Publier</Link>
                             <Link to="/messages" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Messages">💬</Link>
                             <Link to="/favorites" className="w-9 h-9 flex items-center justify-center text-gray-500 dark:text-gray-300 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition text-base" title="Favoris">❤️</Link>
@@ -379,9 +384,10 @@ export default function HomePage() {
     const user = useAuthStore(s => s.user)
     const navigate = useNavigate()
 
-    // Livreur → redirection immédiate vers leur tableau de bord
+    // Livreur / Gestionnaire point de retrait → redirection immédiate
     useEffect(() => {
-        if (user?.role === 'livreur') navigate('/livreur', { replace: true })
+        if (user?.role === 'livreur')               navigate('/livreur',         { replace: true })
+        if (user?.role === 'point_retrait_manager') navigate('/pickup-manager',  { replace: true })
     }, [user])
     const loadMoreRef = useRef(null)
 
