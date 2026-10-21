@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { listingsAPI, messagingAPI, ordersAPI, deliveryAPI } from '../services/api'
@@ -325,6 +325,201 @@ function buildAvailableModes() {
     ]
 }
 
+// ── Picker Points de Retrait (style Wildberries) ──────────────────────────────
+function PickupPointPicker({ points, selected, onSelect }) {
+    const mapRef     = useRef(null)
+    const lMapRef    = useRef(null)
+    const markersRef = useRef([])
+    const listRef    = useRef(null)
+    const [view, setView] = useState('list') // 'list' | 'map'
+
+    // Charger Leaflet une seule fois
+    useEffect(() => {
+        if (!document.getElementById('leaflet-css')) {
+            const link = document.createElement('link')
+            link.id = 'leaflet-css'; link.rel = 'stylesheet'
+            link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+            document.head.appendChild(link)
+        }
+        const initLeaflet = () => {
+            if (!mapRef.current || lMapRef.current) return
+            const L = window.L
+            lMapRef.current = L.map(mapRef.current, { zoomControl: true })
+                .setView([9.537, -13.677], 12)
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap', maxZoom: 18,
+            }).addTo(lMapRef.current)
+            placeMarkers(points, selected)
+        }
+        if (!window.L) {
+            const s = document.createElement('script')
+            s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+            s.onload = initLeaflet
+            document.head.appendChild(s)
+        } else {
+            setTimeout(initLeaflet, 0)
+        }
+        return () => { if (lMapRef.current) { lMapRef.current.remove(); lMapRef.current = null } }
+    }, [])
+
+    // Mettre à jour les marqueurs quand les points ou la sélection changent
+    useEffect(() => {
+        if (lMapRef.current && window.L) placeMarkers(points, selected)
+    }, [points, selected])
+
+    // Forcer le redimensionnement de la carte quand on passe en vue carte
+    useEffect(() => {
+        if (view === 'map' && lMapRef.current) {
+            setTimeout(() => lMapRef.current?.invalidateSize(), 150)
+        }
+    }, [view])
+
+    function placeMarkers(pts, sel) {
+        const L = window.L
+        if (!L || !lMapRef.current) return
+        markersRef.current.forEach(m => m.remove())
+        markersRef.current = []
+        const geo = pts.filter(p => p.latitude && p.longitude)
+        geo.forEach(p => {
+            const isSelected = String(p.id) === String(sel)
+            const icon = L.divIcon({
+                html: `<div style="
+                    background:${isSelected ? '#16a34a' : '#f97316'};
+                    color:white;border-radius:50%;width:${isSelected ? 38 : 30}px;height:${isSelected ? 38 : 30}px;
+                    display:flex;align-items:center;justify-content:center;
+                    font-size:${isSelected ? 18 : 14}px;
+                    box-shadow:0 2px 8px rgba(0,0,0,.35);
+                    border:${isSelected ? 3 : 2}px solid white;
+                    transition:all .2s;">📦</div>`,
+                className: '', iconSize: [isSelected ? 38 : 30, isSelected ? 38 : 30],
+                iconAnchor: [isSelected ? 19 : 15, isSelected ? 19 : 15],
+            })
+            const m = L.marker([p.latitude, p.longitude], { icon })
+                .addTo(lMapRef.current)
+                .bindPopup(`<div style="min-width:160px;font-family:sans-serif">
+                    <p style="font-weight:700;margin:0 0 4px;font-size:13px">${p.name}</p>
+                    <p style="color:#666;font-size:11px;margin:0 0 2px">📍 ${p.address || ''}</p>
+                    ${p.opening_hours ? `<p style="color:#666;font-size:11px;margin:0 0 6px">🕐 ${p.opening_hours}</p>` : ''}
+                    <button onclick="window.__selectPickup('${p.id}')"
+                        style="background:#16a34a;color:white;border:none;border-radius:8px;
+                               padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;width:100%">
+                        ✓ Choisir ce point
+                    </button>
+                </div>`)
+                .on('click', () => { onSelect(String(p.id)); m.openPopup() })
+            markersRef.current.push(m)
+        })
+        if (geo.length > 0) {
+            const bounds = L.latLngBounds(geo.map(p => [p.latitude, p.longitude]))
+            lMapRef.current.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 })
+        }
+    }
+
+    function flyToPoint(p) {
+        onSelect(String(p.id))
+        if (lMapRef.current && p.latitude && p.longitude) {
+            lMapRef.current.flyTo([p.latitude, p.longitude], 15, { duration: 0.6 })
+        }
+        // scroll list item into view
+        const el = document.getElementById(`pp-item-${p.id}`)
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+
+    // Pont JS→React pour le bouton "Choisir" dans le popup Leaflet
+    useEffect(() => {
+        window.__selectPickup = (id) => { onSelect(String(id)); lMapRef.current?.closePopup() }
+        return () => { delete window.__selectPickup }
+    }, [onSelect])
+
+    const geoCount = points.filter(p => p.latitude && p.longitude).length
+
+    if (points.length === 0) {
+        return (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
+                ⚠️ Aucun point de retrait disponible dans cette ville pour le moment.
+            </div>
+        )
+    }
+
+    return (
+        <div className="space-y-2">
+            {/* Bascule Liste / Carte */}
+            <div className="flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+                <button type="button" onClick={() => setView('list')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${view === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>
+                    ☰ Liste
+                </button>
+                <button type="button" onClick={() => setView('map')}
+                    className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${view === 'map' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>
+                    🗺️ Carte {geoCount > 0 ? `(${geoCount})` : ''}
+                </button>
+            </div>
+
+            {/* Carte Leaflet — toujours mountée mais masquée */}
+            <div style={{ display: view === 'map' ? 'block' : 'none' }}>
+                <div ref={mapRef} style={{ height: 240, borderRadius: 12, zIndex: 1, border: '1px solid #e5e7eb' }} />
+                {geoCount === 0 && (
+                    <p className="text-xs text-center text-gray-400 mt-2">
+                        📍 Ces points n'ont pas encore de coordonnées GPS
+                    </p>
+                )}
+            </div>
+
+            {/* Liste — toujours mountée mais masquée sur carte */}
+            <div ref={listRef} className={view === 'list' ? 'space-y-2 max-h-52 overflow-y-auto pr-0.5' : 'hidden'}>
+                {points.map(p => {
+                    const isSel = String(p.id) === String(selected)
+                    return (
+                        <button key={p.id} id={`pp-item-${p.id}`} type="button"
+                            onClick={() => flyToPoint(p)}
+                            className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
+                                isSel ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:border-green-300 hover:bg-gray-50'
+                            }`}>
+                            <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-base flex-shrink-0 ${
+                                isSel ? 'bg-green-500 text-white' : 'bg-orange-100 text-orange-500'
+                            }`}>
+                                📦
+                            </div>
+                            <div className="flex-1 min-w-0">
+                                <p className={`text-sm font-bold truncate ${isSel ? 'text-green-700' : 'text-gray-800'}`}>
+                                    {p.name}
+                                </p>
+                                {p.address && <p className="text-xs text-gray-500 mt-0.5 truncate">📍 {p.address}</p>}
+                                {p.opening_hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {p.opening_hours}</p>}
+                                {p.latitude && p.longitude && (
+                                    <p className="text-xs text-blue-500 mt-0.5">Visible sur la carte →</p>
+                                )}
+                            </div>
+                            {isSel && (
+                                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
+                                </svg>
+                            )}
+                        </button>
+                    )
+                })}
+            </div>
+
+            {/* Point sélectionné — récapitulatif */}
+            {selected && (() => {
+                const p = points.find(pp => String(pp.id) === String(selected))
+                if (!p) return null
+                return (
+                    <div className="bg-green-50 border border-green-200 rounded-xl px-3 py-2 flex items-center gap-2">
+                        <span className="text-green-600 text-lg">📦</span>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-xs font-bold text-green-800 truncate">✅ {p.name}</p>
+                            {p.address && <p className="text-xs text-green-600 truncate">{p.address}</p>}
+                        </div>
+                        <button type="button" onClick={() => onSelect('')}
+                            className="text-green-400 hover:text-green-600 text-sm flex-shrink-0">✕</button>
+                    </div>
+                )
+            })()}
+        </div>
+    )
+}
+
 function OrderModal({ listing, onClose, onSuccess }) {
     const [pickupPoint, setPickupPoint]   = useState('')
     const [paymentMethod, setPaymentMethod] = useState('chachap')
@@ -445,40 +640,16 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             </div>
                         )}
 
-                        {/* Point de retrait */}
+                        {/* Point de retrait — sélecteur Wildberries */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
                                 📦 Choisir votre point de retrait
                             </label>
-                            {pickupPoints.length === 0 ? (
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
-                                    ⚠️ Aucun point de retrait disponible à {listing.city} pour le moment.
-                                </div>
-                            ) : (
-                                <div className="space-y-2">
-                                    {pickupPoints.map(p => (
-                                        <button key={p.id} type="button"
-                                            onClick={() => setPickupPoint(String(p.id))}
-                                            className={`w-full flex items-start gap-3 p-3.5 rounded-xl border-2 text-left transition-all ${
-                                                pickupPoint === String(p.id)
-                                                    ? 'border-green-500 bg-green-50'
-                                                    : 'border-gray-200 hover:border-gray-300'
-                                            }`}>
-                                            <span className={`text-lg mt-0.5 ${pickupPoint === String(p.id) ? '' : 'grayscale opacity-60'}`}>📍</span>
-                                            <div className="flex-1">
-                                                <p className={`text-sm font-bold ${pickupPoint === String(p.id) ? 'text-green-700' : 'text-gray-800'}`}>{p.name}</p>
-                                                {p.address && <p className="text-xs text-gray-500 mt-0.5">{p.address}</p>}
-                                                {p.hours && <p className="text-xs text-gray-400 mt-0.5">🕐 {p.hours}</p>}
-                                            </div>
-                                            {pickupPoint === String(p.id) && (
-                                                <svg className="w-5 h-5 text-green-500 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
-                                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                                                </svg>
-                                            )}
-                                        </button>
-                                    ))}
-                                </div>
-                                )}
+                            <PickupPointPicker
+                                points={Array.isArray(pickupPoints) ? pickupPoints : []}
+                                selected={pickupPoint}
+                                onSelect={id => setPickupPoint(id ? String(id) : '')}
+                            />
                         </div>
 
                         {/* Récapitulatif total */}
