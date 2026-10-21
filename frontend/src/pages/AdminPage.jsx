@@ -1733,17 +1733,19 @@ function TabUsers() {
     livreur:           'bg-amber-100 text-amber-700',
     admin_delivery:    'bg-orange-100 text-orange-700',
     admin_marketing:   'bg-purple-100 text-purple-700',
-    admin_accounting:  'bg-green-100 text-green-700',
+    admin_accounting:        'bg-green-100 text-green-700',
+    point_retrait_manager:   'bg-teal-100 text-teal-700',
   }
   const ROLE_LABELS = {
-    admin:             'Admin',
-    super_admin:       'Super Admin',
-    seller:            'Vendeur',
-    buyer:             'Acheteur',
-    livreur:           'Livreur',
-    admin_delivery:    'Admin Livraison',
-    admin_marketing:   'Admin Marketing',
-    admin_accounting:  'Admin Comptable',
+    admin:                   'Admin',
+    super_admin:             'Super Admin',
+    seller:                  'Vendeur',
+    buyer:                   'Acheteur',
+    livreur:                 'Livreur',
+    admin_delivery:          'Admin Livraison',
+    admin_marketing:         'Admin Marketing',
+    admin_accounting:        'Admin Comptable',
+    point_retrait_manager:   'Gestionnaire PDR',
   }
 
   const roleCounts = users.reduce((acc, u) => { acc[u.role] = (acc[u.role] || 0) + 1; return acc }, {})
@@ -1777,6 +1779,7 @@ function TabUsers() {
           <option value="buyer">Acheteurs</option>
           <option value="seller">Vendeurs</option>
           <option value="livreur">Livreurs</option>
+          <option value="point_retrait_manager">Gestionnaires PDR</option>
           <optgroup label="Admins">
             <option value="admin">Admin</option>
             <option value="admin_delivery">Admin Livraison</option>
@@ -1851,6 +1854,7 @@ function TabUsers() {
                   <option value="buyer">Acheteur</option>
                   <option value="seller">Vendeur</option>
                   <option value="livreur">Livreur</option>
+                  <option value="point_retrait_manager">Gestionnaire PDR</option>
                   <optgroup label="Admins">
                     <option value="admin">Admin</option>
                     <option value="admin_delivery">Admin Livraison</option>
