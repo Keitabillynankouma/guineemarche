@@ -816,6 +816,7 @@ class AdminUserUpdateView(APIView):
             admin_roles = {
                 User.Role.ADMIN, User.Role.SUPER_ADMIN,
                 User.Role.ADMIN_DELIVERY, User.Role.ADMIN_MARKETING, User.Role.ADMIN_ACCOUNTING,
+                User.Role.POINT_RETRAIT_MANAGER,
             }
             if new_role in admin_roles and not is_super:
                 return Response(

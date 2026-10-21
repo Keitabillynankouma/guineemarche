@@ -38,7 +38,7 @@ class User(AbstractBaseUser, PermissionsMixin, BaseModel):
     phone_number = PhoneNumberField(unique=True, null=True, blank=True, region='GN')
     email        = models.EmailField(unique=True, null=True, blank=True)
     full_name    = models.CharField(max_length=150)
-    role         = models.CharField(max_length=20, choices=Role.choices, default=Role.BUYER)
+    role         = models.CharField(max_length=30, choices=Role.choices, default=Role.BUYER)
 
     # Localisation guinéenne
     city         = models.CharField(max_length=100, default='Conakry')

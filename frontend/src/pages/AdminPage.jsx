@@ -1844,12 +1844,9 @@ function TabUsers() {
                 {/* Changer rôle */}
                 <select
                   value={u.role}
-                  onChange={e => {
-                    if (window.confirm(`Changer ${u.full_name} → ${ROLE_LABELS[e.target.value] || e.target.value} ?`)) {
-                      updateMutation.mutate({ id: u.id, role: e.target.value })
-                    }
-                  }}
-                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-400 bg-white"
+                  onChange={e => updateMutation.mutate({ id: u.id, role: e.target.value })}
+                  disabled={updateMutation.isPending}
+                  className="text-xs border border-gray-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-green-400 bg-white disabled:opacity-50"
                 >
                   <option value="buyer">Acheteur</option>
                   <option value="seller">Vendeur</option>
