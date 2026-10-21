@@ -612,10 +612,13 @@ class ShopListView(generics.ListAPIView):
 
 
 class ShopDetailView(generics.RetrieveAPIView):
-    """Détail d'une boutique — uniquement les boutiques approuvées."""
+    """Détail d'une boutique — visible dès la création (pending + approved)."""
     permission_classes = [permissions.AllowAny]
     serializer_class   = ShopSerializer
-    queryset           = Shop.objects.filter(is_active=True, status=Shop.Status.APPROVED).select_related('owner')
+    queryset           = Shop.objects.filter(
+        is_active=True,
+        status__in=[Shop.Status.PENDING, Shop.Status.APPROVED],
+    ).select_related('owner')
 
 
 class MyShopView(APIView):

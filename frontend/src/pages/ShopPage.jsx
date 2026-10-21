@@ -122,6 +122,14 @@ export default function ShopPage() {
 
             <div className="max-w-4xl mx-auto px-4 -mt-4 space-y-5 pb-10">
 
+                {/* Bandeau boutique en attente de validation */}
+                {shop.status === 'pending' && (
+                    <div className="bg-amber-50 border border-amber-300 rounded-2xl px-4 py-3 flex items-center gap-3">
+                        <span className="text-xl">⏳</span>
+                        <p className="text-sm text-amber-800">Cette boutique est en cours de vérification par notre équipe. Les produits sont déjà disponibles.</p>
+                    </div>
+                )}
+
                 {/* Carte info boutique */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
                     <div className="grid grid-cols-3 divide-x divide-gray-100 mb-4">

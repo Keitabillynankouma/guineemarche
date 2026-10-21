@@ -248,6 +248,8 @@ class Shop(BaseModel):
     plan        = models.CharField(max_length=10, choices=Plan.choices, default=Plan.STANDARD)
     plan_until  = models.DateTimeField(null=True, blank=True)
     reject_reason = models.TextField(blank=True)
+    # Adresse où le livreur doit récupérer les colis (peut différer de l'adresse de la boutique)
+    pickup_address = models.CharField(max_length=300, blank=True, help_text="Adresse de collecte des colis par le livreur")
     is_verified = models.BooleanField(default=False)
     is_featured = models.BooleanField(default=False)
     is_active   = models.BooleanField(default=True)

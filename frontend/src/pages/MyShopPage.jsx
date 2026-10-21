@@ -52,13 +52,14 @@ export default function MyShopPage() {
 
   const handleEdit = () => {
     setForm({
-      name:        shop?.name        ?? '',
-      description: shop?.description ?? '',
-      phone:       shop?.phone       ?? '',
-      whatsapp:    shop?.whatsapp    ?? '',
-      address:     shop?.address     ?? '',
-      city:        shop?.city        ?? 'Conakry',
-      website:     shop?.website     ?? '',
+      name:           shop?.name           ?? '',
+      description:    shop?.description    ?? '',
+      phone:          shop?.phone          ?? '',
+      whatsapp:       shop?.whatsapp       ?? '',
+      address:        shop?.address        ?? '',
+      city:           shop?.city           ?? 'Conakry',
+      website:        shop?.website        ?? '',
+      pickup_address: shop?.pickup_address ?? '',
     })
     setEditing(true)
   }
@@ -95,7 +96,7 @@ export default function MyShopPage() {
         <div className="max-w-2xl mx-auto px-4 py-3 flex items-center gap-3">
           <button onClick={() => navigate('/profile')} className="text-green-700 text-lg">←</button>
           <span className="font-bold text-gray-800">Ma Boutique</span>
-          {shop?.status === 'approved' && (
+          {shop && (
             <Link to={`/shops/${shop.id}`}
               className="ml-auto text-xs text-green-600 border border-green-200 px-3 py-1 rounded-full hover:bg-green-50 transition">
               Voir la page publique →
@@ -163,13 +164,14 @@ export default function MyShopPage() {
 
             <div className="space-y-3">
               {[
-                { key: 'name',        label: 'Nom de la boutique *', placeholder: 'Ex: Electro Conakry' },
-                { key: 'description', label: 'Description',           placeholder: 'Décrivez votre boutique...',     multiline: true },
-                { key: 'phone',       label: 'Téléphone',             placeholder: '+224 6XX XXX XXX' },
-                { key: 'whatsapp',    label: 'WhatsApp',              placeholder: '+224 6XX XXX XXX' },
-                { key: 'address',     label: 'Adresse',               placeholder: 'Ex: Kaloum, face à la cathédrale' },
-                { key: 'city',        label: 'Ville',                 placeholder: 'Conakry' },
-                { key: 'website',     label: 'Site web (facultatif)', placeholder: 'https://...' },
+                { key: 'name',           label: 'Nom de la boutique *',                       placeholder: 'Ex: Electro Conakry' },
+                { key: 'description',    label: 'Description',                                placeholder: 'Décrivez votre boutique...',     multiline: true },
+                { key: 'phone',          label: 'Téléphone',                                  placeholder: '+224 6XX XXX XXX' },
+                { key: 'whatsapp',       label: 'WhatsApp',                                   placeholder: '+224 6XX XXX XXX' },
+                { key: 'address',        label: 'Adresse de la boutique',                     placeholder: 'Ex: Kaloum, face à la cathédrale' },
+                { key: 'pickup_address', label: '📦 Adresse de collecte des colis (livreur)', placeholder: 'Ex: Ratoma, rue des jardins — là où le livreur doit venir récupérer vos colis' },
+                { key: 'city',           label: 'Ville',                                      placeholder: 'Conakry' },
+                { key: 'website',        label: 'Site web (facultatif)',                      placeholder: 'https://...' },
               ].map(({ key, label, placeholder, multiline }) => (
                 <div key={key}>
                   <label className="block text-xs font-medium text-gray-600 mb-1">{label}</label>
@@ -231,6 +233,14 @@ export default function MyShopPage() {
                   </button>
                 </div>
                 <p className="text-sm text-gray-500 mt-0.5">📍 {shop.city}{shop.address && ` · ${shop.address}`}</p>
+                {shop.pickup_address && (
+                  <p className="text-sm text-amber-700 bg-amber-50 rounded-lg px-2 py-1 mt-1">
+                    📦 Collecte : {shop.pickup_address}
+                  </p>
+                )}
+                {!shop.pickup_address && (
+                  <p className="text-xs text-gray-400 mt-1 italic">⚠️ Adresse de collecte non renseignée — le livreur ne saura pas où récupérer vos colis.</p>
+                )}
                 {shop.phone    && <p className="text-sm text-gray-500">📞 {shop.phone}</p>}
                 {shop.whatsapp && <p className="text-sm text-gray-500">💬 {shop.whatsapp}</p>}
                 {shop.description && <p className="text-sm text-gray-600 mt-2 line-clamp-2">{shop.description}</p>}

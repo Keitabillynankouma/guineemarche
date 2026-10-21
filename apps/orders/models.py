@@ -847,6 +847,8 @@ class CapitalReserve(BaseModel):
     Utilisé pour payer les vendeurs à la collecte (avant que l'acheteur paie).
     Accès via CapitalReserve.get().
     """
+    # Singleton : PK entier fixe = 1. On écrase explicitement l'UUIDField de BaseModel.
+    id = models.AutoField(primary_key=True)
     SINGLETON_PK = 1
 
     balance_gnf          = models.BigIntegerField(default=0,  help_text="Capital disponible actuellement")

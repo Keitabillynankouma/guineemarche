@@ -260,6 +260,7 @@ class ShopSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'logo', 'logo_url', 'description',
             'phone', 'whatsapp', 'address', 'city', 'website',
+            'pickup_address',
             'is_verified', 'is_featured', 'listing_count',
             'status', 'plan', 'plan_until',
             'owner', 'owner_name', 'created_at',
@@ -286,6 +287,7 @@ class AdminShopSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'name', 'logo_url', 'description',
             'phone', 'whatsapp', 'address', 'city', 'website',
+            'pickup_address',
             'is_verified', 'is_featured', 'listing_count',
             'status', 'plan', 'plan_until', 'reject_reason',
             'owner', 'owner_name', 'owner_phone', 'created_at',
