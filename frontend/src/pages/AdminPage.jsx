@@ -1131,13 +1131,82 @@ function TabSettings() {
 // ── Onglet Points de retrait ──────────────────────────────────────────────────
 const VILLES_GN = ['Conakry','Kindia','Mamou','Labé','Kankan','Faranah','Kissidougou','Guéckédou','Macenta','Nzérékoré','Boké','Fria','Coyah','Dubréka','Siguiri','Koundara','Gaoual','Dinguiraye','Kérouané','Pita','Télimélé']
 
-const EMPTY_PDR = { name: '', address: '', city: 'Conakry', commune: '', phone: '', opening_hours: '', manager: '' }
+const EMPTY_PDR = { name: '', address: '', city: 'Conakry', commune: '', phone: '', opening_hours: '', manager: '', latitude: '', longitude: '' }
+
+// ── Mini-carte GPS pour choisir la position ────────────────────────────────────
+function MapPicker({ lat, lng, onChange }) {
+  const mapRef   = useRef(null)
+  const lMap     = useRef(null)
+  const markerRef = useRef(null)
+
+  useEffect(() => {
+    const initPicker = () => {
+      if (!mapRef.current || lMap.current) return
+      const L  = window.L
+      const center = (lat && lng) ? [parseFloat(lat), parseFloat(lng)] : [9.5370, -13.6773]
+      lMap.current = L.map(mapRef.current, { zoomControl: true }).setView(center, 13)
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 18,
+      }).addTo(lMap.current)
+
+      const pinIcon = L.divIcon({
+        html: '<div style="background:#16a34a;color:white;border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 6px rgba(0,0,0,.4);border:2px solid white">📦</div>',
+        className: '', iconSize: [30, 30], iconAnchor: [15, 15],
+      })
+
+      if (lat && lng) {
+        markerRef.current = L.marker([parseFloat(lat), parseFloat(lng)], { icon: pinIcon, draggable: true })
+          .addTo(lMap.current)
+          .on('dragend', e => {
+            const p = e.target.getLatLng()
+            onChange(p.lat.toFixed(6), p.lng.toFixed(6))
+          })
+      }
+
+      lMap.current.on('click', e => {
+        const { lat: la, lng: lo } = e.latlng
+        if (markerRef.current) markerRef.current.remove()
+        markerRef.current = L.marker([la, lo], { icon: pinIcon, draggable: true })
+          .addTo(lMap.current)
+          .on('dragend', ev => {
+            const p = ev.target.getLatLng()
+            onChange(p.lat.toFixed(6), p.lng.toFixed(6))
+          })
+        onChange(la.toFixed(6), lo.toFixed(6))
+      })
+    }
+
+    if (!document.getElementById('leaflet-css')) {
+      const link = document.createElement('link')
+      link.id = 'leaflet-css'; link.rel = 'stylesheet'
+      link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
+      document.head.appendChild(link)
+    }
+    if (!window.L) {
+      const s = document.createElement('script')
+      s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js'
+      s.onload = initPicker
+      document.head.appendChild(s)
+    } else {
+      initPicker()
+    }
+    return () => { if (lMap.current) { lMap.current.remove(); lMap.current = null } }
+  }, [])
+
+  return (
+    <div>
+      <div ref={mapRef} style={{ height: 240, borderRadius: 12, zIndex: 1, border: '1px solid #e5e7eb' }} />
+      <p className="text-xs text-gray-400 mt-1">🖱️ Clique sur la carte pour placer le pin, ou fais-le glisser pour ajuster</p>
+    </div>
+  )
+}
 
 function TabPickupPoints() {
   const qc = useQueryClient()
   const [form, setForm]     = useState(EMPTY_PDR)
   const [editId, setEditId] = useState(null)
   const [showForm, setShowForm] = useState(false)
+  const [showMap, setShowMap]   = useState(false)
   // Assigner un gestionnaire en ligne (sans ouvrir le formulaire complet)
   const [assigningId, setAssigningId]   = useState(null)
   const [assignManager, setAssignManager] = useState('')
@@ -1192,8 +1261,11 @@ function TabPickupPoints() {
       commune: p.commune || '', phone: p.phone || '',
       opening_hours: p.opening_hours || '',
       manager: p.manager || '',
+      latitude:  p.latitude  ? String(p.latitude)  : '',
+      longitude: p.longitude ? String(p.longitude) : '',
     })
     setEditId(p.id)
+    setShowMap(!!(p.latitude && p.longitude))
     setShowForm(true)
   }
 
@@ -1204,7 +1276,12 @@ function TabPickupPoints() {
 
   const handleSubmit = (e) => {
     e.preventDefault()
-    const payload = { ...form, manager: form.manager || null }
+    const payload = {
+      ...form,
+      manager:   form.manager   || null,
+      latitude:  form.latitude  ? parseFloat(form.latitude)  : null,
+      longitude: form.longitude ? parseFloat(form.longitude) : null,
+    }
     saveMutation.mutate(payload)
   }
 
@@ -1221,7 +1298,7 @@ function TabPickupPoints() {
           <h2 className="text-lg font-bold text-gray-800">📍 Points de retrait</h2>
           <p className="text-xs text-gray-400 mt-0.5">Lieux où les acheteurs peuvent retirer leurs commandes</p>
         </div>
-        <button onClick={() => { setEditId(null); setForm({ name:'',address:'',city:'Conakry',commune:'',phone:'' }); setShowForm(s => !s) }}
+        <button onClick={() => { setEditId(null); setForm(EMPTY_PDR); setShowMap(false); setShowForm(s => !s) }}
           className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-xl text-sm font-medium transition">
           {showForm ? 'Annuler' : '+ Ajouter un point'}
         </button>
@@ -1269,6 +1346,49 @@ function TabPickupPoints() {
                 placeholder="Ex: Lun-Sam 8h-18h"
                 className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400" />
             </div>
+            {/* ── Coordonnées GPS ── */}
+            <div className="md:col-span-2">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs text-gray-500">📍 Position GPS <span className="text-gray-400">(pour apparaître sur la carte)</span></label>
+                <button type="button" onClick={() => setShowMap(s => !s)}
+                  className={`text-xs px-3 py-1 rounded-lg font-medium transition ${showMap ? 'bg-gray-100 text-gray-600' : 'bg-green-100 text-green-700 hover:bg-green-200'}`}>
+                  {showMap ? 'Masquer la carte' : '🗺️ Choisir sur la carte'}
+                </button>
+              </div>
+              {showMap && (
+                <div className="mb-3">
+                  <MapPicker
+                    lat={form.latitude}
+                    lng={form.longitude}
+                    onChange={(lat, lng) => setForm(f => ({ ...f, latitude: lat, longitude: lng }))}
+                  />
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Latitude</label>
+                  <input
+                    value={form.latitude}
+                    onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))}
+                    placeholder="Ex: 9.537000"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs text-gray-400 mb-1">Longitude</label>
+                  <input
+                    value={form.longitude}
+                    onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))}
+                    placeholder="Ex: -13.677300"
+                    className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-green-400"
+                  />
+                </div>
+              </div>
+              {form.latitude && form.longitude && (
+                <p className="text-xs text-green-600 mt-1">✅ Ce point apparaîtra sur la carte clients</p>
+              )}
+            </div>
+
             {/* ── Gestionnaire ── */}
             <div className="md:col-span-2">
               <label className="block text-xs text-gray-500 mb-1">👤 Gestionnaire du point <span className="text-gray-400">(rôle Gestionnaire PDR requis)</span></label>
@@ -1323,6 +1443,10 @@ function TabPickupPoints() {
                       <p className={`font-medium text-sm ${p.is_active ? 'text-gray-800' : 'text-gray-400 line-through'}`}>{p.name}</p>
                       <p className="text-xs text-gray-400 truncate">{p.address}{p.commune && ` · ${p.commune}`}</p>
                       {p.phone && <p className="text-xs text-green-600">{p.phone}</p>}
+                      {p.latitude && p.longitude
+                        ? <p className="text-xs text-green-500">📍 GPS ({parseFloat(p.latitude).toFixed(4)}, {parseFloat(p.longitude).toFixed(4)})</p>
+                        : <p className="text-xs text-amber-500">⚠️ Pas de GPS — invisible sur la carte</p>
+                      }
                     </div>
                     <div className="flex items-center gap-2 flex-shrink-0">
                       <button onClick={() => toggleMutation.mutate({ id: p.id, is_active: !p.is_active })}
