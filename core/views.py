@@ -1,4 +1,6 @@
 import logging
+import os
+from pathlib import Path
 from rest_framework import serializers, viewsets, status as drf_status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -10,6 +12,94 @@ from core.site_settings import SiteSettings
 from core.models import ProjectTask, ProjectNote, ProjectMilestone, TeamMember
 
 logger = logging.getLogger(__name__)
+
+# ── Documents contractuels ────────────────────────────────────────────────────
+
+DOCS_DIR = Path(settings.BASE_DIR) / 'documents_contractuels'
+
+DOCUMENTS_META = [
+    {
+        'slug':        'conditions_acheteur',
+        'filename':    'conditions_acheteur.md',
+        'title':       'Conditions d\'utilisation — Acheteur',
+        'icon':        '🛍️',
+        'description': 'Conditions générales d\'achat, politique de retour et paiement en deux étapes.',
+        'audience':    'Acheteurs',
+    },
+    {
+        'slug':        'contrat_vendeur',
+        'filename':    'contrat_vendeur.md',
+        'title':       'Contrat de partenariat — Vendeur',
+        'icon':        '🤝',
+        'description': 'Obligations du vendeur, commission, politique de retour et arbitrage.',
+        'audience':    'Vendeurs',
+    },
+    {
+        'slug':        'contrat_gestionnaire_pdr',
+        'filename':    'contrat_gestionnaire_pdr.md',
+        'title':       'Contrat de gestionnaire — Point de retrait',
+        'icon':        '📍',
+        'description': 'Missions, rémunération et responsabilités du gestionnaire de point de retrait.',
+        'audience':    'Gestionnaires PDR',
+    },
+    {
+        'slug':        'contrat_livreur',
+        'filename':    'contrat_livreur.md',
+        'title':       'Contrat de prestation — Livreur',
+        'icon':        '🚚',
+        'description': 'Missions, tarification, avertissements et responsabilités du livreur.',
+        'audience':    'Livreurs',
+    },
+    {
+        'slug':        'proposition_partenariat_magasinier',
+        'filename':    'proposition_partenariat_magasinier.md',
+        'title':       'Proposition de partenariat — Magasinier',
+        'icon':        '🏪',
+        'description': 'Lettre commerciale présentant le programme de points de retrait aux boutiques.',
+        'audience':    'Partenaires boutiques',
+    },
+]
+
+
+class DocumentsListView(APIView):
+    """GET /api/v1/core/documents/ — liste des documents contractuels (admin seulement)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request):
+        result = []
+        for doc in DOCUMENTS_META:
+            path = DOCS_DIR / doc['filename']
+            result.append({
+                'slug':        doc['slug'],
+                'title':       doc['title'],
+                'icon':        doc['icon'],
+                'description': doc['description'],
+                'audience':    doc['audience'],
+                'exists':      path.exists(),
+                'size_bytes':  path.stat().st_size if path.exists() else 0,
+            })
+        return Response(result)
+
+
+class DocumentDetailView(APIView):
+    """GET /api/v1/core/documents/<slug>/ — contenu markdown d'un document (admin seulement)."""
+    permission_classes = [IsAdmin]
+
+    def get(self, request, slug):
+        doc = next((d for d in DOCUMENTS_META if d['slug'] == slug), None)
+        if not doc:
+            return Response({'detail': 'Document introuvable.'}, status=404)
+        path = DOCS_DIR / doc['filename']
+        if not path.exists():
+            return Response({'detail': 'Fichier non trouvé sur le serveur.'}, status=404)
+        content = path.read_text(encoding='utf-8')
+        return Response({
+            'slug':     doc['slug'],
+            'title':    doc['title'],
+            'icon':     doc['icon'],
+            'audience': doc['audience'],
+            'content':  content,
+        })
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):

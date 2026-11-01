@@ -550,9 +550,11 @@ function OrderModal({ listing, onClose, onSuccess }) {
     })
 
     const articlePrice = listing.price_type === 'negotiable' ? (parseInt(negotiatedPrice) || listing.price_gnf) : listing.price_gnf
-    // buyerServiceFee est inclus dans le total affiché et dans le paiement,
-    // mais n'est pas détaillé à l'acheteur (frais de service internes).
-    const totalAmount  = articlePrice + buyerServiceFee
+    // Paiement en deux étapes :
+    //   commitment  = frais de service (10 000 GNF) — prélevé maintenant
+    //   article     = prix de l'article             — prélevé au PDR si gardé
+    const commitmentAmount = buyerServiceFee  // frais de service uniquement (livraison = 0 pour pickup point)
+    const totalAmount      = articlePrice + buyerServiceFee  // total affiché pour référence
 
     const handleOrder = async (e) => {
         e.preventDefault(); setError('')
@@ -656,13 +658,21 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             />
                         </div>
 
-                        {/* Récapitulatif total */}
-                        <div className="bg-gray-50 rounded-xl p-4 text-sm">
-                            <div className="flex justify-between font-black text-gray-900">
-                                <span>Total à payer</span>
-                                <span className="text-green-700">{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
+                        {/* Récapitulatif paiement en deux étapes */}
+                        <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
+                            <div className="flex justify-between text-gray-700">
+                                <span>✅ Vous payez maintenant</span>
+                                <span className="font-bold text-green-700">{new Intl.NumberFormat('fr-GN').format(commitmentAmount)} GNF</span>
                             </div>
-                            <p className="text-xs text-gray-400 mt-1">Frais de collecte inclus · Paiement sécurisé</p>
+                            <div className="flex justify-between text-gray-500">
+                                <span>📦 À payer au retrait si vous gardez l'article</span>
+                                <span className="font-semibold">{new Intl.NumberFormat('fr-GN').format(articlePrice)} GNF</span>
+                            </div>
+                            <div className="border-t pt-2 flex justify-between font-black text-gray-900">
+                                <span>Total estimé</span>
+                                <span>{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
+                            </div>
+                            <p className="text-xs text-gray-400">Paiement sécurisé · Prix article prélevé uniquement si gardé</p>
                         </div>
 
                         {/* Mode de paiement — Mobile Money uniquement */}
@@ -680,7 +690,7 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50">
                             {(createOrder.isPending || pay.isPending)
                                 ? 'Traitement en cours…'
-                                : `Payer ${new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF`}
+                                : `Réserver — Payer ${new Intl.NumberFormat('fr-GN').format(commitmentAmount)} GNF maintenant`}
                         </button>
                     </form>
                 </div>

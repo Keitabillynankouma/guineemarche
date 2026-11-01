@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate } from 'react-router-dom'
 import useAuthStore from '../store/authStore'
-import api from '../services/api'
+import api, { documentsAPI } from '../services/api'
 
 // ── API ──────────────────────────────────────────────────────────────────────
 
@@ -91,9 +91,12 @@ const adminAPI = {
   updateZoneRate:  (id, data) => api.patch(`/orders/admin/zone-rates/${id}/`, data),
   deleteZoneRate:  (id)       => api.delete(`/orders/admin/zone-rates/${id}/`),
 
-  // Retours
+  // Retours classiques (ReturnRequest)
   getReturns:    (params)      => api.get('/orders/admin/returns/', { params }),
   updateReturn:  (id, data)    => api.patch(`/orders/admin/returns/${id}/`, data),
+  // Retours essai PDR (commandes status=retourne)
+  getEssaiReturns: () => api.get('/orders/admin/orders/', { params: { status: 'retourne', page_size: 200 } }),
+  resolveEssaiReturn: (id, action) => api.post(`/orders/admin/orders/${id}/resolve-return/`, { action }),
 
   // Capital de roulement
   getCapital:           ()          => api.get('/orders/admin/capital/'),
@@ -2425,6 +2428,134 @@ const RETURN_REASONS = {
   changed_mind:     "Changement d'avis",
   other:            'Autre',
 }
+const ESSAI_RETURN_REASONS = {
+  taille_incorrecte:  'Taille incorrecte (selon annonce)',
+  couleur_differente: 'Couleur différente des photos',
+  article_abime:      'Article abîmé / défectueux',
+  changement_avis:    "Changement d'avis",
+  autre:              'Autre raison',
+}
+
+// ── Sous-section : Retours essai PDR ─────────────────────────────────────────
+function EssaiReturnsList() {
+  const qc = useQueryClient()
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['admin-essai-returns'],
+    queryFn:  () => adminAPI.getEssaiReturns().then(r => r.data),
+    refetchInterval: 60_000,
+  })
+  const orders = data?.results ?? []
+  const pending = orders.filter(o => !o.essai_return_resolved)
+  const resolved = orders.filter(o => o.essai_return_resolved)
+
+  const resolveMutation = useMutation({
+    mutationFn: ({ id, action }) => adminAPI.resolveEssaiReturn(id, action),
+    onSuccess:  () => { refetch(); qc.invalidateQueries(['admin-essai-returns']) },
+  })
+
+  const [showResolved, setShowResolved] = useState(false)
+  const displayed = showResolved ? orders : pending
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="font-bold text-gray-800">👗 Retours après essai en PDR</h3>
+          {pending.length > 0
+            ? <p className="text-xs text-orange-600 font-medium mt-0.5">{pending.length} en attente de traitement</p>
+            : <p className="text-xs text-green-600 mt-0.5">Tous les retours sont traités ✅</p>
+          }
+        </div>
+        <button onClick={() => setShowResolved(v => !v)}
+          className="text-xs text-gray-500 border border-gray-200 px-3 py-1.5 rounded-xl hover:bg-gray-50 transition">
+          {showResolved ? 'Masquer traités' : `Voir tous (${orders.length})`}
+        </button>
+      </div>
+
+      {isLoading && <p className="text-center text-gray-400 py-6">Chargement…</p>}
+      {!isLoading && displayed.length === 0 && (
+        <div className="bg-gray-50 rounded-2xl p-8 text-center text-gray-400">
+          <p className="text-3xl mb-2">✅</p>
+          <p className="text-sm">Aucun retour essai en attente</p>
+        </div>
+      )}
+
+      {displayed.map(o => {
+        const isVendorFault = o.vendor_fault
+        return (
+          <div key={o.id} className={`rounded-2xl border-2 p-5 space-y-3 ${
+            o.essai_return_resolved ? 'bg-gray-50 border-gray-100 opacity-70'
+            : isVendorFault         ? 'bg-orange-50 border-orange-200'
+                                    : 'bg-green-50 border-green-200'
+          }`}>
+            {/* En-tête */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${
+                    o.essai_return_resolved ? 'bg-gray-200 text-gray-600'
+                    : isVendorFault         ? 'bg-orange-200 text-orange-800'
+                                            : 'bg-green-200 text-green-800'
+                  }`}>
+                    {o.essai_return_resolved ? '✅ Traité' : isVendorFault ? '⚠️ Faute vendeur' : '🔄 Changement d\'avis'}
+                  </span>
+                  <span className="text-xs text-gray-400">{new Date(o.created_at).toLocaleDateString('fr-FR')}</span>
+                </div>
+                <p className="font-semibold text-gray-800 mt-1 truncate">{o.listing_title}</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  Acheteur : <span className="font-medium text-gray-700">{o.buyer_name}</span>
+                  <span className="mx-1">·</span>
+                  Vendeur : <span className="font-medium text-gray-700">{o.seller_name}</span>
+                  <span className="mx-1">·</span>
+                  <span className="font-semibold">{fmt(o.amount_gnf)}</span>
+                </p>
+              </div>
+              {o.essai_return_photo && (
+                <a href={o.essai_return_photo} target="_blank" rel="noreferrer">
+                  <img src={o.essai_return_photo} alt="Photo retour"
+                    className="w-16 h-16 object-cover rounded-xl border border-gray-200 flex-shrink-0 hover:scale-105 transition" />
+                </a>
+              )}
+            </div>
+
+            {/* Motif */}
+            <div className={`rounded-xl p-3 text-sm ${isVendorFault ? 'bg-orange-100' : 'bg-green-100'}`}>
+              <p className="font-medium text-gray-700">
+                Motif : {ESSAI_RETURN_REASONS[o.essai_return_reason] || o.essai_return_reason || '—'}
+              </p>
+              {isVendorFault
+                ? <p className="text-orange-700 text-xs mt-1">→ <strong>10 000 GNF à déduire du vendeur</strong> · Acheteur remboursé intégralement</p>
+                : <p className="text-green-700 text-xs mt-1">→ Changement d'avis · <strong>Remboursement intégral, aucune pénalité vendeur</strong></p>
+              }
+            </div>
+
+            {/* Actions */}
+            {!o.essai_return_resolved && (
+              <div className="flex gap-2">
+                {isVendorFault ? (
+                  <button
+                    onClick={() => { if (confirm(`Confirmer : 10 000 GNF déduits du prochain paiement de "${o.seller_name}" (prix article jamais débité à l'acheteur) ?`)) resolveMutation.mutate({ id: o.id, action: 'deduct_vendor' }) }}
+                    disabled={resolveMutation.isPending}
+                    className="flex-1 bg-orange-600 hover:bg-orange-700 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50">
+                    💸 Déduire 10 000 GNF au vendeur
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => { if (confirm(`Clôturer ce retour sans pénalité vendeur ? (Prix article jamais débité à l'acheteur)`)) resolveMutation.mutate({ id: o.id, action: 'refund_only' }) }}
+                    disabled={resolveMutation.isPending}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl text-sm transition disabled:opacity-50">
+                    ✅ Clôturer (sans pénalité vendeur)
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
 
 function TabReturns() {
   const qc = useQueryClient()
@@ -2432,6 +2563,7 @@ function TabReturns() {
   const [search, setSearch]             = useState('')
   const [noteModal, setNoteModal]       = useState(null) // { id, currentNote }
   const [noteText, setNoteText]         = useState('')
+  const [section, setSection]           = useState('essai') // 'essai' | 'classic'
 
   const { data = [], isLoading } = useQuery({
     queryKey: ['admin-returns', statusFilter, search],
@@ -2453,16 +2585,30 @@ function TabReturns() {
     updateMutation.mutate({ id, status: newStatus, ...(note ? { admin_note: note } : {}) })
   }
 
-  const pending = returns.filter(r => r.status === 'pending').length
+  const pendingClassic = returns.filter(r => r.status === 'pending').length
 
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h2 className="text-lg font-bold text-gray-800">↩️ Demandes de retour</h2>
-          {pending > 0 && <p className="text-xs text-amber-600 font-medium mt-0.5">{pending} en attente de traitement</p>}
+        <h2 className="text-lg font-bold text-gray-800">↩️ Retours</h2>
+        {/* Toggle section */}
+        <div className="flex gap-2">
+          <button onClick={() => setSection('essai')}
+            className={`text-xs font-semibold px-4 py-2 rounded-xl transition ${section === 'essai' ? 'bg-orange-500 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-orange-50'}`}>
+            👗 Essai PDR
+          </button>
+          <button onClick={() => setSection('classic')}
+            className={`text-xs font-semibold px-4 py-2 rounded-xl transition ${section === 'classic' ? 'bg-green-600 text-white' : 'bg-white border border-gray-200 text-gray-600 hover:bg-green-50'}`}>
+            📦 Demandes classiques
+          </button>
         </div>
       </div>
+
+      {/* Section retours essai */}
+      {section === 'essai' && <EssaiReturnsList />}
+
+      {/* Section retours classiques */}
+      {section === 'classic' && <>
 
       {/* Filtres */}
       <div className="bg-white rounded-2xl shadow p-4 flex flex-wrap gap-3">
@@ -2559,6 +2705,8 @@ function TabReturns() {
           )
         })}
       </div>
+
+      </>}
     </div>
   )
 }
@@ -3895,6 +4043,170 @@ const MILESTONE_STATUS = {
   cancelled:   { label: 'Annulé',    color: 'bg-red-100 text-red-600'     },
 }
 
+// ── Onglet : Documents contractuels ──────────────────────────────────────────
+
+function MarkdownRenderer({ content }) {
+  // Rendu markdown minimal sans dépendance externe
+  const lines = content.split('\n')
+  const elements = []
+  let i = 0
+  while (i < lines.length) {
+    const line = lines[i]
+    if (line.startsWith('# '))       { elements.push(<h1 key={i} className="text-2xl font-black text-gray-900 mt-6 mb-3">{line.slice(2)}</h1>) }
+    else if (line.startsWith('## ')) { elements.push(<h2 key={i} className="text-lg font-bold text-gray-800 mt-5 mb-2 border-b border-gray-200 pb-1">{line.slice(3)}</h2>) }
+    else if (line.startsWith('### ')){ elements.push(<h3 key={i} className="text-base font-semibold text-gray-700 mt-4 mb-1">{line.slice(4)}</h3>) }
+    else if (line.startsWith('> '))  { elements.push(<blockquote key={i} className="border-l-4 border-green-400 pl-4 italic text-gray-600 my-2 text-sm">{line.slice(2)}</blockquote>) }
+    else if (line.startsWith('- '))  { elements.push(<li key={i} className="ml-5 list-disc text-gray-700 text-sm leading-relaxed">{renderInline(line.slice(2))}</li>) }
+    else if (line.startsWith('```')) {
+      const codeLines = []
+      i++
+      while (i < lines.length && !lines[i].startsWith('```')) { codeLines.push(lines[i]); i++ }
+      elements.push(<pre key={i} className="bg-gray-100 rounded-lg p-3 text-xs font-mono overflow-x-auto my-2 text-gray-800">{codeLines.join('\n')}</pre>)
+    }
+    else if (line.startsWith('|'))   {
+      const rows = []
+      while (i < lines.length && lines[i].startsWith('|')) {
+        if (!lines[i].includes('---')) {
+          rows.push(lines[i].split('|').filter(Boolean).map(c => c.trim()))
+        }
+        i++
+      }
+      elements.push(
+        <div key={`t${i}`} className="overflow-x-auto my-3">
+          <table className="w-full text-sm border-collapse">
+            <thead><tr>{rows[0]?.map((c,j) => <th key={j} className="bg-gray-100 border border-gray-200 px-3 py-1.5 text-left font-semibold text-gray-700">{c}</th>)}</tr></thead>
+            <tbody>{rows.slice(1).map((row,ri) => <tr key={ri} className="even:bg-gray-50">{row.map((c,ci) => <td key={ci} className="border border-gray-200 px-3 py-1.5 text-gray-700">{c}</td>)}</tr>)}</tbody>
+          </table>
+        </div>
+      )
+      continue
+    }
+    else if (line === '---') { elements.push(<hr key={i} className="my-4 border-gray-200" />) }
+    else if (line.trim() === '') { elements.push(<div key={i} className="h-2" />) }
+    else { elements.push(<p key={i} className="text-gray-700 text-sm leading-relaxed">{renderInline(line)}</p>) }
+    i++
+  }
+  return <div className="space-y-0.5">{elements}</div>
+}
+
+function renderInline(text) {
+  // bold **...**
+  const parts = text.split(/(\*\*[^*]+\*\*)/)
+  return parts.map((p, i) =>
+    p.startsWith('**') && p.endsWith('**')
+      ? <strong key={i}>{p.slice(2, -2)}</strong>
+      : p
+  )
+}
+
+function TabDocuments() {
+  const [selectedSlug, setSelectedSlug] = useState(null)
+
+  const { data: docList, isLoading: listLoading } = useQuery({
+    queryKey: ['admin-documents'],
+    queryFn:  () => documentsAPI.list().then(r => r.data),
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const { data: docDetail, isLoading: detailLoading } = useQuery({
+    queryKey: ['admin-document', selectedSlug],
+    queryFn:  () => documentsAPI.detail(selectedSlug).then(r => r.data),
+    enabled:  !!selectedSlug,
+    staleTime: 1000 * 60 * 5,
+  })
+
+  const handleDownload = (doc) => {
+    // Créer un lien de téléchargement à partir du contenu
+    if (!docDetail?.content) return
+    const blob = new Blob([docDetail.content], { type: 'text/markdown;charset=utf-8' })
+    const url  = URL.createObjectURL(blob)
+    const a    = document.createElement('a')
+    a.href     = url
+    a.download = `${doc.slug}.md`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      <div>
+        <h2 className="text-xl font-black text-gray-900">📄 Documents contractuels</h2>
+        <p className="text-sm text-gray-500 mt-1">Contrats, conditions et propositions de partenariat Guimatrix.</p>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+        {/* Liste des documents */}
+        <div className="md:col-span-2 space-y-2">
+          {listLoading && <p className="text-sm text-gray-400">Chargement…</p>}
+          {docList?.map(doc => (
+            <button
+              key={doc.slug}
+              onClick={() => setSelectedSlug(doc.slug)}
+              className={`w-full text-left rounded-xl p-4 border transition ${
+                selectedSlug === doc.slug
+                  ? 'bg-green-50 border-green-400 shadow-sm'
+                  : 'bg-white border-gray-200 hover:border-green-300 hover:bg-green-50/50'
+              }`}>
+              <div className="flex items-start gap-3">
+                <span className="text-2xl flex-shrink-0">{doc.icon}</span>
+                <div className="min-w-0">
+                  <p className="font-semibold text-gray-900 text-sm leading-tight">{doc.title}</p>
+                  <p className="text-xs text-green-700 font-medium mt-0.5">{doc.audience}</p>
+                  <p className="text-xs text-gray-500 mt-1 leading-snug">{doc.description}</p>
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+
+        {/* Visionneuse de document */}
+        <div className="md:col-span-3">
+          {!selectedSlug && (
+            <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center text-gray-400">
+              <p className="text-3xl mb-2">📄</p>
+              <p className="text-sm">Sélectionnez un document pour le consulter</p>
+            </div>
+          )}
+          {selectedSlug && (
+            <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+              {/* Barre de titre */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50">
+                <div className="flex items-center gap-2">
+                  <span className="text-lg">{docDetail?.icon || '📄'}</span>
+                  <span className="font-semibold text-gray-900 text-sm">{docDetail?.title || '…'}</span>
+                </div>
+                <div className="flex gap-2">
+                  {docDetail && (
+                    <button
+                      onClick={() => handleDownload({ slug: selectedSlug })}
+                      className="text-xs bg-green-600 hover:bg-green-700 text-white font-semibold px-3 py-1.5 rounded-lg transition">
+                      ⬇️ Télécharger .md
+                    </button>
+                  )}
+                  <button
+                    onClick={() => setSelectedSlug(null)}
+                    className="text-xs text-gray-400 hover:text-gray-600 px-2 py-1.5">
+                    ✕
+                  </button>
+                </div>
+              </div>
+              {/* Contenu */}
+              <div className="p-6 overflow-y-auto max-h-[70vh]">
+                {detailLoading && (
+                  <div className="flex justify-center py-12">
+                    <div className="w-6 h-6 border-2 border-green-600 border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+                {docDetail?.content && <MarkdownRenderer content={docDetail.content} />}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function TabProject() {
   const qc = useQueryClient()
   const [sub, setSub] = useState('kanban')
@@ -4430,6 +4742,7 @@ const ALL_TABS = [
   { id: 'delivery-config',  label: '🌍 Config livraison' },
   { id: 'banners',          label: '📢 Publicités' },
   { id: 'categories',       label: '🏷️ Catégories' },
+  { id: 'documents',         label: '📄 Documents' },
   { id: 'settings',         label: '⚙️ Paramètres' },
   { id: 'project',          label: '🗂️ Projet' },
 ]
@@ -4569,6 +4882,7 @@ export default function AdminPage() {
         {safeTab === 'pickup-points'   && <TabPickupPoints />}
         {safeTab === 'delivery-config' && <TabDeliveryConfig />}
         {safeTab === 'returns'         && <TabReturns />}
+        {safeTab === 'documents'       && <TabDocuments />}
         {safeTab === 'settings'        && <TabSettings />}
         {safeTab === 'project'         && <TabProject />}
       </div>

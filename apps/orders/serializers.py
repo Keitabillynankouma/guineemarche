@@ -65,7 +65,8 @@ class OrderSerializer(serializers.ModelSerializer):
         fields = (
             'id', 'listing', 'listing_title',
             'buyer', 'buyer_name', 'seller', 'seller_name',
-            'amount_gnf', 'commission_gnf', 'seller_payout_gnf', 'status',
+            'amount_gnf', 'article_amount_gnf', 'article_paid',
+            'commission_gnf', 'seller_payout_gnf', 'status',
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
             'meet_location', 'delivery_address', 'delivery_fee_gnf',
             'delivery_distance_km', 'delivery_weight_kg', 'delivery_buyer_commune',
@@ -75,7 +76,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'created_at', 'updated_at',
         )
         read_only_fields = (
-            'id', 'buyer', 'seller', 'amount_gnf', 'status',
+            'id', 'buyer', 'seller', 'amount_gnf', 'article_amount_gnf', 'article_paid', 'status',
             'commission_gnf', 'seller_payout_gnf',
             'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
             'created_at', 'updated_at',
@@ -175,7 +176,10 @@ class OrderSerializer(serializers.ModelSerializer):
                     pass
                 validated_data['delivery_fee_gnf'] = delivery_fee
 
+        # Montant total affiché (pour référence / affichage) = prix article + livraison + service
         validated_data['amount_gnf'] = article_price + delivery_fee + buyer_service_fee
+        # Prix article stocké séparément — prélevé uniquement au PDR si l'acheteur garde l'article
+        validated_data['article_amount_gnf'] = article_price
         return super().create(validated_data)
 
 
