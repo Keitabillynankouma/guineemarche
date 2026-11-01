@@ -157,7 +157,15 @@ export const ordersAPI = {
   getPlatformSettings: () => api.get('/orders/platform-settings/'),
   getPickupPoints:   (city) => api.get('/orders/pickup-points/',   { params: city ? { city } : {} }),
   getMyPickupPoint:  ()     => api.get('/orders/my-pickup-point/'),
-  pickupOrderAction: (id, action) => api.post(`/orders/my-pickup-point/orders/${id}/action/`, { action }),
+  pickupOrderAction: (id, action, body) => {
+    // body peut être un FormData (pour return_essai + photo) ou undefined
+    if (body instanceof FormData) {
+      return api.post(`/orders/my-pickup-point/orders/${id}/action/`, body, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      })
+    }
+    return api.post(`/orders/my-pickup-point/orders/${id}/action/`, { action })
+  },
   getMeetingZones:   (city) => api.get('/orders/meeting-zones/',   { params: city ? { city } : {} }),
   getDeliveryZones:  (city) => api.get('/orders/delivery-zones/',  { params: city ? { city } : {} }),
   getSeller: () => api.get('/orders/received/'),

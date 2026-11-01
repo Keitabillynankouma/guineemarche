@@ -115,12 +115,15 @@ class MeetingZone(BaseModel):
 class Order(BaseModel):
 
     class Status(models.TextChoices):
-        PENDING           = 'pending',           'En attente'
-        CONFIRMED         = 'confirmed',          'Confirmée'
-        PICKUP_CONFIRMED  = 'pickup_confirmed',   'Collecté par livreur'
-        COMPLETED         = 'completed',          'Terminée'
-        CANCELLED         = 'cancelled',          'Annulée'
-        DISPUTED          = 'disputed',           'Litige'
+        PENDING           = 'pending',            'En attente'
+        CONFIRMED         = 'confirmed',           'Confirmée'
+        PICKUP_CONFIRMED  = 'pickup_confirmed',    'Collecté par livreur'
+        AU_POINT_RETRAIT  = 'au_point_retrait',    'Arrivé au point de retrait'
+        EN_ESSAI          = 'en_essai',            'En cours d\'essai'
+        COMPLETED         = 'completed',           'Terminée'
+        CANCELLED         = 'cancelled',           'Annulée'
+        DISPUTED          = 'disputed',            'Litige'
+        RETOURNE          = 'retourne',            'Retourné'
 
     class DeliveryMode(models.TextChoices):
         MEETING_POINT = 'meeting_point', 'Remise en main propre'
@@ -153,6 +156,24 @@ class Order(BaseModel):
     delivery_address   = models.CharField(max_length=400, blank=True, help_text="Adresse de livraison à domicile")
     delivery_fee_gnf      = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
     buyer_service_fee_gnf = models.BigIntegerField(default=0, help_text="Frais de service plateforme inclus dans amount_gnf (non affichés à l'acheteur)")
+
+    # ── Champs essai en point de retrait ──────────────────────────────────────
+    essai_started_at   = models.DateTimeField(null=True, blank=True, help_text="Heure de début d'essai")
+    essai_return_reason = models.CharField(
+        max_length=30, blank=True,
+        choices=[
+            ('taille_incorrecte',  'Taille incorrecte selon l\'annonce'),
+            ('couleur_differente', 'Couleur différente des photos'),
+            ('article_abime',      'Article abîmé / défectueux'),
+            ('changement_avis',    'Changement d\'avis'),
+            ('autre',              'Autre raison'),
+        ],
+        help_text="Motif de retour après essai"
+    )
+    essai_return_photo = models.ImageField(
+        upload_to='essai_returns/', null=True, blank=True,
+        help_text="Photo de l'article au moment du retour"
+    )
     delivery_distance_km   = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
                                                  help_text="Distance de livraison en km (GPS ou saisie manuelle)")
     delivery_weight_kg     = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,

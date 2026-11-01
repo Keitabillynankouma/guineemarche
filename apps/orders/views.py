@@ -122,31 +122,108 @@ class PickupManagerDashboardView(APIView):
 
 
 class PickupManagerOrderActionView(APIView):
-    """Gestionnaire : marquer une commande comme prête / remise."""
+    """
+    Gestionnaire PDR : actions sur une commande.
+    Actions disponibles :
+      ready        → commande arrivée au PDR, prête pour le client
+      start_essai  → client présent, début de l'essai (timer 15 min)
+      complete     → client garde l'article → commande complétée + escrow libéré
+      return_essai → client refuse → retour avec motif + photo
+      delivered    → (alias legacy de complete)
+    """
     permission_classes = [IsAuthenticated]
 
     def post(self, request, pk):
+        from django.utils import timezone
+        from apps.notifications.models import Notification
+
         try:
             point = request.user.managed_pickup_point
-        except PickupPoint.DoesNotExist:
+        except Exception:
             return Response({'detail': 'Non autorisé.'}, status=403)
 
         order  = get_object_or_404(Order, pk=pk, pickup_point=point)
         action = request.data.get('action')
 
+        # ── Colis arrivé au PDR ──────────────────────────────────────────────
         if action == 'ready':
-            # Commande arrivée au point, prête pour le client
-            order.status = 'au_point_retrait'
-            order.save(update_fields=['status'])
+            order.status = Order.Status.AU_POINT_RETRAIT
+            order.save(update_fields=['status', 'updated_at'])
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='📦 Colis disponible',
+                body=f'Votre commande « {order.listing.title} » est prête à être retirée au point de retrait.',
+                data={'order_id': str(order.id)},
+            )
             return Response({'status': order.status})
 
-        if action == 'delivered':
-            # Client venu récupérer
-            order.status = 'pickup_confirmed'
-            order.save(update_fields=['status'])
+        # ── Début d'essai ────────────────────────────────────────────────────
+        if action == 'start_essai':
+            if order.status != Order.Status.AU_POINT_RETRAIT:
+                return Response({'detail': 'Le colis doit être marqué "au point de retrait" avant l\'essai.'}, status=400)
+            order.status          = Order.Status.EN_ESSAI
+            order.essai_started_at = timezone.now()
+            order.save(update_fields=['status', 'essai_started_at', 'updated_at'])
+            return Response({'status': order.status, 'essai_started_at': order.essai_started_at})
+
+        # ── Client garde l'article ───────────────────────────────────────────
+        if action in ('complete', 'delivered'):
+            if order.status not in (Order.Status.AU_POINT_RETRAIT, Order.Status.EN_ESSAI):
+                return Response({'detail': 'Statut invalide pour cette action.'}, status=400)
+            order.complete()   # libère l'escrow, marque COMPLETED
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='✅ Commande terminée',
+                body=f'L\'acheteur a récupéré sa commande « {order.listing.title} ». Paiement en cours.',
+                data={'order_id': str(order.id)},
+            )
             return Response({'status': order.status})
 
-        return Response({'detail': 'Action invalide. Utilisez "ready" ou "delivered".'}, status=400)
+        # ── Client refuse après essai ────────────────────────────────────────
+        if action == 'return_essai':
+            if order.status != Order.Status.EN_ESSAI:
+                return Response({'detail': 'L\'essai doit être en cours pour effectuer un retour.'}, status=400)
+
+            reason = request.data.get('reason', 'autre')
+            photo  = request.FILES.get('photo')
+
+            order.status              = Order.Status.RETOURNE
+            order.essai_return_reason = reason
+            if photo:
+                order.essai_return_photo = photo
+
+            # Déterminer qui supporte les frais selon le motif
+            vendor_fault = reason in ('taille_incorrecte', 'couleur_differente', 'article_abime')
+
+            order.save(update_fields=['status', 'essai_return_reason', 'essai_return_photo', 'updated_at'])
+
+            # Notifier vendeur et acheteur
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='↩️ Article retourné',
+                body=f'L\'acheteur a retourné « {order.listing.title} » — motif : {reason.replace("_", " ")}.',
+                data={'order_id': str(order.id)},
+            )
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='↩️ Retour enregistré',
+                body=f'Votre retour pour « {order.listing.title} » a été enregistré. Remboursement en cours de traitement.',
+                data={'order_id': str(order.id)},
+            )
+
+            return Response({
+                'status':       order.status,
+                'reason':       reason,
+                'vendor_fault': vendor_fault,
+                'message':      'Retour enregistré. L\'admin va traiter le remboursement.' if vendor_fault
+                                else 'Retour enregistré. Les frais de retour sont à la charge de l\'acheteur.',
+            })
+
+        return Response({'detail': 'Action invalide. Utilisez : ready, start_essai, complete, return_essai.'}, status=400)
 
 
 
