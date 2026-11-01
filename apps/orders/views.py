@@ -2961,6 +2961,22 @@ class ConfirmPickupView(APIView):
         })
 
 
+class PlatformSettingsView(APIView):
+    """
+    GET /api/v1/orders/platform-settings/
+    Retourne les paramètres publics de la plateforme (frais, etc.).
+    Accessible sans authentification.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        from .models import CapitalReserve
+        reserve = CapitalReserve.get()
+        return Response({
+            'buyer_service_fee': reserve.buyer_service_fee,
+        })
+
+
 class AdminCapitalReserveView(APIView):
     """
     GET  /api/v1/orders/admin/capital/           — état du capital de roulement

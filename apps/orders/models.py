@@ -152,6 +152,7 @@ class Order(BaseModel):
     note               = models.TextField(blank=True)
     delivery_address   = models.CharField(max_length=400, blank=True, help_text="Adresse de livraison à domicile")
     delivery_fee_gnf      = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
+    buyer_service_fee_gnf = models.BigIntegerField(default=0, help_text="Frais de service plateforme inclus dans amount_gnf (non affichés à l'acheteur)")
     delivery_distance_km   = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
                                                  help_text="Distance de livraison en km (GPS ou saisie manuelle)")
     delivery_weight_kg     = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
@@ -863,6 +864,10 @@ class CapitalReserve(BaseModel):
     )
     max_order_gnf    = models.BigIntegerField(
         default=300_000, help_text="Montant max d'une commande éligible à l'avance"
+    )
+    buyer_service_fee = models.PositiveIntegerField(
+        default=10_000,
+        help_text="Frais de service prélevés sur l'acheteur (inclus silencieusement dans le total)"
     )
 
     class Meta:

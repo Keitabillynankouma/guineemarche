@@ -154,6 +154,7 @@ export const ordersAPI = {
   pay: (id, data) => api.post(`/orders/${id}/pay/`, data),
   confirmReceipt: (id) => api.post(`/orders/${id}/confirm-receipt/`),
   dispute: (id) => api.post(`/orders/${id}/dispute/`),
+  getPlatformSettings: () => api.get('/orders/platform-settings/'),
   getPickupPoints:   (city) => api.get('/orders/pickup-points/',   { params: city ? { city } : {} }),
   getMyPickupPoint:  ()     => api.get('/orders/my-pickup-point/'),
   pickupOrderAction: (id, action) => api.post(`/orders/my-pickup-point/orders/${id}/action/`, { action }),

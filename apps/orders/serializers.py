@@ -56,7 +56,9 @@ class OrderSerializer(serializers.ModelSerializer):
     delivery_assignment_detail = serializers.SerializerMethodField()
     return_request = ReturnRequestSerializer(read_only=True)
     # Prix négocié — uniquement pour les annonces à prix libre (price_type='negotiable')
-    negotiated_price = serializers.IntegerField(write_only=True, required=False, min_value=1)
+    negotiated_price  = serializers.IntegerField(write_only=True, required=False, min_value=1)
+    # Frais de service acheteur — envoyé par le frontend, tracé dans la commande
+    buyer_service_fee = serializers.IntegerField(write_only=True, required=False, min_value=0)
 
     class Meta:
         model  = Order
@@ -67,7 +69,7 @@ class OrderSerializer(serializers.ModelSerializer):
             'delivery_mode', 'pickup_point', 'pickup_point_detail',
             'meet_location', 'delivery_address', 'delivery_fee_gnf',
             'delivery_distance_km', 'delivery_weight_kg', 'delivery_buyer_commune',
-            'note', 'negotiated_price',
+            'note', 'negotiated_price', 'buyer_service_fee',
             'escrow_status', 'escrow_release_at', 'escrow_released_at', 'escrow_admin_hold',
             'payments', 'delivery_assignment_detail', 'return_request',
             'created_at', 'updated_at',
@@ -132,6 +134,14 @@ class OrderSerializer(serializers.ModelSerializer):
         else:
             article_price = listing.price_gnf
 
+        # Frais de service acheteur — pop du payload (champ write_only), on stocke dans buyer_service_fee_gnf
+        # Si non fourni par le frontend, on prend la valeur courante de CapitalReserve
+        buyer_service_fee = validated_data.pop('buyer_service_fee', None)
+        if buyer_service_fee is None:
+            from .models import CapitalReserve
+            buyer_service_fee = CapitalReserve.get().buyer_service_fee
+        validated_data['buyer_service_fee_gnf'] = buyer_service_fee
+
         # Calcul du montant total : prix article + frais de livraison à domicile
         delivery_mode = validated_data.get('delivery_mode', Order.DeliveryMode.MEETING_POINT)
         delivery_fee  = 0
@@ -165,7 +175,7 @@ class OrderSerializer(serializers.ModelSerializer):
                     pass
                 validated_data['delivery_fee_gnf'] = delivery_fee
 
-        validated_data['amount_gnf'] = article_price + delivery_fee
+        validated_data['amount_gnf'] = article_price + delivery_fee + buyer_service_fee
         return super().create(validated_data)
 
 
