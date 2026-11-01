@@ -522,7 +522,7 @@ function PickupPointPicker({ points, selected, onSelect }) {
 
 function OrderModal({ listing, onClose, onSuccess }) {
     const [pickupPoint, setPickupPoint]   = useState('')
-    const [paymentMethod, setPaymentMethod] = useState('chachap')
+    const paymentMethod = 'chachap'
     const [error, setError]               = useState('')
     const [negotiatedPrice, setNegotiatedPrice] = useState(listing.price_type === 'negotiable' ? String(listing.price_gnf) : '')
     const queryClient = useQueryClient()
@@ -531,6 +531,13 @@ function OrderModal({ listing, onClose, onSuccess }) {
         queryKey: ['pickup-points', listing.city],
         queryFn:  () => ordersAPI.getPickupPoints(listing.city).then(r => r.data?.results || r.data || []),
     })
+
+    const { data: platformSettings } = useQuery({
+        queryKey: ['platform-settings'],
+        queryFn:  () => ordersAPI.getPlatformSettings().then(r => r.data),
+        staleTime: 1000 * 60 * 10,
+    })
+    const buyerServiceFee = platformSettings?.buyer_service_fee ?? 10000
 
     const createOrder = useMutation({
         mutationFn: (data) => ordersAPI.create(data),
@@ -543,7 +550,9 @@ function OrderModal({ listing, onClose, onSuccess }) {
     })
 
     const articlePrice = listing.price_type === 'negotiable' ? (parseInt(negotiatedPrice) || listing.price_gnf) : listing.price_gnf
-    const totalAmount  = articlePrice
+    // buyerServiceFee est inclus dans le total affiché et dans le paiement,
+    // mais n'est pas détaillé à l'acheteur (frais de service internes).
+    const totalAmount  = articlePrice + buyerServiceFee
 
     const handleOrder = async (e) => {
         e.preventDefault(); setError('')
@@ -556,9 +565,10 @@ function OrderModal({ listing, onClose, onSuccess }) {
         }
         try {
             const orderPayload = {
-                listing:      listing.id,
-                delivery_mode: 'pickup_point',
-                pickup_point:  pickupPoint,
+                listing:           listing.id,
+                delivery_mode:     'pickup_point',
+                pickup_point:      pickupPoint,
+                buyer_service_fee: buyerServiceFee,
             }
             if (listing.price_type === 'negotiable' && negotiatedPrice) {
                 orderPayload.negotiated_price = parseInt(negotiatedPrice)
@@ -572,12 +582,6 @@ function OrderModal({ listing, onClose, onSuccess }) {
                     || payErr?.response?.data?.detail
                     || 'Erreur lors de l\'initialisation du paiement.'
                 setError(msg)
-                return
-            }
-            // En espèces : commande confirmée directement
-            if (payResult?.data?.cash) {
-                queryClient.invalidateQueries(['listing', listing.id])
-                onSuccess()
                 return
             }
             // ChaChap Pay : rediriger vers la page de paiement
@@ -661,53 +665,22 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             <p className="text-xs text-gray-400 mt-1">Frais de collecte inclus · Paiement sécurisé</p>
                         </div>
 
-                        {/* Mode de paiement */}
-                        <div className="space-y-2">
-                            <p className="text-xs font-semibold text-gray-600">💳 Mode de paiement</p>
-                            <button
-                                type="button"
-                                onClick={() => setPaymentMethod('chachap')}
-                                className={`w-full flex items-start gap-3 rounded-xl border p-3 text-left transition ${
-                                    paymentMethod === 'chachap'
-                                        ? 'border-green-500 bg-green-50'
-                                        : 'border-gray-200 bg-white hover:border-green-300'
-                                }`}
-                            >
-                                <span className="text-xl mt-0.5">📱</span>
-                                <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-800">Mobile Money</p>
-                                    <p className="text-xs text-gray-500">Orange Money · MTN MoMo · PayCard</p>
-                                    <p className="text-xs text-green-700 mt-0.5">🔒 Paiement sécurisé par escrow</p>
-                                </div>
-                                {paymentMethod === 'chachap' && <span className="text-green-500 font-bold text-base">✓</span>}
-                            </button>
-
-                            <button
-                                type="button"
-                                onClick={() => setPaymentMethod('cash')}
-                                className={`w-full flex items-start gap-3 rounded-xl border p-3 text-left transition ${
-                                    paymentMethod === 'cash'
-                                        ? 'border-amber-500 bg-amber-50'
-                                        : 'border-gray-200 bg-white hover:border-amber-300'
-                                }`}
-                            >
-                                <span className="text-xl mt-0.5">💵</span>
-                                <div className="flex-1">
-                                    <p className="text-sm font-semibold text-gray-800">En espèces</p>
-                                    <p className="text-xs text-gray-500">Paiement à la livraison ou au retrait</p>
-                                    <p className="text-xs text-amber-600 mt-0.5">⚠️ Sans protection escrow</p>
-                                </div>
-                                {paymentMethod === 'cash' && <span className="text-amber-500 font-bold text-base">✓</span>}
-                            </button>
+                        {/* Mode de paiement — Mobile Money uniquement */}
+                        <div className="flex items-start gap-3 rounded-xl border border-green-200 bg-green-50 p-3">
+                            <span className="text-xl mt-0.5">📱</span>
+                            <div className="flex-1">
+                                <p className="text-sm font-semibold text-gray-800">Mobile Money</p>
+                                <p className="text-xs text-gray-500">Orange Money · MTN MoMo · PayCard</p>
+                                <p className="text-xs text-green-700 mt-0.5">🔒 Paiement sécurisé par escrow</p>
+                            </div>
+                            <span className="text-green-500 font-bold text-base mt-0.5">✓</span>
                         </div>
 
                         <button type="submit" disabled={createOrder.isPending || pay.isPending}
                             className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50">
                             {(createOrder.isPending || pay.isPending)
                                 ? 'Traitement en cours…'
-                                : paymentMethod === 'cash'
-                                    ? `Commander — payer en espèces`
-                                    : `Payer ${new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF`}
+                                : `Payer ${new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF`}
                         </button>
                     </form>
                 </div>
