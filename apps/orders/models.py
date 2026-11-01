@@ -157,6 +157,23 @@ class Order(BaseModel):
     delivery_fee_gnf      = models.BigIntegerField(default=0, help_text="Frais de livraison inclus dans amount_gnf")
     buyer_service_fee_gnf = models.BigIntegerField(default=0, help_text="Frais de service plateforme inclus dans amount_gnf (non affichés à l'acheteur)")
 
+    # ── Paiement en deux étapes ───────────────────────────────────────────────
+    # Étape 1 (à la commande)   : delivery_fee_gnf + buyer_service_fee_gnf  → ChachaPay immédiat
+    # Étape 2 (au PDR si gardé) : article_amount_gnf                         → ChachaPay au point de retrait
+    article_amount_gnf = models.BigIntegerField(
+        default=0,
+        help_text="Prix de l'article — prélevé au PDR à la confirmation (non prélevé à la commande)"
+    )
+    article_paid = models.BooleanField(
+        default=False,
+        help_text="L'acheteur a payé le prix de l'article (confirmation au PDR)"
+    )
+
+    @property
+    def commitment_amount_gnf(self):
+        """Montant prélevé à la commande : frais de livraison + frais de service."""
+        return (self.delivery_fee_gnf or 0) + (self.buyer_service_fee_gnf or 0)
+
     # ── Champs essai en point de retrait ──────────────────────────────────────
     essai_started_at   = models.DateTimeField(null=True, blank=True, help_text="Heure de début d'essai")
     essai_return_reason = models.CharField(
@@ -173,6 +190,10 @@ class Order(BaseModel):
     essai_return_photo = models.ImageField(
         upload_to='essai_returns/', null=True, blank=True,
         help_text="Photo de l'article au moment du retour"
+    )
+    essai_return_resolved = models.BooleanField(
+        default=False,
+        help_text="Retour essai traité par l'admin (remboursement acheteur + déduction vendeur si applicable)"
     )
     delivery_distance_km   = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
                                                  help_text="Distance de livraison en km (GPS ou saisie manuelle)")
@@ -278,11 +299,12 @@ class Order(BaseModel):
     def release_escrow(self):
         from django.utils import timezone
         from core.site_settings import SiteSettings
-        # Commission calculée uniquement sur le prix de l'article, pas sur les frais de livraison
+        # Commission calculée uniquement sur le prix de l'article
+        # (delivery_fee_gnf va au livreur, buyer_service_fee_gnf reste à Guimatrix)
         commission_pct         = SiteSettings.flag('commission_pct', default=self.COMMISSION_PCT)
-        item_amount            = self.amount_gnf - (self.delivery_fee_gnf or 0)
+        item_amount            = self.article_amount_gnf or (self.amount_gnf - (self.delivery_fee_gnf or 0) - (self.buyer_service_fee_gnf or 0))
         self.commission_gnf    = int(item_amount * commission_pct / 100)
-        # Le vendeur reçoit : prix article - commission (les frais de livraison vont au livreur)
+        # Le vendeur reçoit : prix article - commission
         self.seller_payout_gnf = item_amount - self.commission_gnf
         self.escrow_status      = self.EscrowStatus.RELEASED
         self.escrow_released_at = timezone.now()
@@ -536,10 +558,18 @@ class Payment(BaseModel):
         FAILED   = 'failed',   'Échoué'
         REFUNDED = 'refunded', 'Remboursé'
 
+    class PaymentType(models.TextChoices):
+        COMMITMENT = 'commitment', 'Engagement (livraison + service)'
+        ARTICLE    = 'article',   'Prix article (au PDR)'
+
     order        = models.ForeignKey(Order, on_delete=models.PROTECT, related_name='payments')
     provider     = models.CharField(max_length=15, choices=Provider.choices)
     phone_number = models.CharField(max_length=20, blank=True)
     amount_gnf   = models.BigIntegerField()
+    payment_type = models.CharField(
+        max_length=12, choices=PaymentType.choices, default=PaymentType.COMMITMENT,
+        help_text="commitment = paiement à la commande; article = paiement au PDR"
+    )
     status       = models.CharField(max_length=10, choices=Status.choices, default=Status.PENDING)
     external_ref = models.CharField(max_length=255, blank=True)
 

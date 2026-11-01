@@ -151,10 +151,10 @@ function RetourModal({ order, onConfirm, onCancel, isPending }) {
           </div>
 
           {/* Résumé faute */}
-          <div className={`rounded-xl p-3 text-sm ${vendorFault ? 'bg-blue-50 border border-blue-200' : 'bg-orange-50 border border-orange-200'}`}>
+          <div className={`rounded-xl p-3 text-sm ${vendorFault ? 'bg-orange-50 border border-orange-200' : 'bg-green-50 border border-green-200'}`}>
             {vendorFault
-              ? <p className="text-blue-700">ℹ️ <strong>Faute vendeur</strong> — remboursement complet de l'acheteur, frais retour à la charge du vendeur.</p>
-              : <p className="text-orange-700">ℹ️ <strong>Faute acheteur</strong> — frais de retour (10 000 GNF) déduits du remboursement.</p>
+              ? <p className="text-orange-700">⚠️ <strong>Faute vendeur</strong> — prix article jamais débité. <strong>10 000 GNF déduits</strong> du prochain paiement vendeur.</p>
+              : <p className="text-green-700">✅ <strong>Changement d'avis</strong> — prix article jamais débité. Aucune pénalité vendeur.</p>
             }
           </div>
         </div>
@@ -178,8 +178,9 @@ function RetourModal({ order, onConfirm, onCancel, isPending }) {
 // ── Composant principal ───────────────────────────────────────────────────────
 export default function PickupManagerDashboard() {
   const { user, logout } = useAuthStore()
-  const [tab,       setTab]       = useState('')
-  const [retourFor, setRetourFor] = useState(null) // order en cours de retour
+  const [tab,              setTab]             = useState('')
+  const [retourFor,        setRetourFor]       = useState(null) // order en cours de retour
+  const [articlePayment,   setArticlePayment]  = useState(null) // { order, payment_url, amount_gnf }
   const qc = useQueryClient()
 
   const { data, isLoading } = useQuery({
@@ -190,7 +191,19 @@ export default function PickupManagerDashboard() {
 
   const action = useMutation({
     mutationFn: ({ id, act, body }) => ordersAPI.pickupOrderAction(id, act, body),
-    onSuccess:  () => qc.invalidateQueries(['my-pickup-point']),
+    onSuccess:  (res, variables) => {
+      // Paiement en deux étapes : le backend retourne awaiting_article_payment
+      if (res?.data?.status === 'awaiting_article_payment') {
+        setArticlePayment({
+          orderId:     variables.id,
+          payment_url: res.data.payment_url,
+          amount_gnf:  res.data.amount_gnf,
+          message:     res.data.message,
+        })
+      } else {
+        qc.invalidateQueries(['my-pickup-point'])
+      }
+    },
   })
 
   const doRetour = ({ reason, photo }) => {
@@ -236,6 +249,42 @@ export default function PickupManagerDashboard() {
           onCancel={() => setRetourFor(null)}
           isPending={action.isPending}
         />
+      )}
+
+      {/* Modal paiement article (étape 2) */}
+      {articlePayment && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-xl p-6 max-w-sm w-full">
+            <div className="text-center mb-4">
+              <span className="text-4xl">📱</span>
+              <h2 className="text-lg font-black text-gray-900 mt-2">Paiement article requis</h2>
+              <p className="text-sm text-gray-500 mt-1">{articlePayment.message}</p>
+            </div>
+            <div className="bg-green-50 rounded-xl p-4 text-center mb-4">
+              <p className="text-xs text-gray-500 uppercase tracking-wide font-semibold">Montant à payer</p>
+              <p className="text-2xl font-black text-green-700">
+                {new Intl.NumberFormat('fr-GN').format(articlePayment.amount_gnf)} GNF
+              </p>
+            </div>
+            <p className="text-sm text-gray-600 mb-4 text-center">
+              Présentez ce lien à l'acheteur sur votre écran ou envoyez-le sur son téléphone.
+            </p>
+            <div className="space-y-2">
+              <a
+                href={articlePayment.payment_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-bold py-3 rounded-xl transition">
+                💳 Ouvrir la page de paiement
+              </a>
+              <button
+                onClick={() => { setArticlePayment(null); qc.invalidateQueries(['my-pickup-point']) }}
+                className="w-full text-center text-sm text-gray-500 hover:text-gray-700 py-2">
+                En attente de confirmation…
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Header */}

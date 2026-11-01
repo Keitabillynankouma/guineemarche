@@ -171,6 +171,31 @@ class PickupManagerOrderActionView(APIView):
         if action in ('complete', 'delivered'):
             if order.status not in (Order.Status.AU_POINT_RETRAIT, Order.Status.EN_ESSAI):
                 return Response({'detail': 'Statut invalide pour cette action.'}, status=400)
+            # Paiement en deux étapes : le prix article n'a pas encore été prélevé
+            if not order.article_paid:
+                # Déclencher le paiement du prix article via ChaChap
+                article_payment = Payment.objects.create(
+                    order=order,
+                    provider=Payment.Provider.CHACHAP,
+                    amount_gnf=order.article_amount_gnf,
+                    payment_type=Payment.PaymentType.ARTICLE,
+                    status=Payment.Status.PENDING,
+                )
+                result = initiate_chachap(amount=order.article_amount_gnf, order_id=str(order.id))
+                if result.success and result.payment_url:
+                    article_payment.external_ref = result.reference
+                    article_payment.save(update_fields=['external_ref'])
+                    return Response({
+                        'status':       'awaiting_article_payment',
+                        'payment_url':  result.payment_url,
+                        'amount_gnf':   order.article_amount_gnf,
+                        'message':      f'Demandez à l\'acheteur de payer {order.article_amount_gnf:,} GNF pour finaliser la commande.',
+                    })
+                else:
+                    article_payment.status = Payment.Status.FAILED
+                    article_payment.save(update_fields=['status'])
+                    return Response({'error': result.message or 'Erreur ChaChap Pay lors du paiement article.'}, status=502)
+            # article_paid=True (webhook a déjà confirmé) → compléter la commande
             order.complete()   # libère l'escrow, marque COMPLETED
             Notification.send(
                 user=order.seller,
@@ -194,7 +219,9 @@ class PickupManagerOrderActionView(APIView):
             if photo:
                 order.essai_return_photo = photo
 
-            # Déterminer qui supporte les frais selon le motif
+            # Déterminer la responsabilité
+            # vendor_fault = True → 10 000 GNF déduits du paiement vendeur (admin traite)
+            # vendor_fault = False (changement d'avis) → retour gratuit, acheteur remboursé intégralement
             vendor_fault = reason in ('taille_incorrecte', 'couleur_differente', 'article_abime')
 
             order.save(update_fields=['status', 'essai_return_reason', 'essai_return_photo', 'updated_at'])
@@ -219,8 +246,15 @@ class PickupManagerOrderActionView(APIView):
                 'status':       order.status,
                 'reason':       reason,
                 'vendor_fault': vendor_fault,
-                'message':      'Retour enregistré. L\'admin va traiter le remboursement.' if vendor_fault
-                                else 'Retour enregistré. Les frais de retour sont à la charge de l\'acheteur.',
+                # Paiement en deux étapes : le prix article n'a jamais été débité
+                # → aucun remboursement article nécessaire. Seul le commitment (10k + livraison) a été prélevé.
+                'message':      (
+                    'Retour enregistré. Prix article jamais débité — aucun remboursement nécessaire. '
+                    '10 000 GNF déduits du prochain paiement vendeur (faute vendeur).'
+                    if vendor_fault else
+                    'Retour enregistré. Prix article jamais débité — aucun remboursement nécessaire. '
+                    'Retour gratuit (changement d\'avis).'
+                ),
             })
 
         return Response({'detail': 'Action invalide. Utilisez : ready, start_essai, complete, return_essai.'}, status=400)
@@ -750,13 +784,18 @@ class InitiatePaymentView(APIView):
             }, status=status.HTTP_201_CREATED)
 
         # ── Paiement via ChaChap Pay (Orange Money, MTN MoMo, PayCard…) ─────────
+        # Paiement en deux étapes :
+        #   Étape 1 (maintenant) : frais de livraison + frais de service (commitment)
+        #   Étape 2 (au PDR)     : prix de l'article si l'acheteur le garde
+        commitment = order.commitment_amount_gnf  # delivery_fee + buyer_service_fee
         payment = Payment.objects.create(
             order=order, provider=Payment.Provider.CHACHAP,
-            amount_gnf=order.amount_gnf,
+            amount_gnf=commitment,
+            payment_type=Payment.PaymentType.COMMITMENT,
             status=Payment.Status.PENDING,
         )
 
-        result = initiate_chachap(amount=order.amount_gnf, order_id=str(order.id))
+        result = initiate_chachap(amount=commitment, order_id=str(order.id))
         if result.success and result.payment_url:
             payment.external_ref = result.reference
             payment.save(update_fields=['external_ref'])
@@ -991,7 +1030,14 @@ class PaymentWebhookView(APIView):
                     return Response({'status': 'ok'})
                 payment.status = Payment.Status.SUCCESS if success else Payment.Status.FAILED
                 payment.save(update_fields=['status'])
-                if success and payment.order.status == Order.Status.PENDING:
+                if success and payment.payment_type == Payment.PaymentType.ARTICLE:
+                    # Paiement article au PDR confirmé → marquer article payé + compléter la commande
+                    payment.order.article_paid = True
+                    payment.order.save(update_fields=['article_paid', 'updated_at'])
+                    payment.order.complete()
+                    payment.order.set_escrow_schedule()
+                elif success and payment.order.status == Order.Status.PENDING:
+                    # Paiement engagement (commitment) confirmé → confirmer la commande
                     payment.order.confirm()
                     payment.order.set_escrow_schedule()
                     # Récompense parrainage : première commande payée du filleul
@@ -1934,6 +1980,7 @@ class AdminOrderListView(APIView):
         offset = (page - 1) * page_size
         orders = qs[offset: offset + page_size]
 
+        VENDOR_FAULT_REASONS = ('taille_incorrecte', 'couleur_differente', 'article_abime')
         data = [{
             'id':               str(o.id),
             'listing_title':    o.listing.title if o.listing else '—',
@@ -1946,6 +1993,11 @@ class AdminOrderListView(APIView):
             'delivery_mode':    o.delivery_mode,
             'delivery_address': o.delivery_address or '',
             'created_at':       o.created_at.isoformat(),
+            # Champs essai retour (non-None seulement si status=retourne)
+            'essai_return_reason':   o.essai_return_reason or '',
+            'essai_return_photo':    o.essai_return_photo.url if o.essai_return_photo else None,
+            'essai_return_resolved': o.essai_return_resolved,
+            'vendor_fault':          o.essai_return_reason in VENDOR_FAULT_REASONS,
         } for o in orders]
 
         return Response({
@@ -1954,6 +2006,63 @@ class AdminOrderListView(APIView):
             'page_size': page_size,
             'pages':     (total + page_size - 1) // page_size,
             'results':   data,
+        })
+
+
+# ── Admin : résoudre un retour essai ─────────────────────────────────────────
+
+class AdminEssaiReturnResolveView(APIView):
+    """
+    Admin : traiter un retour après essai en point de retrait.
+    POST /orders/admin/orders/<pk>/resolve-return/
+    body: { action: 'deduct_vendor' | 'refund_only' }
+      - deduct_vendor : faute vendeur → déduire 10 000 GNF du vendeur (prix article jamais débité à l'acheteur)
+      - refund_only   : changement d'avis → clôturer sans pénalité vendeur (prix article jamais débité)
+    """
+    permission_classes = [IsAdmin]
+
+    def post(self, request, pk):
+        order = get_object_or_404(Order, pk=pk)
+        if order.status != Order.Status.RETOURNE:
+            return Response({'detail': 'Cette commande n\'est pas en statut retourné.'}, status=400)
+        if order.essai_return_resolved:
+            return Response({'detail': 'Ce retour a déjà été traité.'}, status=400)
+
+        action = request.data.get('action')
+        if action not in ('deduct_vendor', 'refund_only'):
+            return Response({'detail': 'Action invalide. Utilisez : deduct_vendor ou refund_only.'}, status=400)
+
+        order.essai_return_resolved = True
+        order.save(update_fields=['essai_return_resolved', 'updated_at'])
+
+        # Notifier l'acheteur du remboursement
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='✅ Remboursement confirmé',
+                body=f'Votre remboursement pour « {order.listing.title} » a été traité. Les fonds seront retournés sur votre Mobile Money.',
+                data={'order_id': str(order.id)},
+            )
+            # Si faute vendeur : notifier le vendeur de la déduction
+            if action == 'deduct_vendor':
+                Notification.send(
+                    user=order.seller,
+                    type=Notification.Type.ORDER_UPDATE,
+                    title='💸 Déduction retour — 10 000 GNF',
+                    body=f'Article retourné (motif : {order.get_essai_return_reason_display() or order.essai_return_reason}). 10 000 GNF seront déduits de votre prochain versement.',
+                    data={'order_id': str(order.id)},
+                )
+        except Exception:
+            pass
+
+        return Response({
+            'status':   'resolved',
+            'action':   action,
+            # Prix article jamais débité → aucun remboursement à effectuer
+            'message':  '10 000 GNF déduits du prochain paiement vendeur. Prix article jamais débité à l\'acheteur.' if action == 'deduct_vendor'
+                        else 'Clôturé sans pénalité vendeur. Prix article jamais débité à l\'acheteur.',
         })
 
 

@@ -208,4 +208,9 @@ export const notificationsAPI = {
   markRead:(id) => api.post(`/notifications/${id}/read/`),
 }
 
+export const documentsAPI = {
+  list:   ()     => api.get('/core/documents/'),
+  detail: (slug) => api.get(`/core/documents/${slug}/`),
+}
+
 export default api
