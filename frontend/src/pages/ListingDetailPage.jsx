@@ -639,21 +639,27 @@ function OrderModal({ listing, onClose, onSuccess }) {
                             />
                         </div>
 
-                        {/* Récapitulatif paiement en deux étapes */}
-                        <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
-                            <div className="flex justify-between text-gray-700">
-                                <span>✅ Vous payez maintenant</span>
-                                <span className="font-bold text-green-700">{new Intl.NumberFormat('fr-GN').format(commitmentAmount)} GNF</span>
+                        {/* Récapitulatif paiement — total en avant */}
+                        <div className="rounded-xl overflow-hidden border border-green-200">
+                            {/* Total proéminent */}
+                            <div className="bg-green-600 text-white px-4 py-3 flex items-center justify-between">
+                                <span className="text-sm font-semibold">💰 Total à payer</span>
+                                <span className="text-xl font-black">{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
                             </div>
-                            <div className="flex justify-between text-gray-500">
-                                <span>📦 À payer au retrait si vous gardez l'article</span>
-                                <span className="font-semibold">{new Intl.NumberFormat('fr-GN').format(articlePrice)} GNF</span>
+                            {/* Détail des 2 étapes */}
+                            <div className="bg-white divide-y divide-gray-100">
+                                <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                                    <span className="text-gray-600">🔐 Maintenant <span className="text-xs text-gray-400">(réservation)</span></span>
+                                    <span className="font-bold text-green-700">{new Intl.NumberFormat('fr-GN').format(commitmentAmount)} GNF</span>
+                                </div>
+                                <div className="flex justify-between items-center px-4 py-2.5 text-sm">
+                                    <span className="text-gray-600">📦 Au retrait <span className="text-xs text-gray-400">(prix article)</span></span>
+                                    <span className="font-semibold text-gray-800">{new Intl.NumberFormat('fr-GN').format(articlePrice)} GNF</span>
+                                </div>
                             </div>
-                            <div className="border-t pt-2 flex justify-between font-black text-gray-900">
-                                <span>Total estimé</span>
-                                <span>{new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
+                            <div className="bg-gray-50 px-4 py-2 text-xs text-gray-400">
+                                ✅ Remboursé si l'article ne correspond pas · 8 % de commission prélevés automatiquement au vendeur
                             </div>
-                            <p className="text-xs text-gray-400">Paiement sécurisé · Prix article prélevé uniquement si gardé</p>
                         </div>
 
                         {/* Mode de paiement — Mobile Money uniquement */}
@@ -668,10 +674,14 @@ function OrderModal({ listing, onClose, onSuccess }) {
                         </div>
 
                         <button type="submit" disabled={createOrder.isPending || pay.isPending}
-                            className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50">
+                            className="w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-md shadow-green-500/20 disabled:opacity-50 flex flex-col items-center gap-0.5">
                             {(createOrder.isPending || pay.isPending)
-                                ? 'Traitement en cours…'
-                                : `Réserver — Payer ${new Intl.NumberFormat('fr-GN').format(commitmentAmount)} GNF maintenant`}
+                                ? <span>Traitement en cours…</span>
+                                : <>
+                                    <span>🔐 Réserver et payer {new Intl.NumberFormat('fr-GN').format(commitmentAmount)} GNF</span>
+                                    <span className="text-xs font-normal opacity-80">Total article : {new Intl.NumberFormat('fr-GN').format(totalAmount)} GNF</span>
+                                  </>
+                            }
                         </button>
                     </form>
                 </div>

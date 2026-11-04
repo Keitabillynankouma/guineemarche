@@ -818,10 +818,11 @@ class ListingShareView(APIView):
         from django.conf import settings as _s
         import html as _html
 
+        # Autoriser ACTIVE et DRAFT (modération en cours) — les bots FB scrapent avant la mise en ligne
         listing = get_object_or_404(
             Listing.objects.select_related('seller', 'category').prefetch_related('media'),
             id=listing_id,
-            status=Listing.Status.ACTIVE,
+            status__in=[Listing.Status.ACTIVE, Listing.Status.DRAFT],
         )
 
         # ── Données ──────────────────────────────────────────────────────────
