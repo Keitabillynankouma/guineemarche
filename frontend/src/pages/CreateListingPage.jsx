@@ -121,27 +121,7 @@ export default function CreateListingPage() {
         queryFn: () => authAPI.getSubscription().then(r => r.data),
     })
 
-    // ── Limite atteinte ────────────────────────────────────────────────────────
-    if (sub && !sub.can_post) {
-        return (
-            <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-                <div className="bg-white rounded-2xl shadow-lg p-8 max-w-sm w-full text-center space-y-5">
-                    <div className="w-16 h-16 bg-gray-100 rounded-2xl flex items-center justify-center text-4xl mx-auto">🔒</div>
-                    <div>
-                        <h2 className="text-xl font-black text-gray-900 mb-1">Limite atteinte</h2>
-                        <p className="text-gray-500 text-sm leading-relaxed">
-                            Vous avez utilisé vos {sub.max_free_listings ?? 5} annonces gratuites. Passez au plan Pro pour publier des annonces illimitées.
-                        </p>
-                    </div>
-                    <Link to="/upgrade"
-                        className="block w-full bg-gradient-to-r from-green-600 to-emerald-500 hover:from-green-700 hover:to-emerald-600 text-white font-bold py-3.5 rounded-xl transition shadow-lg shadow-green-500/20">
-                        💎 Passer au plan Pro
-                    </Link>
-                    <Link to="/" className="block text-sm text-gray-400 hover:text-gray-600">← Retour à l'accueil</Link>
-                </div>
-            </div>
-        )
-    }
+    // Les annonces sont illimitées sur Guimatrix — aucun blocage quota
 
     const handleFiles = async (e) => {
         const selected = Array.from(e.target.files)

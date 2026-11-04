@@ -301,7 +301,19 @@ class Order(BaseModel):
         from core.site_settings import SiteSettings
         # Commission calculée uniquement sur le prix de l'article
         # (delivery_fee_gnf va au livreur, buyer_service_fee_gnf reste à Guimatrix)
-        commission_pct         = SiteSettings.flag('commission_pct', default=self.COMMISSION_PCT)
+        base_pct  = SiteSettings.flag('commission_pct', default=self.COMMISSION_PCT)
+
+        # Taux réduit pour les vendeurs Pro : 6 % au lieu de 8 %
+        PRO_COMMISSION_PCT = 6
+        try:
+            seller_sub = getattr(self.listing.seller, 'subscription', None)
+            if seller_sub and seller_sub.is_pro:
+                commission_pct = PRO_COMMISSION_PCT
+            else:
+                commission_pct = base_pct
+        except Exception:
+            commission_pct = base_pct
+
         item_amount            = self.article_amount_gnf or (self.amount_gnf - (self.delivery_fee_gnf or 0) - (self.buyer_service_fee_gnf or 0))
         self.commission_gnf    = int(item_amount * commission_pct / 100)
         # Le vendeur reçoit : prix article - commission

@@ -281,8 +281,8 @@ class Subscription(BaseModel):
     """Abonnement utilisateur. Gratuit = 5 annonces max, Pro = illimité."""
 
     class Plan(models.TextChoices):
-        FREE  = 'free',  'Gratuit (5 annonces)'
-        PRO   = 'pro',   'Pro — illimité'
+        FREE  = 'free',  'Gratuit (annonces illimitées)'
+        PRO   = 'pro',   'Pro — commission réduite + boost prioritaire'
 
     user            = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
     plan            = models.CharField(max_length=10, choices=Plan.choices, default=Plan.FREE)
@@ -290,7 +290,7 @@ class Subscription(BaseModel):
     valid_until     = models.DateTimeField(null=True, blank=True)
     referral_bonus  = models.PositiveIntegerField(default=0, help_text='Slots gratuits supplémentaires gagnés par parrainage')
 
-    FREE_LIMIT = 5
+    FREE_LIMIT = 0  # Plus de quota — toutes les annonces sont illimitées sur Guimatrix
 
     class Meta:
         verbose_name = 'Abonnement'
@@ -311,7 +311,8 @@ class Subscription(BaseModel):
 
     @property
     def can_post(self):
-        return self.is_pro or self.listings_used < self.effective_limit
+        # Guimatrix est un marketplace à commission — les annonces sont illimitées pour tous.
+        return True
 
     @property
     def remaining_free(self):

@@ -24,9 +24,9 @@ class SiteSettings(models.Model):
         help_text="Nombre d'annonces autorisées sur le plan gratuit (si abonnements actifs).",
     )
     commission_pct = models.PositiveSmallIntegerField(
-        default=4,
-        verbose_name="Commission escrow (%)",
-        help_text="Pourcentage prélevé sur les transactions Mobile Money en escrow.",
+        default=8,
+        verbose_name="Commission plateforme (%)",
+        help_text="Pourcentage prélevé sur le prix article du vendeur à chaque vente (défaut : 8 %).",
     )
 
     # ── Fonctionnalités ───────────────────────────────────────────────────────

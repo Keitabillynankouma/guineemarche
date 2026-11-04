@@ -96,15 +96,15 @@ function ProSection() {
             {/* Carte plan */}
             <div className="bg-gradient-to-br from-green-600 to-green-800 rounded-2xl p-6 text-white">
                 <p className="text-2xl font-bold mb-1">💎 Pro Vendeur</p>
-                <p className="text-green-100 text-sm mb-4">Pour les vendeurs actifs — annonces illimitées</p>
+                <p className="text-green-100 text-sm mb-4">Pour les vendeurs qui veulent vendre plus vite</p>
                 <div className="grid grid-cols-2 gap-2 text-sm">
                     {[
-                        '✅ Annonces illimitées',
-                        '✅ Badge Pro visible',
-                        '✅ Priorité dans la recherche',
-                        '✅ Statistiques d\'annonces',
-                        '✅ Support prioritaire',
-                        '✅ Accès anticipé aux nouvelles fonctions',
+                        '✅ Annonces illimitées (gratuit aussi)',
+                        '✅ Commission réduite à 6 %',
+                        '✅ Badge Pro visible sur vos annonces',
+                        '✅ Priorité dans les résultats de recherche',
+                        '✅ Statistiques avancées par annonce',
+                        '✅ Support prioritaire Guimatrix',
                     ].map(f => <div key={f}>{f}</div>)}
                 </div>
             </div>
@@ -358,7 +358,7 @@ export default function UpgradePage() {
                 {/* Commission info */}
                 <div className="bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 text-xs text-blue-700 flex items-start gap-2">
                     <span>🔒</span>
-                    <span><strong>Commission plateforme : 4 %</strong> — prélevée uniquement sur les transactions Mobile Money sécurisées par l'escrow. Aucun frais sur les paiements en espèces.</span>
+                    <span><strong>Commission plateforme : 8 %</strong> — prélevée sur le prix article du vendeur à chaque vente. Les annonces sont <strong>gratuites et illimitées</strong> pour tous les vendeurs.</span>
                 </div>
 
                 {activeTab === 'pro'    && <ProSection />}
