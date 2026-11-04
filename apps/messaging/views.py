@@ -74,14 +74,15 @@ class MessageListView(generics.ListAPIView):
     serializer_class   = MessageSerializer
 
     def get_queryset(self):
+        from django.db.models import Q
         conversation_id = self.kwargs['conversation_id']
         user = self.request.user
+        # get_object_or_404 avec filtre participant → 404 si non-participant (pas d'IDOR)
         conversation = get_object_or_404(
             Conversation,
-            id=conversation_id
+            Q(buyer=user) | Q(seller=user),
+            id=conversation_id,
         )
-        if user not in [conversation.buyer, conversation.seller]:
-            return Message.objects.none()
 
         # Marquer les messages comme lus
         conversation.messages.filter(

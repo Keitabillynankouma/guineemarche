@@ -4,7 +4,8 @@ from django.conf import settings
 
 logger = logging.getLogger(__name__)
 
-CHACHAP_API_URL = 'https://chapchappay.com'
+from django.conf import settings as _settings
+CHACHAP_API_URL = getattr(_settings, 'CHACHAP_API_URL', 'https://chapchappay.com')
 
 
 def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
@@ -24,10 +25,12 @@ def initiate_chachap(amount: int, order_id: str) -> 'PaymentResult':
 
     logger.info("[CHACHAP] Clé API présente: %s, longueur: %d", bool(api_key), len(api_key))
 
-    # Sans clé → simulation avec URL de redirection factice
+    # Sans clé → erreur en production, simulation en mode debug uniquement
     if not api_key:
-        # En simulation, on utilise order_id comme référence pour que le webhook
-        # puisse retrouver le paiement via Payment.objects.filter(order__id=ref)
+        if not getattr(settings, 'DEBUG', True):
+            logger.error("[CHACHAP] CHACHAP_API_KEY absente en production — paiement refusé")
+            return PaymentResult(success=False, message="Service de paiement temporairement indisponible. Réessayez dans quelques instants.")
+        # Mode debug : simulation locale pour les tests
         sim_ref = str(order_id)
         logger.info("[CHACHAP] Clé API absente — simulation (ref=order_id=%s)", sim_ref)
         return PaymentResult(

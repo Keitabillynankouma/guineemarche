@@ -747,10 +747,14 @@ class InitiatePaymentView(APIView):
         # ── Paiement en espèces ──────────────────────────────────────────────────
         CASH_PROVIDERS = {'cash', 'especes', 'espèces'}
         if provider in CASH_PROVIDERS:
+            # Paiement en deux étapes : à la commande on ne débite que le commitment
+            # (frais livraison + frais service). Le prix article est collecté en espèces
+            # par le gestionnaire PDR au moment de la remise physique.
             payment = Payment.objects.create(
                 order=order,
                 provider=Payment.Provider.CASH,
-                amount_gnf=order.amount_gnf,
+                amount_gnf=order.commitment_amount_gnf,
+                payment_type=Payment.PaymentType.COMMITMENT,
                 status=Payment.Status.PENDING,
             )
             order.confirm()
