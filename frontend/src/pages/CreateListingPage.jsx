@@ -80,7 +80,8 @@ const labelClass = "block text-xs font-semibold text-gray-500 uppercase tracking
 export default function CreateListingPage() {
     const [form, setForm] = useState({
         title: '', description: '', price_gnf: '',
-        price_type: 'fixed', condition: 'new',
+        price_type: 'fixed',  // toujours fixe — Guimatrix n'accepte pas les prix négociables
+        condition: 'new',
         city: 'Conakry', quartier: '', category: '',
         weight_kg: '',
         pickup_address: '',
@@ -344,29 +345,52 @@ export default function CreateListingPage() {
 
                     {/* ── Section 2 : Prix ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="2" icon="💰" title="Prix" subtitle="Fixez votre prix de vente" />
+                        <SectionHeader number="2" icon="💰" title="Prix de vente" subtitle="Indiquez le prix fixe de votre article" />
 
-                        <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-4">
                             <div>
-                                <label className={labelClass}>Prix (GNF)</label>
-                                <input
-                                    type="number" placeholder="0"
-                                    value={form.price_gnf}
-                                    onChange={e => setForm({ ...form, price_gnf: e.target.value })}
-                                    className={inputClass}
-                                />
+                                <label className={labelClass}>Prix en Francs Guinéens (GNF) <span className="text-red-500">*</span></label>
+                                <div className="relative">
+                                    <input
+                                        type="number" placeholder="Ex : 500 000"
+                                        min="1000"
+                                        value={form.price_gnf}
+                                        onChange={e => setForm({ ...form, price_gnf: e.target.value })}
+                                        className={inputClass + ' pr-16'}
+                                        required
+                                    />
+                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">GNF</span>
+                                </div>
+                                <p className="text-xs text-gray-400 mt-1">Minimum : 1 000 GNF. Tous les prix sur Guimatrix sont fixes.</p>
                             </div>
-                            <div>
-                                <label className={labelClass}>Type de prix</label>
-                                <select
-                                    value={form.price_type}
-                                    onChange={e => setForm({ ...form, price_type: e.target.value })}
-                                    className={inputClass}
-                                >
-                                    <option value="fixed">Prix fixe</option>
-                                    <option value="negotiable">À débattre</option>
-                                    <option value="free">Gratuit</option>
-                                </select>
+
+                            {/* Encart commission */}
+                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2">
+                                <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">💡 Comment Guimatrix fonctionne</p>
+                                <div className="space-y-1.5 text-xs text-amber-700">
+                                    <div className="flex items-start gap-2">
+                                        <span>🔐</span>
+                                        <span><strong>Réservation</strong> — l'acheteur paie <strong>10 000 GNF</strong> pour réserver votre article (frais de service Guimatrix, non remboursables si l'acheteur abandonne).</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <span>📦</span>
+                                        <span><strong>Paiement du prix</strong> — l'acheteur règle votre prix à la remise physique de l'article au point de retrait.</span>
+                                    </div>
+                                    <div className="flex items-start gap-2">
+                                        <span>💸</span>
+                                        <span><strong>Votre revenu</strong> — vous recevez votre prix moins <strong>8 % de commission Guimatrix</strong>.</span>
+                                    </div>
+                                </div>
+                                {form.price_gnf && Number(form.price_gnf) >= 1000 && (
+                                    <div className="mt-3 pt-3 border-t border-amber-200">
+                                        <p className="text-xs text-amber-800">
+                                            💰 Pour un prix de <strong>{Number(form.price_gnf).toLocaleString('fr-FR')} GNF</strong>,
+                                            vous recevrez :{' '}
+                                            <strong>{Math.round(Number(form.price_gnf) * 0.92).toLocaleString('fr-FR')} GNF</strong>
+                                            <span className="text-amber-600"> (commission : {Math.round(Number(form.price_gnf) * 0.08).toLocaleString('fr-FR')} GNF)</span>
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
                     </div>

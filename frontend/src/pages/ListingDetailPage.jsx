@@ -627,25 +627,6 @@ function OrderModal({ listing, onClose, onSuccess }) {
 
                     <form onSubmit={handleOrder} className="space-y-5">
 
-                        {/* Prix négocié */}
-                        {listing.price_type === 'negotiable' && (
-                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
-                                <label className="block text-xs font-bold text-amber-700 uppercase tracking-wide mb-2">
-                                    🤝 Prix négocié (GNF)
-                                </label>
-                                <p className="text-xs text-amber-600 mb-2">
-                                    Prix affiché : <strong>{new Intl.NumberFormat('fr-GN').format(listing.price_gnf)} GNF</strong> — entrez le prix convenu avec le vendeur.
-                                </p>
-                                <input
-                                    type="number" min="1" step="1000"
-                                    value={negotiatedPrice}
-                                    onChange={e => setNegotiatedPrice(e.target.value)}
-                                    className="w-full border border-amber-300 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-amber-400 bg-white font-semibold"
-                                    placeholder="Ex: 250000"
-                                />
-                            </div>
-                        )}
-
                         {/* Point de retrait — sélecteur Wildberries */}
                         <div>
                             <label className="block text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
@@ -820,11 +801,62 @@ export default function ListingDetailPage() {
         catch {} finally { setSending(false) }
     }
 
+    // URL de partage social — sert les balises Open Graph aux bots (Facebook, WhatsApp…)
+    // puis redirige les vrais utilisateurs vers la page annonce React.
+    const shareUrl = `${import.meta.env.VITE_API_URL || 'https://api.guimatrix.com'}/share/listing/${listing?.id}/`
+    const [copied, setCopied] = useState(false)
+    const [showShareMenu, setShowShareMenu] = useState(false)
+
     const shareOnWhatsApp = () => {
         if (!listing) return
-        const url  = encodeURIComponent(window.location.href)
-        const text = encodeURIComponent(`🛒 *${listing.title}* — ${formatPrice(listing.price_gnf, listing.price_type)}\n📍 ${listing.city}\nVoir sur Guimatrix :`)
-        window.open(`https://wa.me/?text=${text}%20${url}`, '_blank')
+        const text = encodeURIComponent(
+            `🛒 *${listing.title}* — ${formatPrice(listing.price_gnf, listing.price_type)}\n📍 ${listing.city}\nVoir sur Guimatrix :`
+        )
+        window.open(`https://wa.me/?text=${text}%20${encodeURIComponent(shareUrl)}`, '_blank')
+    }
+
+    const shareOnFacebook = () => {
+        window.open(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`, '_blank', 'width=600,height=400')
+    }
+
+    const shareOnTwitter = () => {
+        const text = encodeURIComponent(`${listing.title} — ${formatPrice(listing.price_gnf, listing.price_type)} 📍 ${listing.city}`)
+        window.open(`https://twitter.com/intent/tweet?text=${text}&url=${encodeURIComponent(shareUrl)}&via=Guimatrix_GN`, '_blank', 'width=600,height=400')
+    }
+
+    const shareOnTelegram = () => {
+        const text = encodeURIComponent(`${listing.title} — ${formatPrice(listing.price_gnf, listing.price_type)} 📍 ${listing.city}`)
+        window.open(`https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${text}`, '_blank')
+    }
+
+    const copyShareLink = async () => {
+        try {
+            await navigator.clipboard.writeText(shareUrl)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        } catch {
+            // Fallback pour navigateurs sans clipboard API
+            const el = document.createElement('textarea')
+            el.value = shareUrl
+            document.body.appendChild(el)
+            el.select()
+            document.execCommand('copy')
+            document.body.removeChild(el)
+            setCopied(true)
+            setTimeout(() => setCopied(false), 2000)
+        }
+    }
+
+    const shareNative = () => {
+        if (navigator.share) {
+            navigator.share({
+                title: listing.title,
+                text: `${listing.title} — ${formatPrice(listing.price_gnf, listing.price_type)} 📍 ${listing.city}`,
+                url: shareUrl,
+            }).catch(() => {})
+        } else {
+            setShowShareMenu(m => !m)
+        }
     }
 
     // ── Early returns APRÈS tous les hooks ────────────────────────────────────
@@ -880,11 +912,45 @@ export default function ListingDetailPage() {
                                 {favorited ? '❤️' : '🤍'}
                             </button>
                         )}
-                        <button onClick={shareOnWhatsApp}
-                            className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">
-                            <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
-                            Partager
-                        </button>
+                        {/* ── Bouton partager (natif mobile / menu desktop) ── */}
+                        <div className="relative">
+                            <button onClick={shareNative}
+                                className="flex items-center gap-1.5 bg-green-500 hover:bg-green-600 text-white text-sm font-medium px-3 py-1.5 rounded-lg transition">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current" xmlns="http://www.w3.org/2000/svg">
+                                    <path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92 1.61 0 2.92-1.31 2.92-2.92s-1.31-2.92-2.92-2.92z"/>
+                                </svg>
+                                Partager
+                            </button>
+
+                            {/* Menu déroulant (si Web Share API indisponible) */}
+                            {showShareMenu && (
+                                <div className="absolute right-0 top-full mt-1 bg-white border border-gray-100 rounded-xl shadow-xl z-50 w-52 overflow-hidden"
+                                    onMouseLeave={() => setShowShareMenu(false)}>
+                                    <button onClick={() => { shareOnWhatsApp(); setShowShareMenu(false) }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-green-50 transition">
+                                        <span className="text-lg">💬</span> WhatsApp
+                                    </button>
+                                    <button onClick={() => { shareOnFacebook(); setShowShareMenu(false) }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-blue-50 transition">
+                                        <span className="text-lg">📘</span> Facebook
+                                    </button>
+                                    <button onClick={() => { shareOnTwitter(); setShowShareMenu(false) }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition">
+                                        <span className="text-lg">🐦</span> Twitter / X
+                                    </button>
+                                    <button onClick={() => { shareOnTelegram(); setShowShareMenu(false) }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-sky-50 transition">
+                                        <span className="text-lg">✈️</span> Telegram
+                                    </button>
+                                    <div className="border-t border-gray-100" />
+                                    <button onClick={() => { copyShareLink(); setShowShareMenu(false) }}
+                                        className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition">
+                                        <span className="text-lg">{copied ? '✅' : '🔗'}</span>
+                                        {copied ? 'Lien copié !' : 'Copier le lien'}
+                                    </button>
+                                </div>
+                            )}
+                        </div>
                         <button onClick={() => setShowQR(true)}
                             className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium px-3 py-1.5 rounded-lg transition"
                             title="QR Code de cette annonce">
@@ -989,10 +1055,23 @@ export default function ListingDetailPage() {
                         </div>
                         <p className="text-3xl font-extrabold price-tag mb-1">
                             {formatPrice(listing.price_gnf, listing.price_type)}
-                            {listing.price_type === 'negotiable' && (
-                                <span className="text-sm font-normal text-gray-400 ml-2">· Prix négociable</span>
-                            )}
                         </p>
+                        {/* Encart protection acheteur — 2 étapes de paiement */}
+                        <div className="bg-green-50 border border-green-100 rounded-xl p-3 mb-3 space-y-1.5 text-xs text-green-800">
+                            <p className="font-bold text-green-700">🛡️ Comment vous payez</p>
+                            <div className="flex items-start gap-2">
+                                <span>🔐</span>
+                                <span><strong>Maintenant :</strong> 10 000 GNF (frais de service Guimatrix pour réserver l'article)</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span>📦</span>
+                                <span><strong>Au retrait :</strong> {new Intl.NumberFormat('fr-GN').format(listing.price_gnf)} GNF (prix de l'article)</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                                <span>✅</span>
+                                <span><strong>Protection acheteur :</strong> remboursé si l'article ne correspond pas à l'annonce</span>
+                            </div>
+                        </div>
                         <div className="flex flex-wrap gap-3 text-sm text-gray-400 mb-4">
                             <span>📍 {listing.city}{listing.quartier && ` · ${listing.quartier}`}</span>
                             <span>👁 {listing.view_count} vue{listing.view_count !== 1 ? 's' : ''}</span>
@@ -1131,6 +1210,37 @@ export default function ListingDetailPage() {
                             )}
                         </div>
                     )}
+
+                    {/* ── Partager cette annonce ── */}
+                    <div className="bg-white rounded-2xl shadow-card p-5">
+                        <h2 className="font-semibold text-gray-800 mb-3 text-sm">📣 Partager cette annonce</h2>
+                        <div className="grid grid-cols-2 gap-2">
+                            <button onClick={shareOnWhatsApp}
+                                className="flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#1ebe5d] text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current flex-shrink-0"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+                                WhatsApp
+                            </button>
+                            <button onClick={shareOnFacebook}
+                                className="flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#1565d8] text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current flex-shrink-0"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                                Facebook
+                            </button>
+                            <button onClick={shareOnTwitter}
+                                className="flex items-center justify-center gap-2 bg-black hover:bg-gray-800 text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current flex-shrink-0"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.746l7.73-8.835L1.254 2.25H8.08l4.253 5.622zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+                                Twitter / X
+                            </button>
+                            <button onClick={shareOnTelegram}
+                                className="flex items-center justify-center gap-2 bg-[#2AABEE] hover:bg-[#1a98d8] text-white text-xs font-semibold px-3 py-2.5 rounded-xl transition">
+                                <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current flex-shrink-0"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+                                Telegram
+                            </button>
+                        </div>
+                        <button onClick={copyShareLink}
+                            className={`mt-2 w-full flex items-center justify-center gap-2 border text-xs font-semibold px-3 py-2.5 rounded-xl transition ${copied ? 'border-green-400 bg-green-50 text-green-700' : 'border-gray-200 hover:border-gray-300 text-gray-600 hover:bg-gray-50'}`}>
+                            {copied ? '✅ Lien copié !' : '🔗 Copier le lien de partage'}
+                        </button>
+                    </div>
 
                     {/* Infos supplémentaires */}
                     <div className="bg-white rounded-2xl shadow p-5 space-y-2 text-sm text-gray-500">
