@@ -20,6 +20,7 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.http import JsonResponse
+from apps.listings.views import ListingShareView
 
 def bad_request(request, exception):
     return JsonResponse({'error': 'Bad request'}, status=400)
@@ -43,6 +44,9 @@ _ADMIN_URL = os.environ.get('DJANGO_ADMIN_URL', 'gm-backoffice-9f3a2e/')
 urlpatterns = [
     path(_ADMIN_URL, admin.site.urls),
     path('api/v1/', include('config.api_urls')),
+    # Page de partage social — accessible aux bots Facebook/WhatsApp/Twitter
+    # URL : https://api.guimatrix.com/share/listing/<uuid>/
+    path('share/listing/<uuid:listing_id>/', ListingShareView.as_view(), name='listing-share'),
 ]
 
 if settings.DEBUG:

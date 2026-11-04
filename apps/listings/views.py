@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from django_filters.rest_framework import DjangoFilterBackend
 from django.shortcuts import get_object_or_404
+from django.http import HttpResponse
 
 from django.utils import timezone
 from django.db import models
@@ -793,3 +794,232 @@ class AdminCategoryDetailView(generics.RetrieveUpdateDestroyAPIView):
         instance.is_active = False
         instance.save(update_fields=['is_active'])
         return Response({'status': 'deactivated'}, status=status.HTTP_200_OK)
+
+
+# ── Page de partage social (Open Graph) ───────────────────────────────────────
+
+class ListingShareView(APIView):
+    """
+    GET /share/listing/<uuid:listing_id>/
+
+    Page HTML minimale pour le partage sur les réseaux sociaux (Facebook, WhatsApp,
+    Twitter/X, LinkedIn, Telegram…).
+
+    Les crawlers (bots) lisent les balises Open Graph et Twitter Card dans le <head>.
+    Les vrais utilisateurs sont redirigés en JavaScript vers l'app React
+    (https://guimatrix.com/listing/<id>).
+
+    Cette vue n'est PAS sous /api/v1/ — elle est enregistrée directement
+    dans config/urls.py pour être accessible à la racine du domaine.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request, listing_id):
+        from django.conf import settings as _s
+        import html as _html
+
+        listing = get_object_or_404(
+            Listing.objects.select_related('seller', 'category').prefetch_related('media'),
+            id=listing_id,
+            status=Listing.Status.ACTIVE,
+        )
+
+        # ── Données ──────────────────────────────────────────────────────────
+        frontend_url = getattr(_s, 'FRONTEND_URL', 'https://guimatrix.com')
+        api_url      = getattr(_s, 'API_BASE_URL',  'https://api.guimatrix.com')
+
+        listing_url  = f"{frontend_url}/listing/{listing.id}"
+        share_url    = f"{api_url}/share/listing/{listing.id}/"
+
+        title = _html.escape(listing.title)
+
+        price_str = (
+            'Gratuit' if listing.price_type == 'free'
+            else f"{listing.price_gnf:,} GNF".replace(',', ' ')
+        )
+        if listing.price_type == 'negotiable':
+            price_str += ' (à débattre)'
+
+        # Description courte pour OG (160 chars max)
+        raw_desc = listing.description or ''
+        desc_short = _html.escape(
+            (raw_desc[:155] + '…') if len(raw_desc) > 157 else raw_desc
+        )
+        og_description = f"{price_str} · {listing.city} · {desc_short}"
+
+        # Image principale
+        first_media = listing.media.first()
+        og_image = (
+            first_media.file.url
+            if first_media and hasattr(first_media.file, 'url')
+            else f"{frontend_url}/og-default.png"
+        )
+        # Cloudinary : forcer HTTPS et transformer en 1200×630 (ratio Facebook)
+        if 'cloudinary.com' in og_image and og_image.startswith('http://'):
+            og_image = og_image.replace('http://', 'https://', 1)
+        if 'cloudinary.com' in og_image:
+            # Insérer transformation si absente
+            if '/upload/' in og_image and 'w_1200' not in og_image:
+                og_image = og_image.replace('/upload/', '/upload/w_1200,h_630,c_fill,f_auto,q_auto/', 1)
+
+        condition_labels = {
+            'new':      'Neuf',
+            'like_new': 'Comme neuf',
+            'good':     'Bon état',
+            'fair':     'État correct',
+            'poor':     'Très usé',
+        }
+        condition = condition_labels.get(listing.condition, listing.condition)
+        category  = listing.category.name if listing.category else ''
+        seller    = _html.escape(listing.seller.full_name or '')
+
+        # WhatsApp message pré-rempli
+        import urllib.parse
+        wa_text = urllib.parse.quote(
+            f"🛍️ {listing.title}\n"
+            f"💰 {price_str}\n"
+            f"📍 {listing.city}\n"
+            f"👉 {share_url}"
+        )
+
+        # ── HTML ─────────────────────────────────────────────────────────────
+        html = f"""<!DOCTYPE html>
+<html lang="fr" prefix="og: https://ogp.me/ns#">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{title} — {price_str} | Guimatrix</title>
+
+  <!-- ── SEO basique ───────────────────────────────────────── -->
+  <meta name="description" content="{og_description}">
+  <meta name="robots" content="index, follow">
+  <link rel="canonical" href="{share_url}">
+
+  <!-- ── Open Graph (Facebook, WhatsApp, LinkedIn, Telegram) ── -->
+  <meta property="og:type"        content="product">
+  <meta property="og:site_name"   content="Guimatrix">
+  <meta property="og:url"         content="{share_url}">
+  <meta property="og:title"       content="{title} — {price_str}">
+  <meta property="og:description" content="{og_description}">
+  <meta property="og:image"       content="{og_image}">
+  <meta property="og:image:width"  content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt"    content="{title}">
+  <meta property="og:locale"       content="fr_GN">
+
+  <!-- Open Graph product (Facebook Catalog) -->
+  <meta property="product:price:amount"   content="{listing.price_gnf}">
+  <meta property="product:price:currency" content="GNF">
+  <meta property="product:condition"      content="{condition}">
+  <meta property="product:availability"   content="in stock">
+
+  <!-- ── Twitter Card ──────────────────────────────────────── -->
+  <meta name="twitter:card"        content="summary_large_image">
+  <meta name="twitter:site"        content="@Guimatrix_GN">
+  <meta name="twitter:title"       content="{title} — {price_str}">
+  <meta name="twitter:description" content="{og_description}">
+  <meta name="twitter:image"       content="{og_image}">
+  <meta name="twitter:image:alt"   content="{title}">
+
+  <!-- ── Schema.org Product (Google, Pinterest) ────────────── -->
+  <script type="application/ld+json">
+  {{
+    "@context": "https://schema.org",
+    "@type": "Product",
+    "name": "{title}",
+    "description": "{desc_short}",
+    "image": "{og_image}",
+    "url": "{share_url}",
+    "category": "{category}",
+    "itemCondition": "https://schema.org/{'NewCondition' if listing.condition == 'new' else 'UsedCondition'}",
+    "offers": {{
+      "@type": "Offer",
+      "priceCurrency": "GNF",
+      "price": "{listing.price_gnf}",
+      "availability": "https://schema.org/InStock",
+      "seller": {{
+        "@type": "Person",
+        "name": "{seller}"
+      }}
+    }}
+  }}
+  </script>
+
+  <style>
+    * {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f9fafb; color: #1f2937;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; padding: 1rem;
+    }}
+    .card {{
+      background: white; border-radius: 16px; box-shadow: 0 4px 24px rgba(0,0,0,.1);
+      max-width: 440px; width: 100%; overflow: hidden;
+    }}
+    .img-wrap {{ position: relative; height: 220px; background: #e5e7eb; overflow: hidden; }}
+    .img-wrap img {{ width: 100%; height: 100%; object-fit: cover; }}
+    .badge {{
+      position: absolute; top: 10px; left: 10px;
+      background: #16a34a; color: white;
+      font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 999px;
+    }}
+    .body {{ padding: 1.25rem; }}
+    h1 {{ font-size: 1.1rem; font-weight: 700; line-height: 1.4; margin-bottom: .5rem; }}
+    .price {{ font-size: 1.4rem; font-weight: 800; color: #16a34a; margin-bottom: .5rem; }}
+    .meta {{ font-size: .82rem; color: #6b7280; margin-bottom: 1rem; display: flex; gap: .75rem; flex-wrap: wrap; }}
+    .cta {{
+      display: block; text-align: center;
+      background: #16a34a; color: white;
+      padding: .75rem; border-radius: 10px;
+      font-weight: 700; font-size: .95rem;
+      text-decoration: none; margin-bottom: .75rem;
+    }}
+    .cta:hover {{ background: #15803d; }}
+    .wa {{
+      display: flex; align-items: center; justify-content: center; gap: .5rem;
+      background: #25D366; color: white;
+      padding: .65rem; border-radius: 10px;
+      font-weight: 600; font-size: .9rem;
+      text-decoration: none;
+    }}
+    .footer {{ font-size: .72rem; text-align: center; color: #9ca3af; margin-top: .75rem; }}
+    .spinner {{
+      text-align: center; padding: 2rem;
+      font-size: .9rem; color: #6b7280;
+    }}
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="img-wrap">
+      <img src="{og_image}" alt="{title}" onerror="this.style.display='none'">
+      <span class="badge">Guimatrix</span>
+    </div>
+    <div class="body">
+      <h1>{title}</h1>
+      <div class="price">{price_str}</div>
+      <div class="meta">
+        <span>📍 {listing.city}</span>
+        {"<span>🏷️ " + category + "</span>" if category else ""}
+        {"<span>✨ " + condition + "</span>" if condition else ""}
+      </div>
+      <a href="{listing_url}" class="cta">Voir l'annonce complète →</a>
+      <a href="https://wa.me/?text={wa_text}" class="wa" target="_blank" rel="noopener">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
+        Partager sur WhatsApp
+      </a>
+      <div class="footer">Guimatrix — Le marché intelligent de la Guinée 🇬🇳</div>
+    </div>
+  </div>
+
+  <!-- Redirection automatique vers l'app React pour les vrais utilisateurs -->
+  <script>
+    // Les crawlers n'exécutent pas JavaScript — ils lisent les meta tags ci-dessus.
+    // Les vrais utilisateurs sont redirigés immédiatement vers l'app React.
+    window.location.replace("{listing_url}");
+  </script>
+</body>
+</html>"""
+
+        return HttpResponse(html, content_type='text/html; charset=utf-8')
