@@ -79,8 +79,25 @@ class ListingSerializer(serializers.ModelSerializer):
             return False
         return Favorite.objects.filter(user=request.user, listing=obj).exists()
 
+    def validate_price_type(self, value):
+        """Seul le prix fixe est autorisé sur Guimatrix."""
+        if value and value != Listing.PriceType.FIXED:
+            raise serializers.ValidationError(
+                "Seul le prix fixe est accepté sur Guimatrix. "
+                "Les articles gratuits ou à prix débattable ne sont pas supportés."
+            )
+        return Listing.PriceType.FIXED
+
+    def validate_price_gnf(self, value):
+        """Prix minimum : 1 000 GNF."""
+        if value is not None and value < 1000:
+            raise serializers.ValidationError("Le prix minimum est de 1 000 GNF.")
+        return value
+
     @transaction.atomic
     def create(self, validated_data):
+        # Forcer prix fixe même si le frontend envoie autre chose
+        validated_data['price_type'] = Listing.PriceType.FIXED
         uploaded_files = validated_data.pop('uploaded_files', [])
         uploaded_video = validated_data.pop('uploaded_video', None)
         listing = Listing.objects.create(**validated_data)
