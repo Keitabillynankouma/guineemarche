@@ -86,7 +86,8 @@ export default function CreateListingPage() {
         weight_kg: '',
         pickup_address: '',
     })
-    const [deliveryModes, setDeliveryModes] = useState(['collecte'])
+    // Mode de livraison unique : collecte Guimatrix (toujours activé)
+    const deliveryModes = ['collecte']
     const [files, setFiles]               = useState([])
     const [previews, setPreviews]         = useState([])
     const [videoFile, setVideoFile]       = useState(null)
@@ -148,12 +149,12 @@ export default function CreateListingPage() {
         setError('')
         setLoading(true)
         try {
-            if (deliveryModes.length === 0) {
-                setError('Sélectionnez au moins un mode de livraison.')
+            if (!form.pickup_address.trim()) {
+                setError('Veuillez indiquer votre adresse de collecte.')
                 setLoading(false)
                 return
             }
-            if (false && !form.pickup_address.trim()) { // adresse facultative désormais
+            if (false && false) { // placeholder désactivé
                 setError('Veuillez indiquer votre adresse / lieu de retrait.')
                 setLoading(false)
                 return
@@ -327,51 +328,20 @@ export default function CreateListingPage() {
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                         <SectionHeader number="2" icon="💰" title="Prix de vente" subtitle="Indiquez le prix fixe de votre article" />
 
-                        <div className="space-y-4">
-                            <div>
-                                <label className={labelClass}>Prix en Francs Guinéens (GNF) <span className="text-red-500">*</span></label>
-                                <div className="relative">
-                                    <input
-                                        type="number" placeholder="Ex : 500 000"
-                                        min="1000"
-                                        value={form.price_gnf}
-                                        onChange={e => setForm({ ...form, price_gnf: e.target.value })}
-                                        className={inputClass + ' pr-16'}
-                                        required
-                                    />
-                                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">GNF</span>
-                                </div>
-                                <p className="text-xs text-gray-400 mt-1">Minimum : 1 000 GNF. Tous les prix sur Guimatrix sont fixes.</p>
+                        <div>
+                            <label className={labelClass}>Prix en Francs Guinéens (GNF) <span className="text-red-500">*</span></label>
+                            <div className="relative">
+                                <input
+                                    type="number" placeholder="Ex : 500 000"
+                                    min="1000"
+                                    value={form.price_gnf}
+                                    onChange={e => setForm({ ...form, price_gnf: e.target.value })}
+                                    className={inputClass + ' pr-16'}
+                                    required
+                                />
+                                <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-semibold text-gray-400">GNF</span>
                             </div>
-
-                            {/* Encart commission */}
-                            <div className="bg-amber-50 border border-amber-100 rounded-xl p-4 space-y-2">
-                                <p className="text-xs font-bold text-amber-800 uppercase tracking-wide">💡 Comment Guimatrix fonctionne</p>
-                                <div className="space-y-1.5 text-xs text-amber-700">
-                                    <div className="flex items-start gap-2">
-                                        <span>🔐</span>
-                                        <span><strong>Réservation</strong> — l'acheteur paie <strong>10 000 GNF</strong> pour réserver votre article (frais de service Guimatrix, non remboursables si l'acheteur abandonne).</span>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                        <span>📦</span>
-                                        <span><strong>Paiement du prix</strong> — l'acheteur règle votre prix à la remise physique de l'article au point de retrait.</span>
-                                    </div>
-                                    <div className="flex items-start gap-2">
-                                        <span>💸</span>
-                                        <span><strong>Votre revenu</strong> — vous recevez votre prix moins <strong>8 % de commission Guimatrix</strong>.</span>
-                                    </div>
-                                </div>
-                                {form.price_gnf && Number(form.price_gnf) >= 1000 && (
-                                    <div className="mt-3 pt-3 border-t border-amber-200">
-                                        <p className="text-xs text-amber-800">
-                                            💰 Pour un prix de <strong>{Number(form.price_gnf).toLocaleString('fr-FR')} GNF</strong>,
-                                            vous recevrez :{' '}
-                                            <strong>{Math.round(Number(form.price_gnf) * 0.92).toLocaleString('fr-FR')} GNF</strong>
-                                            <span className="text-amber-600"> (commission : {Math.round(Number(form.price_gnf) * 0.08).toLocaleString('fr-FR')} GNF)</span>
-                                        </p>
-                                    </div>
-                                )}
-                            </div>
+                            <p className="text-xs text-gray-400 mt-1">Prix fixe · Minimum 1 000 GNF · 8 % de commission Guimatrix prélevée à la vente</p>
                         </div>
                     </div>
 
@@ -420,44 +390,21 @@ export default function CreateListingPage() {
                         </div>
                     </div>
 
-                    {/* ── Section 5 : Modes de livraison ── */}
+                    {/* ── Section 5 : Adresse de collecte ── */}
                     <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-                        <SectionHeader number="5" icon="🚚" title="Livraison" subtitle="Comment votre article sera récupéré par l'acheteur" />
+                        <SectionHeader number="5" icon="📍" title="Adresse de collecte" subtitle="Où notre équipe viendra récupérer votre article" />
 
-                        <div className="space-y-3">
-
-                            {/* Collecte Guimatrix — mode unique */}
-                            <label className="flex items-start gap-4 p-4 rounded-xl border-2 border-green-500 bg-green-50 cursor-pointer">
-                                <input type="checkbox" className="mt-0.5 w-4 h-4 accent-green-600"
-                                    checked={deliveryModes.includes('collecte')}
-                                    onChange={e => setDeliveryModes(prev =>
-                                        e.target.checked ? [...prev.filter(m => m !== 'collecte'), 'collecte'] : prev.filter(m => m !== 'collecte')
-                                    )}
-                                />
-                                <div className="flex-1">
-                                    <p className="text-sm font-bold text-green-800">🚚 Collecte Guimatrix</p>
-                                    <p className="text-xs text-gray-500 mt-0.5">Notre équipe vient chercher l'article chez vous. Vous n'avez rien à faire.</p>
-                                </div>
-                            </label>
-
-                            {/* Adresse de collecte — où le collecteur Guimatrix viendra chercher l'article */}
-                            <div className="mt-1 pl-2 border-l-2 border-green-200 space-y-1">
-                                <label className={labelClass}>
-                                    📍 Votre adresse de collecte <span className="text-xs text-gray-400 font-normal">(facultatif)</span>
-                                </label>
-                                <input
-                                    type="text"
-                                    placeholder="Ex : Kaloum, quartier N°12, en face de la mosquée centrale"
-                                    value={form.pickup_address}
-                                    onChange={e => setForm({ ...form, pickup_address: e.target.value })}
-                                    className={inputClass}
-                                />
-                                <p className="text-xs text-gray-400">Le collecteur Guimatrix vous contactera pour confirmer le créneau de collecte.</p>
-                            </div>
-
-                            {deliveryModes.length === 0 && (
-                                <p className="text-xs text-red-500 mt-1">⚠️ Cochez au moins un mode de livraison.</p>
-                            )}
+                        <div className="space-y-2">
+                            <label className={labelClass}>Adresse précise <span className="text-red-500">*</span></label>
+                            <input
+                                type="text"
+                                placeholder="Ex : Kaloum, quartier N°12, en face de la mosquée centrale"
+                                value={form.pickup_address}
+                                onChange={e => setForm({ ...form, pickup_address: e.target.value })}
+                                className={inputClass}
+                                required
+                            />
+                            <p className="text-xs text-gray-400">Notre collecteur vous contactera pour confirmer le créneau de passage.</p>
                         </div>
                     </div>
 

@@ -38,24 +38,131 @@ class DeliveryZoneAdmin(admin.ModelAdmin):
 
 @admin.register(Order)
 class OrderAdmin(admin.ModelAdmin):
-    list_display   = ('id', 'listing', 'buyer', 'seller', 'status', 'delivery_mode', 'amount_gnf', 'escrow_status', 'created_at')
-    list_filter    = ('status', 'delivery_mode', 'escrow_status')
-    search_fields  = ('buyer__full_name', 'buyer__phone_number', 'seller__full_name', 'listing__title')
-    readonly_fields = ('id', 'created_at', 'updated_at')
+    list_display   = (
+        'short_id', 'listing_title', 'seller_info', 'adresse_collecte',
+        'status_badge', 'pickup_point_name', 'article_amount_fmt',
+        'escrow_status', 'created_at',
+    )
+    list_filter    = ('status', 'escrow_status', 'delivery_mode')
+    search_fields  = (
+        'buyer__full_name', 'buyer__phone_number',
+        'seller__full_name', 'seller__phone_number',
+        'listing__title', 'listing__pickup_address',
+        'pickup_point__name',
+    )
+    readonly_fields = ('id', 'created_at', 'updated_at', 'adresse_collecte_detail')
     ordering       = ('-created_at',)
-    actions        = ['confirm_orders', 'cancel_orders']
+    actions        = ['confirm_orders', 'marquer_collecte', 'marquer_au_pdr', 'cancel_orders']
+
+    fieldsets = (
+        ('Commande', {
+            'fields': ('id', 'status', 'listing', 'buyer', 'seller', 'created_at', 'updated_at'),
+        }),
+        ('🚚 Collecte & Dépôt PDR', {
+            'fields': ('adresse_collecte_detail', 'pickup_point', 'delivery_mode'),
+            'classes': ('wide',),
+            'description': 'Adresse de collecte chez le vendeur → Point de retrait acheteur',
+        }),
+        ('💰 Paiement & Escrow', {
+            'fields': (
+                'amount_gnf', 'article_amount_gnf', 'delivery_fee_gnf', 'buyer_service_fee_gnf',
+                'commitment_amount_gnf', 'commission_gnf', 'seller_payout_gnf',
+                'escrow_status', 'article_paid',
+            ),
+        }),
+    )
+
+    # ── Colonnes personnalisées ───────────────────────────────────────────────
+
+    @admin.display(description='ID')
+    def short_id(self, obj):
+        return str(obj.id)[:8] + '…'
+
+    @admin.display(description='Article')
+    def listing_title(self, obj):
+        return obj.listing.title if obj.listing else '—'
+
+    @admin.display(description='Vendeur / Tél')
+    def seller_info(self, obj):
+        return f"{obj.seller.full_name} · {obj.seller.phone_number}"
+
+    @admin.display(description='📍 Adresse collecte')
+    def adresse_collecte(self, obj):
+        try:
+            addr = obj.listing.pickup_address
+            return addr[:60] + '…' if addr and len(addr) > 60 else (addr or '⚠️ Non renseignée')
+        except Exception:
+            return '—'
+
+    @admin.display(description='📍 Adresse collecte (complète)')
+    def adresse_collecte_detail(self, obj):
+        try:
+            addr = obj.listing.pickup_address
+            phone = obj.seller.phone_number
+            return f"{addr or '⚠️ Non renseignée'}  —  Tél vendeur : {phone}"
+        except Exception:
+            return '—'
+
+    @admin.display(description='Point de retrait')
+    def pickup_point_name(self, obj):
+        return obj.pickup_point.name if obj.pickup_point else '—'
+
+    @admin.display(description='Statut')
+    def status_badge(self, obj):
+        ICONS = {
+            'pending':          '⏳ En attente',
+            'confirmed':        '✅ Confirmée',
+            'pickup_confirmed': '🚚 Collecté',
+            'au_point_retrait': '📦 Au PDR',
+            'en_essai':         '🔍 En essai',
+            'completed':        '🏁 Terminée',
+            'cancelled':        '❌ Annulée',
+            'disputed':         '⚖️ Litige',
+            'retourne':         '↩️ Retourné',
+        }
+        return ICONS.get(obj.status, obj.status)
+
+    @admin.display(description='Prix article')
+    def article_amount_fmt(self, obj):
+        amt = obj.article_amount_gnf or 0
+        return f"{amt:,} GNF"
+
+    # ── Actions ───────────────────────────────────────────────────────────────
 
     @admin.action(description='✅ Confirmer les commandes sélectionnées')
     def confirm_orders(self, request, queryset):
+        ok = 0
         for order in queryset.filter(status='pending'):
             order.confirm()
-        self.message_user(request, 'Commandes confirmées.')
+            ok += 1
+        self.message_user(request, f'{ok} commande(s) confirmée(s).')
+
+    @admin.action(description='🚚 Marquer comme collecté chez le vendeur')
+    def marquer_collecte(self, request, queryset):
+        from django.utils import timezone
+        ok = 0
+        for order in queryset.filter(status='confirmed'):
+            order.status = 'pickup_confirmed'
+            order.save(update_fields=['status', 'updated_at'])
+            ok += 1
+        self.message_user(request, f'{ok} commande(s) marquée(s) comme collectée(s) chez le vendeur.')
+
+    @admin.action(description='📦 Marquer comme déposé au point de retrait')
+    def marquer_au_pdr(self, request, queryset):
+        ok = 0
+        for order in queryset.filter(status='pickup_confirmed'):
+            order.status = 'au_point_retrait'
+            order.save(update_fields=['status', 'updated_at'])
+            ok += 1
+        self.message_user(request, f'{ok} commande(s) marquée(s) comme déposée(s) au point de retrait.')
 
     @admin.action(description='❌ Annuler les commandes sélectionnées')
     def cancel_orders(self, request, queryset):
+        ok = 0
         for order in queryset.filter(status__in=['pending', 'confirmed']):
             order.cancel()
-        self.message_user(request, 'Commandes annulées.')
+            ok += 1
+        self.message_user(request, f'{ok} commande(s) annulée(s).')
 
 
 @admin.register(Payment)
