@@ -122,6 +122,18 @@ export default function CreateListingPage() {
         queryFn: () => authAPI.getSubscription().then(r => r.data),
     })
 
+    // Auto-remplir l'adresse de collecte depuis la boutique du vendeur
+    const { data: shopData } = useQuery({
+        queryKey: ['my-shop'],
+        queryFn: () => import('../services/api').then(m => m.shopsAPI.myShop()).then(r => r.data),
+        onSuccess: (shop) => {
+            if (shop?.pickup_address && !form.pickup_address) {
+                setForm(f => ({ ...f, pickup_address: shop.pickup_address }))
+            }
+        },
+        staleTime: 60_000,
+    })
+
     // Les annonces sont illimitées sur Guimatrix — aucun blocage quota
 
     const handleFiles = async (e) => {
@@ -404,7 +416,18 @@ export default function CreateListingPage() {
                                 className={inputClass}
                                 required
                             />
-                            <p className="text-xs text-gray-400">Notre collecteur vous contactera pour confirmer le créneau de passage.</p>
+                            {shopData?.pickup_address && form.pickup_address === shopData.pickup_address ? (
+                                <p className="text-xs text-green-600">✅ Pré-remplie depuis votre boutique — vous pouvez la modifier pour cette annonce si besoin.</p>
+                            ) : (
+                                <p className="text-xs text-gray-400">Notre collecteur vous contactera pour confirmer le créneau de passage.</p>
+                            )}
+                            {shopData && !shopData.pickup_address && (
+                                <p className="text-xs text-amber-600">
+                                    💡 Configurez votre adresse de collecte dans votre{' '}
+                                    <a href="/my-shop" className="underline font-medium">boutique</a>
+                                    {' '}pour ne pas avoir à la ressaisir à chaque annonce.
+                                </p>
+                            )}
                         </div>
                     </div>
 
