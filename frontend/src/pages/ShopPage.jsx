@@ -1,6 +1,8 @@
+import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { shopsAPI, listingsAPI } from '../services/api'
+import useAuthStore from '../store/authStore'
 
 function fmt(price, type) {
     if (type === 'free') return 'Gratuit'
@@ -19,8 +21,61 @@ function SkeletonCard() {
     )
 }
 
+function StarRating({ value, onChange, size = 'md' }) {
+    const [hover, setHover] = useState(0)
+    const sz = size === 'sm' ? 'w-4 h-4' : 'w-6 h-6'
+    return (
+        <div className="flex gap-0.5">
+            {[1, 2, 3, 4, 5].map(star => (
+                <button
+                    key={star}
+                    type="button"
+                    onClick={() => onChange && onChange(star)}
+                    onMouseEnter={() => onChange && setHover(star)}
+                    onMouseLeave={() => onChange && setHover(0)}
+                    className={`${sz} transition-colors ${onChange ? 'cursor-pointer' : 'cursor-default'}`}
+                >
+                    <svg viewBox="0 0 24 24" fill={(hover || value) >= star ? '#f59e0b' : 'none'}
+                        stroke={(hover || value) >= star ? '#f59e0b' : '#d1d5db'} strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round"
+                            d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                    </svg>
+                </button>
+            ))}
+        </div>
+    )
+}
+
+function ReviewCard({ review }) {
+    return (
+        <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
+            <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-full bg-green-100 flex items-center justify-center text-xs font-bold text-green-700">
+                        {review.buyer_name?.[0]?.toUpperCase() || '?'}
+                    </div>
+                    <span className="text-sm font-semibold text-gray-800">{review.buyer_name || 'Acheteur'}</span>
+                </div>
+                <StarRating value={review.rating} size="sm" />
+            </div>
+            {review.comment && (
+                <p className="text-sm text-gray-600 leading-relaxed">{review.comment}</p>
+            )}
+            <p className="text-xs text-gray-400 mt-2">
+                {new Date(review.created_at).toLocaleDateString('fr-FR', { year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+        </div>
+    )
+}
+
 export default function ShopPage() {
     const { id } = useParams()
+    const { user } = useAuthStore()
+    const qc = useQueryClient()
+
+    const [rating, setRating]   = useState(0)
+    const [comment, setComment] = useState('')
+    const [reviewErr, setReviewErr] = useState('')
 
     const { data: shop, isLoading: shopLoading } = useQuery({
         queryKey: ['shop', id],
@@ -32,7 +87,41 @@ export default function ShopPage() {
         queryFn: () => listingsAPI.getAll({ seller: shop.owner }).then(r => r.data),
         enabled: !!shop?.owner,
     })
+
+    const { data: reviews = [], isLoading: reviewsLoading } = useQuery({
+        queryKey: ['shop-reviews', id],
+        queryFn: () => shopsAPI.getReviews(id).then(r => r.data),
+        enabled: !!id,
+    })
+
     const listings = Array.isArray(listingsData) ? listingsData : (listingsData?.results || [])
+
+    const followMutation = useMutation({
+        mutationFn: () => shopsAPI.toggleFollow(id),
+        onSuccess: () => qc.invalidateQueries({ queryKey: ['shop', id] }),
+    })
+
+    const reviewMutation = useMutation({
+        mutationFn: (data) => shopsAPI.postReview(id, data),
+        onSuccess: () => {
+            qc.invalidateQueries({ queryKey: ['shop-reviews', id] })
+            qc.invalidateQueries({ queryKey: ['shop', id] })
+            setRating(0)
+            setComment('')
+            setReviewErr('')
+        },
+        onError: (err) => {
+            setReviewErr(err?.response?.data?.detail || 'Erreur lors de l\'envoi de l\'avis.')
+        },
+    })
+
+    const handleReviewSubmit = (e) => {
+        e.preventDefault()
+        if (!rating) { setReviewErr('Veuillez sélectionner une note.'); return }
+        reviewMutation.mutate({ rating, comment })
+    }
+
+    const isOwnShop = user && shop && user.id === shop.owner
 
     if (shopLoading) return (
         <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -74,8 +163,7 @@ export default function ShopPage() {
                         )}
                     </div>
                     {shop.whatsapp && (
-                        <a
-                            href={`https://wa.me/${shop.whatsapp.replace(/\D/g, '')}`}
+                        <a href={`https://wa.me/${shop.whatsapp.replace(/\D/g, '')}`}
                             target="_blank" rel="noopener noreferrer"
                             className="bg-green-600 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 hover:bg-green-700 transition shadow-sm">
                             <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
@@ -103,7 +191,7 @@ export default function ShopPage() {
                             }
                         </div>
 
-                        <div className="text-white mb-1">
+                        <div className="text-white mb-1 flex-1">
                             <h1 className="text-2xl font-black tracking-tight">{shop.name}</h1>
                             <div className="flex flex-wrap items-center gap-2 mt-1.5">
                                 <span className="flex items-center gap-1 text-sm text-green-100">
@@ -115,7 +203,35 @@ export default function ShopPage() {
                                     </span>
                                 )}
                             </div>
+                            {/* Note moyenne dans le hero */}
+                            {shop.avg_rating && (
+                                <div className="flex items-center gap-2 mt-2">
+                                    <StarRating value={Math.round(shop.avg_rating)} size="sm" />
+                                    <span className="text-white/90 text-sm font-semibold">{shop.avg_rating}</span>
+                                    <span className="text-white/60 text-xs">({shop.review_count} avis)</span>
+                                </div>
+                            )}
                         </div>
+
+                        {/* Bouton suivre */}
+                        {!isOwnShop && user && (
+                            <button
+                                onClick={() => followMutation.mutate()}
+                                disabled={followMutation.isPending}
+                                className={`flex items-center gap-1.5 text-sm font-bold px-4 py-2 rounded-xl transition shadow-sm flex-shrink-0 ${
+                                    shop.is_following
+                                        ? 'bg-white text-green-700 hover:bg-green-50'
+                                        : 'bg-white/20 text-white border border-white/30 hover:bg-white/30'
+                                }`}
+                            >
+                                {shop.is_following ? '✓ Suivi' : '+ Suivre'}
+                                {shop.follower_count > 0 && (
+                                    <span className={`text-xs px-1.5 py-0.5 rounded-full ${shop.is_following ? 'bg-green-100 text-green-600' : 'bg-white/20'}`}>
+                                        {shop.follower_count}
+                                    </span>
+                                )}
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -132,10 +248,11 @@ export default function ShopPage() {
 
                 {/* Carte info boutique */}
                 <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-5">
-                    <div className="grid grid-cols-3 divide-x divide-gray-100 mb-4">
+                    <div className="grid grid-cols-4 divide-x divide-gray-100 mb-4">
                         {[
                             { val: shop.listing_count ?? 0, label: 'Annonce' + (shop.listing_count !== 1 ? 's' : '') },
-                            { val: shop.plan === 'pro' ? 'Pro' : 'Standard', label: 'Plan' },
+                            { val: shop.avg_rating ? `${shop.avg_rating}★` : '—', label: shop.review_count > 0 ? `${shop.review_count} avis` : 'Avis' },
+                            { val: shop.follower_count ?? 0, label: 'Abonné' + (shop.follower_count !== 1 ? 's' : '') },
                             { val: shop.created_at ? new Date(shop.created_at).getFullYear() : '—', label: 'Membre depuis' },
                         ].map(s => (
                             <div key={s.label} className="text-center px-3">
@@ -207,7 +324,6 @@ export default function ShopPage() {
                                                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                                                 : <div className="w-full h-full flex items-center justify-center text-4xl">📦</div>
                                             }
-                                            {/* Badge boost masqué côté acheteur */}
                                         </div>
                                         <div className="p-3">
                                             <p className="font-bold text-sm text-gray-900 truncate leading-snug">{l.title}</p>
@@ -217,6 +333,70 @@ export default function ShopPage() {
                                     </Link>
                                 )
                             })}
+                        </div>
+                    )}
+                </div>
+
+                {/* Section Avis */}
+                <div>
+                    <h2 className="font-black text-gray-900 text-base mb-4">
+                        Avis clients
+                        {reviews.length > 0 && (
+                            <span className="ml-2 text-sm font-normal text-gray-400">({reviews.length})</span>
+                        )}
+                    </h2>
+
+                    {/* Formulaire avis (acheteur connecté, pas le proprio) */}
+                    {user && !isOwnShop && (
+                        <form onSubmit={handleReviewSubmit}
+                            className="bg-white rounded-2xl border border-gray-100 p-5 mb-4 shadow-sm">
+                            <p className="text-sm font-bold text-gray-800 mb-3">Laisser un avis</p>
+                            <div className="mb-3">
+                                <StarRating value={rating} onChange={setRating} />
+                            </div>
+                            <textarea
+                                value={comment}
+                                onChange={e => setComment(e.target.value)}
+                                placeholder="Votre commentaire (optionnel)…"
+                                rows={3}
+                                maxLength={500}
+                                className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:border-green-400 resize-none"
+                            />
+                            {reviewErr && <p className="text-red-500 text-xs mt-1">{reviewErr}</p>}
+                            <button
+                                type="submit"
+                                disabled={reviewMutation.isPending}
+                                className="mt-3 bg-green-600 hover:bg-green-700 text-white text-sm font-bold px-5 py-2 rounded-xl transition disabled:opacity-60">
+                                {reviewMutation.isPending ? 'Envoi…' : 'Publier l\'avis'}
+                            </button>
+                        </form>
+                    )}
+
+                    {!user && (
+                        <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 mb-4 text-center">
+                            <p className="text-sm text-gray-500">
+                                <Link to="/login" className="text-green-600 font-semibold hover:underline">Connectez-vous</Link> pour laisser un avis.
+                            </p>
+                        </div>
+                    )}
+
+                    {reviewsLoading ? (
+                        <div className="space-y-3">
+                            {[...Array(3)].map((_, i) => (
+                                <div key={i} className="bg-gray-50 rounded-xl p-4 animate-pulse">
+                                    <div className="h-3 bg-gray-200 rounded w-1/3 mb-2" />
+                                    <div className="h-3 bg-gray-200 rounded w-2/3" />
+                                </div>
+                            ))}
+                        </div>
+                    ) : reviews.length === 0 ? (
+                        <div className="bg-white rounded-2xl border border-gray-100 py-12 text-center">
+                            <p className="text-3xl mb-2">⭐</p>
+                            <p className="text-gray-500 text-sm">Aucun avis pour le moment. Soyez le premier !</p>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            {reviews.map(r => <ReviewCard key={r.id} review={r} />)}
                         </div>
                     )}
                 </div>

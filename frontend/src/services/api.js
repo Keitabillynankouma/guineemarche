@@ -135,6 +135,9 @@ export const shopsAPI = {
   list: (params) => api.get('/accounts/shops/', { params }),
   featured: () => api.get('/accounts/shops/', { params: { featured: true } }),
   getOne: (id) => api.get(`/accounts/shops/${id}/`),
+  getReviews: (id) => api.get(`/accounts/shops/${id}/reviews/`),
+  postReview: (id, data) => api.post(`/accounts/shops/${id}/reviews/`, data),
+  toggleFollow: (id) => api.post(`/accounts/shops/${id}/follow/`),
   myShop: () => api.get('/accounts/shop/'),
   saveShop: (data) => api.post('/accounts/shop/', data),
 }

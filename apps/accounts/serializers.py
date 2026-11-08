@@ -1,6 +1,6 @@
 from rest_framework import serializers
 from django.utils import timezone
-from .models import User, UserProfile, OTPCode, Subscription, Badge, Shop
+from .models import User, UserProfile, OTPCode, Subscription, Badge, Shop, ShopReview, ShopFollow
 from core.utils import generate_otp, otp_expiry
 from core.sms import send_otp_sms
 
@@ -249,11 +249,24 @@ class SubscriptionSerializer(serializers.ModelSerializer):
         read_only_fields = fields
 
 
+class ShopReviewSerializer(serializers.ModelSerializer):
+    buyer_name = serializers.CharField(source='buyer.full_name', read_only=True)
+
+    class Meta:
+        model  = ShopReview
+        fields = ('id', 'buyer', 'buyer_name', 'rating', 'comment', 'created_at')
+        read_only_fields = ('id', 'buyer', 'buyer_name', 'created_at')
+
+
 class ShopSerializer(serializers.ModelSerializer):
     logo_url      = serializers.SerializerMethodField()
     listing_count = serializers.IntegerField(read_only=True)
     owner_name    = serializers.CharField(source='owner.full_name', read_only=True)
     # owner_phone retiré délibérément — PII, accessible uniquement via AdminShopSerializer
+    avg_rating    = serializers.SerializerMethodField()
+    review_count  = serializers.SerializerMethodField()
+    follower_count = serializers.SerializerMethodField()
+    is_following  = serializers.SerializerMethodField()
 
     class Meta:
         model  = Shop
@@ -264,15 +277,33 @@ class ShopSerializer(serializers.ModelSerializer):
             'is_verified', 'is_featured', 'listing_count',
             'status', 'plan', 'plan_until',
             'owner', 'owner_name', 'created_at',
+            'avg_rating', 'review_count', 'follower_count', 'is_following',
         )
         read_only_fields = (
             'id', 'is_verified', 'is_featured', 'status', 'plan', 'plan_until',
             'owner', 'owner_name', 'created_at',
+            'avg_rating', 'review_count', 'follower_count', 'is_following',
         )
         extra_kwargs = {'logo': {'write_only': True, 'required': False}}
 
     def get_logo_url(self, obj):
         return obj.logo_url
+
+    def get_avg_rating(self, obj):
+        v = obj.avg_rating
+        return round(v, 1) if v else None
+
+    def get_review_count(self, obj):
+        return obj.review_count
+
+    def get_follower_count(self, obj):
+        return obj.follower_count
+
+    def get_is_following(self, obj):
+        request = self.context.get('request')
+        if not request or not request.user.is_authenticated:
+            return False
+        return ShopFollow.objects.filter(shop=obj, user=request.user).exists()
 
 
 class AdminShopSerializer(serializers.ModelSerializer):

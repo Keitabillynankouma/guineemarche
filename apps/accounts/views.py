@@ -24,13 +24,14 @@ class LoginRateThrottle(AnonRateThrottle):
     scope = 'login'
     rate  = '10/hour'
 
-from .models import User, OTPCode, Subscription, Badge, Shop, Referral
+from .models import User, OTPCode, Subscription, Badge, Shop, Referral, ShopReview, ShopFollow
 from .serializers import (
     RegisterSerializer, EmailRegisterSerializer,
     VerifyOTPSerializer, VerifyEmailOTPSerializer,
     LoginSerializer,
     UserSerializer, UserProfileSerializer, ChangePasswordSerializer,
     SubscriptionSerializer, BadgeSerializer, ShopSerializer, AdminShopSerializer,
+    ShopReviewSerializer,
 )
 from core.permissions import IsAdmin
 
@@ -610,6 +611,11 @@ class ShopListView(generics.ListAPIView):
             qs = qs.filter(city__iexact=city)
         return qs
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
+
 
 class ShopDetailView(generics.RetrieveAPIView):
     """Détail d'une boutique — visible dès la création (pending + approved)."""
@@ -620,6 +626,70 @@ class ShopDetailView(generics.RetrieveAPIView):
         status__in=[Shop.Status.PENDING, Shop.Status.APPROVED],
     ).select_related('owner')
 
+    def get_serializer_context(self):
+        ctx = super().get_serializer_context()
+        ctx['request'] = self.request
+        return ctx
+
+
+class ShopReviewListCreateView(APIView):
+    """GET les avis d'une boutique / POST créer un avis (acheteur authentifié)."""
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
+
+    def get(self, request, pk):
+        reviews = ShopReview.objects.filter(shop_id=pk).select_related('buyer').order_by('-created_at')
+        return Response(ShopReviewSerializer(reviews, many=True).data)
+
+    def post(self, request, pk):
+        shop = generics.get_object_or_404(
+            Shop, pk=pk, is_active=True,
+            status__in=[Shop.Status.PENDING, Shop.Status.APPROVED],
+        )
+        # Un vendeur ne peut pas noter sa propre boutique
+        if hasattr(request.user, 'shop') and request.user.shop == shop:
+            return Response({'detail': 'Vous ne pouvez pas noter votre propre boutique.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        serializer = ShopReviewSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        try:
+            review = ShopReview.objects.create(
+                shop=shop,
+                buyer=request.user,
+                rating=serializer.validated_data['rating'],
+                comment=serializer.validated_data.get('comment', ''),
+            )
+        except Exception:
+            # Contrainte unique → mettre à jour l'avis existant
+            review = ShopReview.objects.get(shop=shop, buyer=request.user)
+            review.rating  = serializer.validated_data['rating']
+            review.comment = serializer.validated_data.get('comment', '')
+            review.save(update_fields=['rating', 'comment', 'updated_at'])
+
+        return Response(ShopReviewSerializer(review).data, status=status.HTTP_201_CREATED)
+
+
+class ShopFollowToggleView(APIView):
+    """POST → toggle follow/unfollow. Renvoie {following: bool, follower_count: int}."""
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        shop = generics.get_object_or_404(
+            Shop, pk=pk, is_active=True,
+            status__in=[Shop.Status.PENDING, Shop.Status.APPROVED],
+        )
+        follow, created = ShopFollow.objects.get_or_create(shop=shop, user=request.user)
+        if not created:
+            follow.delete()
+            following = False
+        else:
+            following = True
+
+        return Response({
+            'following':      following,
+            'follower_count': shop.follower_count,
+        })
+
 
 class MyShopView(APIView):
     """Créer ou mettre à jour sa boutique (soumis à validation admin)."""
@@ -629,7 +699,7 @@ class MyShopView(APIView):
     def get(self, request):
         try:
             shop = request.user.shop
-            return Response(ShopSerializer(shop).data)
+            return Response(ShopSerializer(shop, context={'request': request}).data)
         except Shop.DoesNotExist:
             return Response(None)
 

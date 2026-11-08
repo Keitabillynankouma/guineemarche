@@ -20,7 +20,9 @@ urlpatterns = [
     path('referral/',          views.ReferralStatsView.as_view(), name='referral-stats'),
     path('shop/',              views.MyShopView.as_view(),        name='my-shop'),
     path('shops/',             views.ShopListView.as_view(),      name='shop-list'),
-    path('shops/<uuid:pk>/',   views.ShopDetailView.as_view(),    name='shop-detail'),
+    path('shops/<uuid:pk>/',          views.ShopDetailView.as_view(),           name='shop-detail'),
+    path('shops/<uuid:pk>/reviews/',  views.ShopReviewListCreateView.as_view(), name='shop-reviews'),
+    path('shops/<uuid:pk>/follow/',   views.ShopFollowToggleView.as_view(),     name='shop-follow'),
 
     # Push notifications FCM
     path('me/fcm-token/', views.RegisterFCMTokenView.as_view(), name='register-fcm-token'),
