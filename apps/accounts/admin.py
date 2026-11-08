@@ -174,10 +174,15 @@ class ShopAdmin(admin.ModelAdmin):
 
 @admin.register(Subscription)
 class SubscriptionAdmin(admin.ModelAdmin):
-    list_display   = ('user', 'plan', 'listings_used', 'valid_until', 'referral_bonus')
+    list_display   = ('user', 'plan', 'listings_used', 'max_listings_display', 'valid_until', 'referral_bonus')
     list_filter    = ('plan',)
     search_fields  = ('user__full_name', 'user__phone_number')
     readonly_fields = ('id', 'created_at', 'updated_at')
+
+    @admin.display(description='Quota')
+    def max_listings_display(self, obj):
+        limit = obj.max_listings
+        return '∞ Illimité' if limit is None else f'{obj.listings_used} / {limit}'
 
 
 @admin.register(Badge)

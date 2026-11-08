@@ -314,11 +314,11 @@ class Order(BaseModel):
         # (delivery_fee_gnf va au livreur, buyer_service_fee_gnf reste à Guimatrix)
         base_pct  = SiteSettings.flag('commission_pct', default=self.COMMISSION_PCT)
 
-        # Taux réduit pour les vendeurs Pro : 6 % au lieu de 8 %
+        # Taux réduit pour les vendeurs Pro et Business : 6 % au lieu de 8 %
         PRO_COMMISSION_PCT = 6
         try:
             seller_sub = getattr(self.listing.seller, 'subscription', None)
-            if seller_sub and seller_sub.is_pro:
+            if seller_sub and seller_sub.is_pro:  # is_pro couvre Pro ET Business
                 commission_pct = PRO_COMMISSION_PCT
             else:
                 commission_pct = base_pct

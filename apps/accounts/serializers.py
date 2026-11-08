@@ -239,14 +239,19 @@ class BadgeSerializer(serializers.ModelSerializer):
 
 
 class SubscriptionSerializer(serializers.ModelSerializer):
-    is_pro   = serializers.BooleanField(read_only=True)
-    can_post = serializers.BooleanField(read_only=True)
-    # remaining_free supprimé : FREE_LIMIT = 0, les annonces sont illimitées pour tous.
-    # La différence Free/Pro est uniquement le taux de commission (8% vs 6%) et le boost.
+    is_pro       = serializers.BooleanField(read_only=True)
+    is_business  = serializers.BooleanField(read_only=True)
+    can_post     = serializers.BooleanField(read_only=True)
+    max_listings = serializers.IntegerField(read_only=True, allow_null=True)
+    remaining    = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model  = Subscription
-        fields = ('plan', 'listings_used', 'valid_until', 'is_pro', 'can_post')
+        fields = (
+            'plan', 'listings_used', 'valid_until',
+            'is_pro', 'is_business', 'can_post',
+            'max_listings', 'remaining',
+        )
         read_only_fields = fields
 
 
@@ -350,8 +355,8 @@ class UserSerializer(serializers.ModelSerializer):
             return SubscriptionSerializer(sub).data
         except Exception:
             return {'plan': 'free', 'listings_used': 0, 'valid_until': None,
-                    'is_pro': False, 'can_post': True, 'remaining_free': None,
-                    'max_free_listings': 5, 'free_listings_enabled': True}
+                    'is_pro': False, 'is_business': False, 'can_post': True,
+                    'max_listings': 3, 'remaining': 3}
 
     class Meta:
         model  = User

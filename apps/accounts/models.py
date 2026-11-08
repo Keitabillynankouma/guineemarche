@@ -330,19 +330,30 @@ class ShopFollow(BaseModel):
 
 
 class Subscription(BaseModel):
-    """Abonnement utilisateur. Gratuit = 5 annonces max, Pro = illimité."""
+    """
+    Abonnement utilisateur — 3 plans :
+      Free     : 3 annonces actives, 30 jours, renouvellement manuel
+      Pro      : 15 annonces actives, boosts 7 jours, boutique personnalisée, commission 6%
+      Business : illimité, tous les avantages Pro, support prioritaire, commission 6%
+    """
 
     class Plan(models.TextChoices):
-        FREE  = 'free',  'Gratuit (annonces illimitées)'
-        PRO   = 'pro',   'Pro — commission réduite + boost prioritaire'
+        FREE     = 'free',     'Gratuit — 3 annonces'
+        PRO      = 'pro',      'Pro — 15 annonces + boost'
+        BUSINESS = 'business', 'Business — illimité + support prioritaire'
 
-    user            = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
-    plan            = models.CharField(max_length=10, choices=Plan.choices, default=Plan.FREE)
-    listings_used   = models.PositiveIntegerField(default=0)
-    valid_until     = models.DateTimeField(null=True, blank=True)
-    referral_bonus  = models.PositiveIntegerField(default=0, help_text='Slots gratuits supplémentaires gagnés par parrainage')
+    # Quotas par plan (None = illimité)
+    PLAN_LIMITS = {
+        'free':     3,
+        'pro':      15,
+        'business': None,
+    }
 
-    FREE_LIMIT = 0  # Plus de quota — toutes les annonces sont illimitées sur Guimatrix
+    user           = models.OneToOneField(User, on_delete=models.CASCADE, related_name='subscription')
+    plan           = models.CharField(max_length=10, choices=Plan.choices, default=Plan.FREE)
+    listings_used  = models.PositiveIntegerField(default=0)
+    valid_until    = models.DateTimeField(null=True, blank=True)
+    referral_bonus = models.PositiveIntegerField(default=0, help_text='Slots supplémentaires gagnés par parrainage')
 
     class Meta:
         verbose_name = 'Abonnement'
@@ -350,27 +361,51 @@ class Subscription(BaseModel):
     def __str__(self):
         return f"{self.user.full_name} — {self.plan}"
 
-    @property
-    def is_pro(self):
+    def _is_valid(self):
+        """Vérifie que l'abonnement n'est pas expiré."""
         from django.utils import timezone
-        return self.plan == self.Plan.PRO and (
-            self.valid_until is None or self.valid_until > timezone.now()
-        )
+        return self.valid_until is None or self.valid_until > timezone.now()
 
     @property
-    def effective_limit(self):
-        return self.FREE_LIMIT + self.referral_bonus
+    def is_pro(self):
+        """Pro OU Business actif."""
+        return self.plan in (self.Plan.PRO, self.Plan.BUSINESS) and self._is_valid()
+
+    @property
+    def is_business(self):
+        return self.plan == self.Plan.BUSINESS and self._is_valid()
+
+    @property
+    def max_listings(self):
+        """Quota d'annonces actives pour ce plan (None = illimité)."""
+        base = self.PLAN_LIMITS.get(self.plan, 3)
+        if base is None:
+            return None
+        return base + self.referral_bonus
+
+    @property
+    def remaining(self):
+        """Annonces qu'il reste à publier (None = illimité)."""
+        limit = self.max_listings
+        if limit is None:
+            return None
+        return max(0, limit - self.listings_used)
 
     @property
     def can_post(self):
-        # Guimatrix est un marketplace à commission — les annonces sont illimitées pour tous.
-        return True
+        limit = self.max_listings
+        if limit is None:
+            return True
+        return self.listings_used < limit
+
+    # Alias de rétrocompatibilité
+    @property
+    def effective_limit(self):
+        return self.max_listings
 
     @property
     def remaining_free(self):
-        if self.is_pro:
-            return None  # illimité
-        return max(0, self.effective_limit - self.listings_used)
+        return self.remaining
 
 
 class Badge(BaseModel):

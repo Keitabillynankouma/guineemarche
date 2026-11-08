@@ -83,26 +83,26 @@ class ListingListCreateView(generics.ListCreateAPIView):
             site = None
 
         sub, _ = Subscription.objects.get_or_create(user=user)
-        # Vérifier quotas dès que "Publications gratuites illimitées" est désactivé.
-        # NB : le toggle "Activer les abonnements payants" est indépendant — il
-        #      sert uniquement à afficher la page Tarifs. La limite s'applique
-        #      sans qu'il soit nécessaire d'activer les abonnements payants.
-        if site and not site.free_listings_enabled:
-            limit = site.max_free_listings  # valeur définie dans Paramètres admin
-            # Pro → illimité | Gratuit → vérifier le compteur contre la limite du site
-            if not sub.is_pro and sub.listings_used >= limit:
-                raise PermissionDenied(
-                    detail={
-                        'code': 'subscription_required',
-                        'message': (
-                            f'Vous avez atteint la limite de {limit} annonce{"s" if limit != 1 else ""} gratuite{"s" if limit != 1 else ""}. '
-                            'Passez au plan Pro pour publier des annonces illimitées.'
-                            if limit > 0 else
-                            'La publication d\'annonces est réservée aux abonnés. '
-                            'Contactez l\'administrateur pour obtenir un accès Pro.'
-                        ),
-                    }
-                )
+        # Vérifier le quota du plan de l'utilisateur
+        if not sub.can_post:
+            limit = sub.max_listings or 0
+            plan_label = {
+                'free':     'Gratuit',
+                'pro':      'Pro',
+                'business': 'Business',
+            }.get(sub.plan, sub.plan)
+            raise PermissionDenied(
+                detail={
+                    'code':    'quota_reached',
+                    'message': (
+                        f'Vous avez atteint la limite de {limit} annonce{"s" if limit != 1 else ""} '
+                        f'active{"s" if limit != 1 else ""} du plan {plan_label}. '
+                        + ('Passez au plan Pro (15 annonces) ou Business (illimité).'
+                           if sub.plan == 'free' else
+                           'Passez au plan Business pour des annonces illimitées.')
+                    ),
+                }
+            )
 
         # 1. Sauvegarder en DRAFT (en attente de modération async)
         try:

@@ -496,70 +496,99 @@ export default function ProfilePage() {
 
                 <div className="bg-white rounded-2xl shadow p-4">
                     <h2 className="font-semibold text-gray-700 mb-3">Mon abonnement</h2>
-                    {sub?.is_pro ? (
-                        /* ── Plan Pro actif ── */
-                        <div className="space-y-3">
-                            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200">
-                                <span className="text-2xl">💎</span>
-                                <div>
-                                    <p className="font-bold text-green-700">Plan Pro actif</p>
-                                    {sub.valid_until && (
-                                        <p className="text-xs text-gray-500">
-                                            Expire le {new Date(sub.valid_until).toLocaleDateString('fr-FR')}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <div className="grid grid-cols-1 gap-2 text-xs text-gray-600">
-                                {[
-                                    { icon: '✅', label: 'Annonces illimitées' },
-                                    { icon: '💸', label: 'Commission réduite : 6% par vente' },
-                                    { icon: '🚀', label: 'Boost prioritaire dans les résultats' },
-                                    { icon: '🏅', label: 'Badge Pro sur votre profil' },
-                                ].map(f => (
-                                    <div key={f.label} className="flex items-center gap-2">
-                                        <span>{f.icon}</span><span>{f.label}</span>
-                                    </div>
-                                ))}
+
+                    {/* Badge plan actif */}
+                    {sub?.is_business ? (
+                        <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-xl border border-purple-200 mb-3">
+                            <span className="text-2xl">🏢</span>
+                            <div>
+                                <p className="font-bold text-purple-700">Plan Business actif</p>
+                                {sub.valid_until && <p className="text-xs text-gray-400">Expire le {new Date(sub.valid_until).toLocaleDateString('fr-FR')}</p>}
                             </div>
                         </div>
-                    ) : (
-                        /* ── Plan Gratuit ── */
-                        <div className="space-y-3">
-                            {/* Comparatif Free vs Pro */}
-                            <div className="grid grid-cols-2 gap-2 text-xs">
-                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                                    <p className="font-bold text-gray-700 mb-2">Gratuit (actuel)</p>
-                                    {[
-                                        { icon: '✅', label: 'Annonces illimitées' },
-                                        { icon: '💸', label: 'Commission : 8%' },
-                                        { icon: '❌', label: 'Pas de boost' },
-                                        { icon: '❌', label: 'Pas de badge Pro' },
-                                    ].map(f => (
-                                        <div key={f.label} className="flex items-center gap-1.5 mb-1 text-gray-500">
-                                            <span className="text-xs">{f.icon}</span><span>{f.label}</span>
-                                        </div>
-                                    ))}
-                                </div>
-                                <div className="bg-green-50 rounded-xl p-3 border border-green-200">
-                                    <p className="font-bold text-green-700 mb-2">Pro 💎</p>
-                                    {[
-                                        { icon: '✅', label: 'Annonces illimitées' },
-                                        { icon: '💸', label: 'Commission : 6%' },
-                                        { icon: '🚀', label: 'Boost prioritaire' },
-                                        { icon: '🏅', label: 'Badge Pro' },
-                                    ].map(f => (
-                                        <div key={f.label} className="flex items-center gap-1.5 mb-1 text-green-700">
-                                            <span className="text-xs">{f.icon}</span><span>{f.label}</span>
-                                        </div>
-                                    ))}
-                                </div>
+                    ) : sub?.is_pro ? (
+                        <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200 mb-3">
+                            <span className="text-2xl">💎</span>
+                            <div>
+                                <p className="font-bold text-green-700">Plan Pro actif</p>
+                                {sub.valid_until && <p className="text-xs text-gray-400">Expire le {new Date(sub.valid_until).toLocaleDateString('fr-FR')}</p>}
                             </div>
-                            <Link to="/upgrade"
-                                className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">
-                                💎 Passer au plan Pro — commission à 6%
-                            </Link>
                         </div>
+                    ) : null}
+
+                    {/* Barre de quota (Free et Pro seulement) */}
+                    {!sub?.is_business && (
+                        <div className="mb-3">
+                            <div className="flex justify-between text-xs text-gray-500 mb-1">
+                                <span>Annonces actives</span>
+                                <span className={`font-bold ${sub?.remaining === 0 ? 'text-red-500' : 'text-gray-700'}`}>
+                                    {sub?.listings_used ?? 0} / {sub?.max_listings ?? 3}
+                                </span>
+                            </div>
+                            <div className="w-full bg-gray-100 rounded-full h-2">
+                                <div
+                                    className={`h-2 rounded-full transition-all ${sub?.remaining === 0 ? 'bg-red-400' : sub?.is_pro ? 'bg-green-500' : 'bg-blue-400'}`}
+                                    style={{ width: `${Math.min(100, ((sub?.listings_used ?? 0) / (sub?.max_listings ?? 3)) * 100)}%` }}
+                                />
+                            </div>
+                            {sub?.remaining === 0 && (
+                                <p className="text-xs text-red-500 mt-1">Limite atteinte — passez au plan supérieur pour publier.</p>
+                            )}
+                            {sub?.remaining > 0 && (
+                                <p className="text-xs text-gray-400 mt-1">Il vous reste {sub.remaining} annonce{sub.remaining > 1 ? 's' : ''}</p>
+                            )}
+                        </div>
+                    )}
+
+                    {/* Comparatif 3 plans */}
+                    {!sub?.is_business && (
+                        <div className="grid grid-cols-3 gap-1.5 text-xs mb-3">
+                            {[
+                                {
+                                    plan: 'free', label: 'Gratuit', emoji: '🆓',
+                                    features: ['3 annonces', '30 jours', 'Commission 8%'],
+                                    active: !sub?.is_pro,
+                                    color: 'gray',
+                                },
+                                {
+                                    plan: 'pro', label: 'Pro', emoji: '💎',
+                                    features: ['15 annonces', 'Boost 7j', 'Commission 6%'],
+                                    active: sub?.is_pro && !sub?.is_business,
+                                    color: 'green',
+                                },
+                                {
+                                    plan: 'business', label: 'Business', emoji: '🏢',
+                                    features: ['Illimité', 'Support prioritaire', 'Commission 6%'],
+                                    active: false,
+                                    color: 'purple',
+                                },
+                            ].map(p => (
+                                <div key={p.plan} className={`rounded-xl p-2.5 border ${
+                                    p.active
+                                        ? p.color === 'green' ? 'bg-green-50 border-green-300' : 'bg-blue-50 border-blue-200'
+                                        : 'bg-gray-50 border-gray-200'
+                                }`}>
+                                    <p className={`font-bold mb-1.5 ${p.active ? (p.color === 'green' ? 'text-green-700' : 'text-blue-700') : 'text-gray-500'}`}>
+                                        {p.emoji} {p.label} {p.active && '✓'}
+                                    </p>
+                                    {p.features.map(f => (
+                                        <p key={f} className={`leading-snug ${p.active ? 'text-gray-700' : 'text-gray-400'}`}>{f}</p>
+                                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )}
+
+                    {/* CTA upgrade */}
+                    {!sub?.is_business && (
+                        <Link to="/upgrade"
+                            className={`block w-full text-center text-white font-semibold py-2.5 rounded-xl text-sm transition ${
+                                sub?.is_pro
+                                    ? 'bg-purple-600 hover:bg-purple-700'
+                                    : 'bg-green-600 hover:bg-green-700'
+                            }`}>
+                            {sub?.is_pro ? '🏢 Passer au plan Business' : '💎 Passer au plan Pro — 15 annonces'}
+                        </Link>
                     )}
                 </div>
 
