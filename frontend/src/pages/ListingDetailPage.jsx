@@ -449,7 +449,10 @@ function PickupPointPicker({ points, selected, onSelect }) {
                     className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${view === 'list' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>
                     ☰ Liste
                 </button>
-                <button type="button" onClick={() => setView('map')}
+                <button type="button" onClick={() => {
+                    setView('map')
+                    setTimeout(() => { lMapRef.current?.invalidateSize() }, 50)
+                }}
                     className={`flex-1 py-1.5 rounded-lg text-xs font-semibold transition ${view === 'map' ? 'bg-white shadow text-gray-800' : 'text-gray-500'}`}>
                     🗺️ Carte {geoCount > 0 ? `(${geoCount})` : ''}
                 </button>
