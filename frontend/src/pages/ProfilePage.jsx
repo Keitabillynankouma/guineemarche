@@ -497,44 +497,67 @@ export default function ProfilePage() {
                 <div className="bg-white rounded-2xl shadow p-4">
                     <h2 className="font-semibold text-gray-700 mb-3">Mon abonnement</h2>
                     {sub?.is_pro ? (
-                        <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200">
-                            <span className="text-2xl">💎</span>
-                            <div>
-                                <p className="font-bold text-green-700">Plan Pro actif</p>
-                                {sub.valid_until && (
-                                    <p className="text-xs text-gray-500">
-                                        Expire le {new Date(sub.valid_until).toLocaleDateString('fr-FR')}
-                                    </p>
-                                )}
+                        /* ── Plan Pro actif ── */
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 p-3 bg-green-50 rounded-xl border border-green-200">
+                                <span className="text-2xl">💎</span>
+                                <div>
+                                    <p className="font-bold text-green-700">Plan Pro actif</p>
+                                    {sub.valid_until && (
+                                        <p className="text-xs text-gray-500">
+                                            Expire le {new Date(sub.valid_until).toLocaleDateString('fr-FR')}
+                                        </p>
+                                    )}
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 gap-2 text-xs text-gray-600">
+                                {[
+                                    { icon: '✅', label: 'Annonces illimitées' },
+                                    { icon: '💸', label: 'Commission réduite : 6% par vente' },
+                                    { icon: '🚀', label: 'Boost prioritaire dans les résultats' },
+                                    { icon: '🏅', label: 'Badge Pro sur votre profil' },
+                                ].map(f => (
+                                    <div key={f.label} className="flex items-center gap-2">
+                                        <span>{f.icon}</span><span>{f.label}</span>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ) : (
+                        /* ── Plan Gratuit ── */
                         <div className="space-y-3">
-                            <div className="flex items-center justify-between text-sm">
-                                <span className="text-gray-600">Annonces gratuites utilisées</span>
-                                <span className={`font-bold ${sub?.remaining_free === 0 ? 'text-red-500' : 'text-gray-800'}`}>
-                                    {sub?.listings_used ?? '…'} / {sub?.max_free_listings ?? 5}
-                                </span>
-                            </div>
-                            <div className="w-full bg-gray-100 rounded-full h-2">
-                                <div
-                                    className={`h-2 rounded-full transition-all ${sub?.remaining_free === 0 ? 'bg-red-500' : 'bg-green-500'}`}
-                                    style={{ width: `${Math.min(100, ((sub?.listings_used ?? 0) / 5) * 100)}%` }}
-                                />
-                            </div>
-                            {sub?.remaining_free === 0 && (
-                                <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 text-sm text-amber-700">
-                                    Limite atteinte. Passez au plan Pro pour continuer à publier.
+                            {/* Comparatif Free vs Pro */}
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                                <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
+                                    <p className="font-bold text-gray-700 mb-2">Gratuit (actuel)</p>
+                                    {[
+                                        { icon: '✅', label: 'Annonces illimitées' },
+                                        { icon: '💸', label: 'Commission : 8%' },
+                                        { icon: '❌', label: 'Pas de boost' },
+                                        { icon: '❌', label: 'Pas de badge Pro' },
+                                    ].map(f => (
+                                        <div key={f.label} className="flex items-center gap-1.5 mb-1 text-gray-500">
+                                            <span className="text-xs">{f.icon}</span><span>{f.label}</span>
+                                        </div>
+                                    ))}
                                 </div>
-                            )}
-                            <p className="text-xs text-gray-400">
-                                {sub?.remaining_free > 0
-                                    ? `Il vous reste ${sub.remaining_free} annonce(s) gratuite(s)`
-                                    : 'Plan gratuit — 5 annonces maximum'}
-                            </p>
+                                <div className="bg-green-50 rounded-xl p-3 border border-green-200">
+                                    <p className="font-bold text-green-700 mb-2">Pro 💎</p>
+                                    {[
+                                        { icon: '✅', label: 'Annonces illimitées' },
+                                        { icon: '💸', label: 'Commission : 6%' },
+                                        { icon: '🚀', label: 'Boost prioritaire' },
+                                        { icon: '🏅', label: 'Badge Pro' },
+                                    ].map(f => (
+                                        <div key={f.label} className="flex items-center gap-1.5 mb-1 text-green-700">
+                                            <span className="text-xs">{f.icon}</span><span>{f.label}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                             <Link to="/upgrade"
                                 className="block w-full text-center bg-green-600 hover:bg-green-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">
-                                💎 Passer au plan Pro — annonces illimitées
+                                💎 Passer au plan Pro — commission à 6%
                             </Link>
                         </div>
                     )}
