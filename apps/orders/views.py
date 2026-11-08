@@ -1,4 +1,4 @@
-from rest_framework import generics, status, permissions
+from rest_framework import generics, status, permissions, parsers
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.throttling import AnonRateThrottle, SimpleRateThrottle
@@ -2067,6 +2067,64 @@ class AdminEssaiReturnResolveView(APIView):
             # Prix article jamais débité → aucun remboursement à effectuer
             'message':  '10 000 GNF déduits du prochain paiement vendeur. Prix article jamais débité à l\'acheteur.' if action == 'deduct_vendor'
                         else 'Clôturé sans pénalité vendeur. Prix article jamais débité à l\'acheteur.',
+        })
+
+
+# ── Admin : confirmer collecte avec photo obligatoire ────────────────────────
+
+class AdminConfirmPickupView(APIView):
+    """
+    Admin : marquer une commande comme collectée chez le vendeur.
+    Requiert une photo du colis emballé (multipart/form-data).
+    POST /orders/admin/orders/<pk>/confirm-pickup/
+    body: { photo: <file> }  — photo obligatoire
+    """
+    permission_classes = [IsAdmin]
+    parser_classes     = [parsers.MultiPartParser, parsers.FormParser]
+
+    def post(self, request, pk):
+        from django.utils import timezone
+        order = get_object_or_404(Order, pk=pk)
+
+        if order.status != Order.Status.CONFIRMED:
+            return Response(
+                {'detail': f'Statut actuel : {order.status}. La collecte ne peut être confirmée que sur une commande "confirmée".'},
+                status=400,
+            )
+
+        photo = request.FILES.get('photo')
+        if not photo:
+            return Response({'detail': 'La photo du colis est obligatoire.'}, status=400)
+
+        order.pickup_photo        = photo
+        order.pickup_collected_at = timezone.now()
+        order.status              = Order.Status.PICKUP_CONFIRMED
+        order.save(update_fields=['pickup_photo', 'pickup_collected_at', 'status', 'updated_at'])
+
+        # Notifier le vendeur et l'acheteur
+        try:
+            from apps.notifications.models import Notification
+            Notification.send(
+                user=order.seller,
+                type=Notification.Type.ORDER_UPDATE,
+                title='📦 Colis collecté',
+                body=f'Votre article « {order.listing.title} » a été collecté par notre livreur. Il sera déposé au point de retrait sous peu.',
+                data={'order_id': str(order.id)},
+            )
+            Notification.send(
+                user=order.buyer,
+                type=Notification.Type.ORDER_UPDATE,
+                title='🚚 Votre commande est en route',
+                body=f'« {order.listing.title} » a été collecté chez le vendeur. Il sera disponible au point de retrait très prochainement.',
+                data={'order_id': str(order.id)},
+            )
+        except Exception:
+            pass
+
+        return Response({
+            'status':              'pickup_confirmed',
+            'pickup_collected_at': order.pickup_collected_at.isoformat(),
+            'pickup_photo_url':    request.build_absolute_uri(order.pickup_photo.url) if order.pickup_photo else None,
         })
 
 

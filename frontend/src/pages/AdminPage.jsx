@@ -98,6 +98,15 @@ const adminAPI = {
   getEssaiReturns: () => api.get('/orders/admin/orders/', { params: { status: 'retourne', page_size: 200 } }),
   resolveEssaiReturn: (id, action) => api.post(`/orders/admin/orders/${id}/resolve-return/`, { action }),
 
+  // Collecte avec photo obligatoire
+  confirmPickup: (id, photoFile) => {
+    const fd = new FormData()
+    fd.append('photo', photoFile)
+    return api.post(`/orders/admin/orders/${id}/confirm-pickup/`, fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+  },
+
   // Capital de roulement
   getCapital:           ()          => api.get('/orders/admin/capital/'),
   injectCapital:        (amount)    => api.post('/orders/admin/capital/', { amount_gnf: amount }),
@@ -1814,11 +1823,19 @@ function TabDeliveries() {
 // ── Onglet : Toutes les commandes ─────────────────────────────────────────────
 
 function TabOrders() {
-  const [search, setSearch]     = useState('')
+  const qc = useQueryClient()
+  const [search, setSearch]       = useState('')
   const [statusFilter, setStatus] = useState('')
-  const [modeFilter, setMode]   = useState('')
+  const [modeFilter, setMode]     = useState('')
 
-  const { data, isLoading } = useQuery({
+  // Photo collecte
+  const fileRef        = useRef(null)
+  const [pickupOrderId, setPickupOrderId]     = useState(null)   // ordre en attente de photo
+  const [pickupPreview, setPickupPreview]     = useState(null)   // prévisualisation locale
+  const [pickupFile, setPickupFile]           = useState(null)
+  const [pickupError, setPickupError]         = useState('')
+
+  const { data, isLoading, refetch } = useQuery({
     queryKey: ['admin-orders', search, statusFilter, modeFilter],
     queryFn:  () => adminAPI.getOrders({
       search:  search        || undefined,
@@ -1828,15 +1845,37 @@ function TabOrders() {
   })
   const orders = Array.isArray(data) ? data : []
 
-  const ORDER_STATUS = {
-    pending:   { label: '⏳ En attente',  color: 'bg-gray-100 text-gray-600' },
-    paid:      { label: '💳 Payée',       color: 'bg-blue-100 text-blue-700' },
-    confirmed: { label: '✅ Confirmée',    color: 'bg-emerald-100 text-emerald-700' },
-    completed: { label: '🏁 Terminée',    color: 'bg-green-100 text-green-700' },
-    disputed:  { label: '⚠️ Litige',      color: 'bg-red-100 text-red-700' },
-    cancelled: { label: '❌ Annulée',     color: 'bg-red-50 text-red-500' },
+  const confirmPickupMutation = useMutation({
+    mutationFn: ({ id, file }) => adminAPI.confirmPickup(id, file),
+    onSuccess: () => {
+      refetch()
+      qc.invalidateQueries(['admin-orders'])
+      setPickupOrderId(null); setPickupPreview(null); setPickupFile(null); setPickupError('')
+    },
+    onError: (err) => setPickupError(err.response?.data?.detail || 'Erreur lors de l\'upload.'),
+  })
+
+  const handleFileChange = (e) => {
+    const f = e.target.files[0]
+    if (!f) return
+    setPickupFile(f)
+    setPickupPreview(URL.createObjectURL(f))
+    setPickupError('')
   }
-  const MODE_LABELS = { home_delivery: '🚚 Livraison', pickup: '📦 Retrait', meetup: '🤝 Rencontre' }
+
+  const ORDER_STATUS = {
+    pending:          { label: '⏳ En attente',          color: 'bg-gray-100 text-gray-600' },
+    paid:             { label: '💳 Payée',               color: 'bg-blue-100 text-blue-700' },
+    confirmed:        { label: '✅ Confirmée',            color: 'bg-emerald-100 text-emerald-700' },
+    pickup_confirmed: { label: '🚚 Collecté',            color: 'bg-cyan-100 text-cyan-700' },
+    au_point_retrait: { label: '📦 Au PDR',              color: 'bg-indigo-100 text-indigo-700' },
+    en_essai:         { label: '🔍 En essai',            color: 'bg-purple-100 text-purple-700' },
+    completed:        { label: '🏁 Terminée',            color: 'bg-green-100 text-green-700' },
+    disputed:         { label: '⚠️ Litige',              color: 'bg-red-100 text-red-700' },
+    retourne:         { label: '↩️ Retourné',            color: 'bg-orange-100 text-orange-700' },
+    cancelled:        { label: '❌ Annulée',             color: 'bg-red-50 text-red-500' },
+  }
+  const MODE_LABELS = { home_delivery: '🚚 Livraison', pickup_point: '📦 PDR', meeting_point: '🤝 Rencontre' }
 
   return (
     <div className="space-y-5">
@@ -1852,15 +1891,15 @@ function TabOrders() {
           className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
           <option value="">Tous statuts</option>
           {Object.entries(ORDER_STATUS).map(([v, { label }]) => (
-            <option key={v} value={v}>{label.replace(/[⏳💳✅🏁⚠️❌] /g, '')}</option>
+            <option key={v} value={v}>{label}</option>
           ))}
         </select>
         <select value={modeFilter} onChange={e => setMode(e.target.value)}
           className="border border-gray-300 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-500">
           <option value="">Tous modes</option>
           <option value="home_delivery">Livraison à domicile</option>
-          <option value="pickup">Point de retrait</option>
-          <option value="meetup">Rencontre</option>
+          <option value="pickup_point">Point de retrait</option>
+          <option value="meeting_point">Rencontre</option>
         </select>
       </div>
 
@@ -1876,22 +1915,72 @@ function TabOrders() {
         <div className="space-y-2">
           {orders.map(o => {
             const st = ORDER_STATUS[o.status] || { label: o.status, color: 'bg-gray-100 text-gray-500' }
+            const isPickupPending = pickupOrderId === o.id
             return (
-              <div key={o.id} className="bg-white rounded-2xl shadow p-4 flex items-center gap-4">
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold text-gray-800 truncate">{o.listing_title}</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    🛒 {o.buyer_name}
-                    <span className="text-gray-300"> → </span>
-                    🏷️ {o.seller_name}
-                    {o.delivery_mode && <span className="ml-2">{MODE_LABELS[o.delivery_mode] || o.delivery_mode}</span>}
-                  </p>
-                  <p className="text-xs text-gray-300">{new Date(o.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })}</p>
+              <div key={o.id} className="bg-white rounded-2xl shadow p-4 space-y-3">
+                <div className="flex items-center gap-4">
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-gray-800 truncate">{o.listing_title}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      🛒 {o.buyer_name}
+                      <span className="text-gray-300"> → </span>
+                      🏷️ {o.seller_name}
+                      {o.delivery_mode && <span className="ml-2">{MODE_LABELS[o.delivery_mode] || o.delivery_mode}</span>}
+                    </p>
+                    <p className="text-xs text-gray-300">{new Date(o.created_at).toLocaleDateString('fr-FR', { day:'2-digit', month:'short', year:'numeric' })}</p>
+                  </div>
+                  <div className="flex flex-col items-end gap-1.5 flex-shrink-0">
+                    <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
+                    <span className="text-sm font-bold text-green-600">{fmt(o.amount_gnf)}</span>
+                    {/* Bouton photo collecte — uniquement sur commandes confirmées */}
+                    {o.status === 'confirmed' && !isPickupPending && (
+                      <button
+                        onClick={() => { setPickupOrderId(o.id); setPickupPreview(null); setPickupFile(null); setPickupError('') }}
+                        className="text-xs bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 px-3 py-1.5 rounded-lg transition font-medium"
+                      >📸 Photo collecte</button>
+                    )}
+                    {/* Afficher la photo collecte si déjà uploadée */}
+                    {o.pickup_photo_url && (
+                      <a href={o.pickup_photo_url} target="_blank" rel="noreferrer"
+                        className="text-xs text-green-600 underline">📷 Voir photo</a>
+                    )}
+                  </div>
                 </div>
-                <div className="flex flex-col items-end gap-1 flex-shrink-0">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${st.color}`}>{st.label}</span>
-                  <span className="text-sm font-bold text-green-600">{fmt(o.amount_gnf)}</span>
-                </div>
+
+                {/* Zone upload photo — inline sous la commande */}
+                {isPickupPending && (
+                  <div className="border border-cyan-200 bg-cyan-50 rounded-xl p-4 space-y-3">
+                    <p className="text-sm font-semibold text-cyan-800">📸 Photo du colis emballé (obligatoire)</p>
+                    {pickupError && <p className="text-xs text-red-600">{pickupError}</p>}
+                    <div
+                      onClick={() => fileRef.current?.click()}
+                      className="border-2 border-dashed border-cyan-300 rounded-xl p-3 cursor-pointer hover:border-cyan-500 transition text-center"
+                    >
+                      {pickupPreview ? (
+                        <img src={pickupPreview} alt="preview" className="max-h-32 mx-auto rounded-lg object-contain" />
+                      ) : (
+                        <div className="text-cyan-400">
+                          <p className="text-2xl mb-1">📦</p>
+                          <p className="text-xs">Cliquer pour choisir une photo</p>
+                        </div>
+                      )}
+                    </div>
+                    <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleFileChange} className="hidden" />
+                    <div className="flex gap-2">
+                      <button
+                        disabled={!pickupFile || confirmPickupMutation.isPending}
+                        onClick={() => pickupFile && confirmPickupMutation.mutate({ id: o.id, file: pickupFile })}
+                        className="flex-1 bg-cyan-600 hover:bg-cyan-700 text-white font-semibold py-2 rounded-xl text-sm transition disabled:opacity-50"
+                      >
+                        {confirmPickupMutation.isPending ? 'Envoi…' : '✅ Confirmer la collecte'}
+                      </button>
+                      <button
+                        onClick={() => { setPickupOrderId(null); setPickupPreview(null); setPickupFile(null) }}
+                        className="px-4 bg-gray-100 hover:bg-gray-200 text-gray-600 rounded-xl text-sm transition"
+                      >Annuler</button>
+                    </div>
+                  </div>
+                )}
               </div>
             )
           })}

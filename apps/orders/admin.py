@@ -50,7 +50,7 @@ class OrderAdmin(admin.ModelAdmin):
         'listing__title', 'listing__pickup_address',
         'pickup_point__name',
     )
-    readonly_fields = ('id', 'created_at', 'updated_at', 'adresse_collecte_detail')
+    readonly_fields = ('id', 'created_at', 'updated_at', 'adresse_collecte_detail', 'pickup_photo_preview')
     ordering       = ('-created_at',)
     actions        = ['confirm_orders', 'marquer_collecte', 'marquer_au_pdr', 'cancel_orders']
 
@@ -59,7 +59,7 @@ class OrderAdmin(admin.ModelAdmin):
             'fields': ('id', 'status', 'listing', 'buyer', 'seller', 'created_at', 'updated_at'),
         }),
         ('🚚 Collecte & Dépôt PDR', {
-            'fields': ('adresse_collecte_detail', 'pickup_point', 'delivery_mode'),
+            'fields': ('adresse_collecte_detail', 'pickup_point', 'delivery_mode', 'pickup_photo', 'pickup_photo_preview', 'pickup_collected_at'),
             'classes': ('wide',),
             'description': 'Adresse de collecte chez le vendeur → Point de retrait acheteur',
         }),
@@ -102,6 +102,16 @@ class OrderAdmin(admin.ModelAdmin):
             return f"{addr or '⚠️ Non renseignée'}  —  Tél vendeur : {phone}"
         except Exception:
             return '—'
+
+    @admin.display(description='🖼️ Photo collecte')
+    def pickup_photo_preview(self, obj):
+        from django.utils.html import format_html
+        if obj.pickup_photo:
+            return format_html(
+                '<a href="{}" target="_blank"><img src="{}" style="max-height:120px;border-radius:8px;border:1px solid #e5e7eb;" /></a>',
+                obj.pickup_photo.url, obj.pickup_photo.url,
+            )
+        return '— Pas encore de photo'
 
     @admin.display(description='Point de retrait')
     def pickup_point_name(self, obj):

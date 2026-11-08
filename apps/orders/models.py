@@ -195,6 +195,17 @@ class Order(BaseModel):
         default=False,
         help_text="Retour essai traité par l'admin (remboursement acheteur + déduction vendeur si applicable)"
     )
+
+    # ── Photo de collecte (obligatoire avant pickup_confirmed) ────────────────
+    pickup_photo        = models.ImageField(
+        upload_to='pickup_photos/', null=True, blank=True,
+        help_text="Photo du colis emballé prise par le livreur lors de la collecte chez le vendeur"
+    )
+    pickup_collected_at = models.DateTimeField(
+        null=True, blank=True,
+        help_text="Date/heure exacte de la collecte chez le vendeur"
+    )
+
     delivery_distance_km   = models.DecimalField(max_digits=7, decimal_places=2, null=True, blank=True,
                                                  help_text="Distance de livraison en km (GPS ou saisie manuelle)")
     delivery_weight_kg     = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True,
