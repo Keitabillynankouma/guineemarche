@@ -39,10 +39,11 @@ def _collect_suspicious_listings(since):
         })
 
     # 2. Descriptions très courtes (moins de 20 caractères)
+    from django.db.models.functions import Length
     short_desc = Listing.objects.filter(
         created_at__gte=since,
         status=Listing.Status.ACTIVE,
-    ).extra(where=["LENGTH(description) < 20"])[:20]
+    ).annotate(desc_len=Length('description')).filter(desc_len__lt=20)[:20]
     for l in short_desc:
         suspects.append({
             'id': str(l.id), 'title': l.title,
@@ -52,11 +53,11 @@ def _collect_suspicious_listings(since):
         })
 
     # 3. Vendeurs ayant publié plus de 5 annonces en 24h
-    from django.db.models import Count
+    from django.db.models import Count as _Count
     bulk_sellers = Listing.objects.filter(
         created_at__gte=since,
     ).values('seller__phone_number', 'seller__id').annotate(
-        count=Count('id')
+        count=_Count('id')
     ).filter(count__gte=5).order_by('-count')
 
     for s in bulk_sellers:
@@ -77,9 +78,10 @@ def _collect_suspicious_accounts(since):
     suspects = []
 
     # 1. Comptes créés depuis moins de 24h avec annonces déjà publiées
+    from django.db.models import Count as _Count2
     new_with_listings = User.objects.filter(
         created_at__gte=since,
-    ).annotate(listing_count=__import__('django.db.models', fromlist=['Count']).Count('listings')).filter(
+    ).annotate(listing_count=_Count2('listings')).filter(
         listing_count__gte=3
     ).values('phone_number', 'full_name', 'created_at', 'listing_count')
 
@@ -117,11 +119,15 @@ def _collect_payment_anomalies(since):
     anomalies = []
 
     # Paiements échoués répétés sur le même vendeur
+    from django.db.models import Count as _Count3
+    failed_status = getattr(Payment.Status, 'FAILED', None) or getattr(Payment.Status, 'failed', None)
+    if not failed_status:
+        return anomalies  # statut FAILED non défini sur ce modèle
     failed = Payment.objects.filter(
         created_at__gte=since,
-        status=Payment.Status.FAILED,
+        status=failed_status,
     ).values('order__seller__phone_number').annotate(
-        count=__import__('django.db.models', fromlist=['Count']).Count('id')
+        count=_Count3('id')
     ).filter(count__gte=3).order_by('-count')
 
     for f in failed:
@@ -156,7 +162,7 @@ def _analyze_with_claude(suspicious_listings, suspicious_accounts, payment_anoma
         }
 
         response = client.messages.create(
-            model='claude-haiku-4-5-20251001',
+            model='claude-haiku-5-5',
             max_tokens=800,
             system="""Tu es l'agent de sécurité de Guimatrix, une marketplace guinéenne.
 Analyse les données de sécurité des dernières 24h et produis un rapport concis en français.

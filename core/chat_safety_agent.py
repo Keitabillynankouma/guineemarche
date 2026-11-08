@@ -34,14 +34,24 @@ _PHONE_RE = re.compile(
 
 # Mots-clés d'arnaque courants (variantes avec fautes incluses)
 _SCAM_KEYWORDS = [
-    'western union', 'moneygram', 'wave money', 'ria money',
-    'virer', 'virement bancaire', 'numéro de compte',
-    'rib ', ' rib', 'iban',
-    'je pars demain', 'départ demain', 'voyage urgent',
+    # Transferts d'argent hors plateforme
+    'western union', 'moneygram', 'wave money', 'ria money', 'orange money',
+    'mtn money', 'virer', 'virement bancaire', 'numéro de compte',
+    'rib ', ' rib', 'iban', 'envoyer l\'argent', 'envoie l\'argent',
+    # Urgence artificielle
+    'je pars demain', 'départ demain', 'voyage urgent', 'je quitte',
+    'je pars ce soir', 'disponible aujourd\'hui seulement', 'offre expire',
+    # Arnaque avance / acompte
     'acompte', 'avance', 'avancer l\'argent', 'envoyer d\'abord',
-    'payer avant', 'prix spécial rien que pour vous',
-    'contactez-moi sur whatsapp', 'mon whatsapp', 'whatsapp perso',
+    'payer avant', 'frais de livraison', 'frais de douane',
+    'déblocage', 'frais administratifs',
+    # Hors plateforme
+    'prix spécial rien que pour vous', 'contactez-moi sur whatsapp',
+    'mon whatsapp', 'whatsapp perso', 'telegram perso',
     'hors site', 'en dehors', 'en privé',
+    # Fraudes locales guinéennes
+    'envoie d\'abord', 'je te fais confiance', 'tu peux payer maintenant',
+    'c\'est un cadeau', 'je suis à l\'étranger', 'militaire', 'soldat',
 ]
 
 # URLs externes (on blackliste tout lien qui n'est pas guimatrix.com)
@@ -104,7 +114,7 @@ def _ai_scan(content: str) -> dict | None:
         import anthropic
         client = anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
-            model='claude-haiku-4-5-20251001',
+            model='claude-haiku-5-5',
             max_tokens=150,
             system="""Tu analyses des messages sur une marketplace guinéenne (Guimatrix) pour détecter les arnaques.
 Retourne UNIQUEMENT un JSON sans texte autour :
